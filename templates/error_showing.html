@@ -1,0 +1,12 @@
+{% extends "main.html" %}
+{% block title %}Logs of {{container_id}}{% endblock %}
+{% block head %}
+{{ super() }}
+
+{% endblock %}
+{% block content %}
+<div id="errors">
+    <p class="h1">Oh no! An error Occurred.</p>
+    <div>Your request could not be retrieved because of some problem. Here is what happened: {{r|safe}}.</div>
+</div>
+{% endblock %}

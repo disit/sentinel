@@ -1,0 +1,1089 @@
+{% extends "main.html" %}
+{% block title %}SnapSentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<!-- data-bs-theme="dark" -->
+<script>
+	var donotupdate = false;
+	var test_results;
+	var test_results_divs = {};
+	var data_tables = {};
+	const extra_data_locations = [
+		{%for item in extra_data%}['{{item[0]}}', '{{item[1]}}', '{{item[2]}}', '{{item[3]}}'],
+		{% endfor %}
+	];
+	var less_columns = true;
+	
+	var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 2, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 6, visible: false},{target: 7, visible: false},{target: 8, visible: false},{target: 9, visible: false},{target: 10, visible: false},{target: 11, visible: false},{target: 13, visible: false},{target: 14, visible: false},{target: 15, visible: false},{target: 16, visible: false},{target: 17, visible: false},{target: 19, visible: false}]};
+	var container_rows = {};
+	var iframes = {};
+	var closed_categories = new Set();
+	var logs_for_categories = {};
+	var stored_pings_results = {};
+	var button_data = [
+		{%for element in extra%}
+		{'data':`<div class="row align-items-start"><div class="col"><input type="button" name="{{element[1]}}" id="{{element[1]}}" value="{{element[1]}}" class="form-control" onclick="runComplexTests(this, '{{element[7]}}')" style="background: {{element[4]}}; color: {{element[6]}}"/>
+				<div>{{element[5]|safe}}</div></div>
+				{%if element[3] != None%}{% for element_2 in element[3].split(';') %}{% set parts = element_2.split(':') %}
+					<input type="{{ parts[0] }}" id="{{ parts[2] }}-{{element[1]}}" name="{{ parts[2] }}" placeholder="{{parts[1]}}" class="form-control"></div>{% endfor %}{%endif%}
+				<div class="col" id="{{element[1]}}-result">No data yet...</div></div>`, 'type':`{{element[7]|safe}}`},
+		{%endfor%}
+	];
+	
+	const lookupTable = {
+		{%for item in categories%}'{{item[0]}}': ['{{item[1]}}','{{item[2]|safe}}','{{item[3]|safe}}'],
+		{% endfor %}'nothing': 'nothing'
+	};
+	
+	async function toggleUpdate() {
+		if (donotupdate) {
+			document.getElementById("buttonForUpdates").innerHTML = "Stop containers refresh";
+			donotupdate = false;
+		}
+		else {
+			document.getElementById("buttonForUpdates").innerHTML = "Resume containers refresh";
+			donotupdate = true;
+			//after 30 minutes, resume updates in case user forgot to turn them on
+			await smartSleep(1800000);
+			document.getElementById("buttonForUpdates").innerHTML = "Stop containers refresh";
+			donotupdate = false;
+		}
+	}
+	
+	function smartSleep(ms) {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+	
+	$( function() {
+		$( "#draggable" ).draggable({ cancel: "p.ui-widget-header" });
+	} );
+	
+	
+	
+	$(document).ready(async function askcontainers() {
+	{% block additional_content_admin_log_datatable_trigger %}{% endblock %}
+	$('.close').on('click', 
+		function() {
+			$('#passwordModal').modal('hide');
+		});
+		while (1) {
+			if (!donotupdate) {
+				update_routine();
+			}
+			await smartSleep(120000);
+		}
+	});
+	
+	async function get_muted_components() {
+		try {
+			$.ajax({
+				url: './get_muted_components',
+				type: 'GET',
+				success: function(response) {
+					response.forEach(current_item => {
+						try {
+							document.getElementById("mutebutton-"+current_item[1]).class="btn btn-warning";
+							document.getElementById("mutebutton-"+current_item[1]).value="Currently muted";
+							
+						}
+						catch (exception_var) {
+							//nothing, this is fine
+						}
+					});
+				},
+				error: function(error) {
+					console.log("Error!: "+error);
+				}
+			});
+		}
+		catch (exception_var) {
+			console.log(exception_var);
+		}
+	}
+	
+	async function better_get_all_tests() {
+		try {
+			$.ajax({
+				url: './test_all_ports',
+				type: 'GET',
+				success: function(response) {
+					for (a in response) {
+						try {
+							if (a != "nothing") {
+								document.getElementById(a+"-result").innerHTML=response[a];
+								}
+						}
+						catch (exception_var) {
+							//nothing, this is fine
+						}
+					}
+				},
+				error: function(error) {
+					console.log("Error!: "+error);
+				}
+			});
+		}
+		catch (exception_var) {
+			console.log(exception_var);
+		}
+	
+	}
+	
+	async function update_routine() {
+	
+		var allTables = $.fn.dataTable.tables();
+		delete allTables[0];
+		$.each(allTables, function(index, table) { 
+			testthisthingffs = structuredClone(dict_of_hidden_columns);
+			testthisthingffs['destroy'] = true;
+			var dataTable = $(table).DataTable(testthisthingffs);
+		});
+		getcontainers();
+		testsResults();
+		showTestResults();
+		$("table[id^='table-']").DataTable();
+		document.getElementById("last-update").innerHTML = "Last update: " + new Date().toLocaleString();
+		cg = colorGenerator();
+		better_get_all_tests();
+		const logs = document.querySelectorAll('p');
+		logs.forEach(current_log => {
+			if (current_log.id.endsWith("logs"))
+			logs_for_categories[current_log.id]=current_log.innerHTML;
+		});
+		var see_logs = document.getElementById('see_logs');
+		var lines = see_logs.innerHTML.split('<br>');
+		get_muted_components();
+		if (lines.length > 100) {
+			lines = lines.slice(lines.length - 100);
+			see_logs.innerHTML = lines.join('<br>');
+		}
+	};
+	
+	function getcontainers(){
+		try {
+			$.ajax({
+				url: './advanced_read_containers',
+				type: 'POST',
+				success: function(response) {
+					makeTable(response);
+				},
+				error: function(error) {
+					logging(error);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+		
+	};
+	async function rebootContainer(containerID, element) {
+		element.value = "Restarting...";
+		try {
+			logging(containerID+' received an attempted rebooting!', element.parentElement.parentElement.parentElement.parentElement.parentElement.parentElement.parentElement.parentElement.id+'-logs');
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+		//make it look like the operation takes some time if it is too fast
+		element.value = "Restart";
+	};
+	function testsResults() {
+		try {
+			$.ajax({
+				url: './tests_results',
+				type: 'POST',
+				success: function(response) {
+					setTestResults(response);
+					},
+				error: function(error) {
+					logging(error);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+	};
+	
+	function sendRequest(url_to_be_used, store_location) {
+		try {
+			$.ajax({
+				url: './get_data_from_source',
+				type: 'GET',
+				data: {"url_of_resource":url_to_be_used},
+				success: function(data, textStatus, jqXHR) {
+					store_location.innerHTML = data;
+					logging(data+ textStatus+ jqXHR);
+					return;
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					logging(errorThrown+ textStatus+ jqXHR);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+	};
+	
+	function get_complex_tests(){
+		try {
+			$.ajax({
+				url: './get_complex_tests',
+				type: 'GET',
+				success: function(response) {
+					for (const element of response) {
+						try {
+						document.getElementById(element[3]+'-result').innerHTML=element[2];
+						}
+						catch (exception_var) {
+							logging("Error in obtaining complex tests: "+ exception_var + ' - ' + element);
+						}
+					}
+					logging(response);
+				},
+				error: function(error) {
+					logging(error);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+	};
+	
+	async function runTests(container, element, location) {
+		const currentTime = Date.now();
+		const button = event.target;
+		if (!button.lastExecutionTime) {
+			button.lastExecutionTime = 0;
+		}
+		if (currentTime - button.lastExecutionTime >= 3000) {
+			button.lastExecutionTime = currentTime;
+		} else {
+			alert("You cannot perform this action, wait a few seconds.");
+			return;
+		}
+		element.value = "Checking the port...";
+		document.getElementById(container+'-result').innerHTML= 'Pending... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+		try {
+			$.ajax({
+				url: './run_test',
+				type: 'POST',
+				data: {container: container},
+				success: function(response) {
+					if (response==="") response = "No test was found for this component."; 
+					logging("<b>" + element.name + "</b> had its port checked and the result was: <b>"+response[0]+'</b><br>Complete response: ' + response[1] + '<hr>', location+'-logs');
+					test_results[container] = response;
+					stored_pings_results[container] = response;
+				},
+				error: function(error) {
+					logging(error);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+		element.value = "Check the port...";
+	};
+	
+	function load_db() {
+		try {
+			$.ajax({
+				url: './load_db',
+				type: 'POST',
+				success: function(response) {
+					logging(response);
+				},
+				error: function(error) {
+					logging(error);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+	};
+	
+	async function runComplexTests(test_element, category) {
+		const currentTime = Date.now();
+		const button = event.target;
+		if (!button.lastExecutionTime) {
+			button.lastExecutionTime = 0;
+		}
+		if (currentTime - button.lastExecutionTime >= 3000) {
+			button.lastExecutionTime = currentTime;
+		} else {
+			alert("You cannot perform this action, wait a few seconds.");
+			return;
+		}
+		try {
+			var oldtext = test_element.name;
+			test_element.value = "Running " + test_element.value;
+			document.getElementById(oldtext+'-result').innerHTML= 'Pending... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			let test_family = test_element.parentElement.querySelectorAll('input');
+			let test_name = test_family[0].value;
+			let dict_to_be_sent = {};
+			dict_to_be_sent['test_name'] = oldtext;
+			test_family.forEach(el => {dict_to_be_sent[el.name]=el.value});
+			delete dict_to_be_sent[test_element.name];
+			$.ajax({
+				url: './run_test_complex',
+				type: 'POST',
+				data: dict_to_be_sent,
+				success: function(response) {
+					logging(category + " - Complex test was ran: "+response, category+"-logs");
+					document.getElementById(oldtext+'-result').innerHTML=response;
+				},
+				error: function(error) {
+					logging(oldtext + " - " + error.statusText ,category+"-logs");
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+		test_element.value = oldtext;
+	};
+	
+	function setTestResults(results) {
+		test_results = results;
+		try {
+			test_results.forEach((element) => {
+				test_results_divs[element[3]]=element[2];
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+	};
+	
+	function logging(logging_str, log_destination="see_logs") {
+		if (log_destination==="") { 
+			log_destination = "see_logs"; 
+		}
+		document.getElementById(log_destination).innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+		logs_for_categories[log_destination] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		if (log_destination!="see_logs") { 
+			document.getElementById("see_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+			logs_for_categories["see_logs"] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		}
+	};
+	
+	const buttons = document.querySelectorAll('input[type="button"]');
+	
+	async function getSummary() {
+		try {
+			$.ajax({
+				url: './get_summary_status',
+				type: 'GET',
+				success: function(response) {
+					for (const element of response) {
+						try {
+							document.getElementById(element[0]+'-status').innerHTML=element[0]+' - '+element[1];
+							} 
+						catch (e) {
+							if (e instanceof TypeError) {
+								return;
+							}
+							else {
+								logging(exception_var);
+							}
+						}
+		
+					}
+					logging(response);
+				},
+				error: function(error) {
+					logging(error);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+	};
+	
+	function getExtraData(url_of_resource, destination_element) {
+		try {
+			$.ajax({
+				url: "./get_data_from_source",
+				method: "GET",
+				data: {url_of_resource: url_of_resource[1]},
+				success: function(response) {
+					renderContentInIframe(response, destination_element, url_of_resource[3]);
+				},
+				error: function(xhr, status, error) {
+					var errorHtml = "<p>Error: Unable to fetch data from "+url_of_resource+" due to "+error+" with status "+status+"</p>";
+					renderContentInIframe(errorHtml, destination_element);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			console.error(exception_var+", please kill me");
+		}
+	};
+	
+	function renderContentInIframe(content, destination_element, description_data) {
+		var iframe = document.createElement('iframe');
+		iframe.setAttribute("style", "width: 100%; height: 450px;");
+		var description = document.createElement('div');
+		description.innerHTML = description_data;
+		destination_element.appendChild(description);
+		destination_element.appendChild(iframe);
+		var doc = iframe.contentWindow.document;
+		doc.open();
+		doc.write(content);
+		doc.close();
+	};
+	
+	function showTestResults() {
+		if (test_results==null) {
+			return; //not set yet
+		}
+		logging(test_results);
+		try {
+			test_results.forEach((element)=> {
+				try {
+					document.getElementById(element[3]+'-result').innerHTML=element[2];
+				}
+				catch (exception_var) {
+					logging('An orphan test with the name '+element[3]+' gave a result of: ' +element[2]);
+				} 
+			}) 
+		}
+		catch (exception_var) {
+			logging(exception_var);
+		}
+	};
+	
+	function getTestResult(container) {
+		test_results.forEach((element)=> {
+			try {
+				if (element[3] == container) {
+					document.getElementById[container].innerHTML=element[2];
+				}
+			}
+			catch (exception_var) {
+				console.error(exception_var);
+			}
+		})
+		return container;
+	};
+	
+	function createTable(headerData, rowData, name_of_table_value) {
+		try {
+			document.getElementById("table-"+name_of_table_value.replace(/\s+/g, '')).innerHTML="";
+		}
+		catch {
+			//it's fine
+		}
+		const table = document.createElement("table");
+		table.setAttribute("id", "table-"+name_of_table_value.replace(/\s+/g, ''));
+		table.setAttribute("class", "table table-striped table-bordered");
+		table.setAttribute("style", "table-layout: fixed; background-color: white;");
+		const thead = document.createElement("thead");
+		thead.setAttribute("class", "thead-dark");
+		const tbody = document.createElement("tbody");
+	
+		const headerRow = document.createElement("tr");
+		headerData.forEach(headerText => {
+			const th = document.createElement("th");
+			th.setAttribute("class", "column");
+			th.textContent = headerText;
+			headerRow.appendChild(th);
+		});
+		thead.appendChild(headerRow);
+	
+		rowData.forEach(rowValues => {
+			if (container_rows[rowValues["Name"]]) {
+				console.log("shouldn't update", rowValues["Name"]);
+				tbody.appendChild(container_rows[rowValues["Name"]]);
+				return;
+			}
+			const row = document.createElement("tr");
+			row.setAttribute("name", rowValues["Name"]);			
+			var elements = Object.values(rowValues);
+			var index_of_below_array = 0;
+			elements.forEach(cellData => {
+				const td = document.createElement("td");
+				if (index_of_below_array === 3) {
+					var content_of_id_cell = '<a target="_blank" href="./advanced-container/'+elements[12]+'">'+cellData+'</a>';
+					td.innerHTML = content_of_id_cell;
+				}
+				else if (index_of_below_array === 20) {
+					var content_of_id_cell;
+					if ((cellData === "running" != (elements[6] === "certbot/certbot")) && !elements[21].includes('unhealthy'))
+						content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+						else content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+					td.innerHTML = '<div id="'+elements[12]+'-reboot-result">'+content_of_id_cell+'</div>';
+				}
+				else {
+					td.textContent = cellData;
+				}
+				row.appendChild(td);
+				index_of_below_array = index_of_below_array + 1;
+			});
+			
+			var rebootbutton = document.createElement("td");
+			rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-containerid="`+elements[12]+`" data-containercategory="`+name_of_table_value+`">Reboot</button>`;
+			row.appendChild(rebootbutton);
+			var testsbutton = document.createElement("td");
+			testsbutton.innerHTML=`<input type="button" name="`+elements[12]+`" value="Check the port..." class="btn btn-info" onclick="runTests('`+elements[12]+`', this, '`+name_of_table_value+`')"/>`;
+			row.appendChild(testsbutton);
+			tbody.appendChild(row);
+			var testresults = document.createElement("td");
+			testresults.setAttribute('id',elements[12]+'-result');
+
+			var some_value;
+			for (const key in lookupTable) {
+				if (rowValues["Name"].startsWith(key.replace('*', ''))) {
+					some_value = lookupTable[key];
+				break;
+				}
+			}
+			if (!some_value) some_value = ["","Failure to retrieve contacts", "Failure to retrieve location"];
+			
+
+			var in_case_of_problems = document.createElement("td");
+			in_case_of_problems.innerHTML=some_value[1];
+			
+			var location_of_component = document.createElement("td");
+			location_of_component.innerHTML=some_value[2];
+			in_case_of_problems.innerHTML=some_value[1];
+
+			row.appendChild(testresults);
+			row.appendChild(in_case_of_problems);
+			row.appendChild(location_of_component);
+				
+			var do_not_update_this_td = document.createElement("td");
+			var do_not_update_this = document.createElement("input");
+			do_not_update_this.setAttribute("onclick", "toggle_update_this_line(this)");
+			do_not_update_this.setAttribute("class", "btn btn-info");
+			do_not_update_this.setAttribute("type", "button");
+			do_not_update_this.setAttribute("value", "Stop refreshing");
+			do_not_update_this_td.appendChild(do_not_update_this);
+			do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[12]+'" id="mutebutton-'+elements[12]+'">Mute</button>';
+			row.appendChild(do_not_update_this_td);
+			tbody.appendChild(row);
+			testresults.innerHTML=test_results_divs[row.childNodes[12].innerHTML];
+			if (testresults.innerHTML == "undefined") {
+				testresults.innerHTML = "No tests found";
+			}
+		});
+	
+		table.appendChild(thead);
+		table.appendChild(tbody);
+		const box = document.createElement("div");
+		box.setAttribute("class", "p-5 text-center");
+		box.setAttribute("style", "border-radius: 3rem; background-color: "+cg.next().value)
+		const name_of_table = document.createElement("h1");
+		name_of_table.setAttribute("class", "text-body-emphasis");
+		name_of_table.innerHTML = name_of_table_value;
+		box.appendChild(name_of_table);
+		box.appendChild(table);
+		return table;
+	};
+	
+	function makeTable(containerdata) {
+		const headerData = ["I/O" ,"CPU%", "Command", "ContainerID (click for container-logs)", "Created at", "ID", "Image", "Labels", "Local Volumes", "Mem%", "Mem Used / Mem Max", "Mounts", "Container Name", "Names", "Network I/O", "Networks", "PIDs", "Ports", "Running for / Exited since", "Size", "State", "Status", "Restart", "Is alive port test", "Last test results", "Contacts", "Location", "Operations"];
+		
+		const tableContainer = document.getElementById("table-container");
+		tableContainer.setAttribute("style", "display: flex; flex-wrap: wrap;")
+		tableContainer.innerText="";
+		containerdata.sort((a, b) => {
+			const nameA = a.Name.toUpperCase();
+			const nameB = b.Name.toUpperCase();
+			if (nameA < nameB) {
+				return -1;
+			}
+			if (nameA > nameB) {
+				return 1;
+			}
+				return 0;
+			}
+		);
+		const categorizedData = {};
+		
+		containerdata.forEach(item => {
+			const name = item.Name;
+			let category = 'Unknown';
+			for (const key in lookupTable) {
+				if (name.startsWith(key.replace('*', ''))) {
+					category = lookupTable[key][0];
+					break;
+				}
+			}
+			if (!categorizedData[category]) {
+				categorizedData[category] = [];
+			}
+			categorizedData[category].push(item);
+		});
+		
+		
+		const cg = colorGenerator();
+		var something = Object.keys(categorizedData).sort();
+		document.getElementById("category_menu").innerHTML="";
+		jQuery.each(something, function (item, val_2) {
+			var val = categorizedData[val_2];
+			var i = val_2;
+			const box = document.createElement("div");
+			box.setAttribute("class", "p-5 text-center");
+			box.setAttribute("style", "border-radius: 3rem; background-color: "+cg.next().value);
+			box.setAttribute("id",i);
+			if (!closed_categories.has(i)) box.style.display = "none"; else box.style.display = "block";
+				const centerer = document.createElement("div");
+				centerer.setAttribute("name", i);
+				const name_of_table = document.createElement("h1");
+				if (!closed_categories.has(i)) 
+					name_of_table.setAttribute("class", "btn btn-light btn-lg"); 
+				else 
+					name_of_table.setAttribute("class", "btn btn-light btn-lg");
+				name_of_table.setAttribute("onclick", "collapse_category('"+i+"', this)");
+				name_of_table.setAttribute("id", i+"-status");
+				name_of_table.innerHTML = i;
+				var menupage = document.getElementById("category_menu");
+				menupage.appendChild(name_of_table);
+				var div_for_category_name = document.createElement("h1");
+				div_for_category_name.innerHTML=i;
+				tableContainer.appendChild(centerer);
+				box.appendChild(div_for_category_name);
+				box.appendChild(createTable(headerData, val, i));
+				let a = 'table-'+i.replace(/\s+/g, '');
+				const parser = new DOMParser();
+				extra_data_locations.filter(innerArray => innerArray[0] === i).forEach(innerArray => {
+					getExtraData(innerArray, box);
+				});
+				if (add_complex_test_table_depending_on_category(i)) {
+					const complex_tests = document.createElement("div");
+					complex_tests.setAttribute("style", "background-color: white;");
+					complex_tests.innerHTML=add_complex_test_table_depending_on_category(i);
+					box.appendChild(complex_tests);
+				}
+				centerer.appendChild(box);
+				const category_logs = document.createElement("p");
+				category_logs.setAttribute("id", i+"-logs");
+				category_logs.setAttribute("class", "ui-widget-header");
+				category_logs.setAttribute("style", "text-align: left; min-height: 250px;");
+				box.appendChild(category_logs);
+				if (logs_for_categories[i+"-logs"]) category_logs.innerHTML=logs_for_categories[i+"-logs"];
+			
+			else console.log("Skipped unmanaged containers");
+			
+			});
+		get_summary_new();
+		who_has_issues();
+		get_complex_tests();
+		data_tables=$("table[id^='table-']").DataTable(dict_of_hidden_columns);
+		
+		$('.open-modal').on('click', function() {
+			var id = $(this).data('containerid');
+			var category = $(this).data('containercategory');
+			$('#containeridmodal').val(id);
+			$('#containercategorymodal').val(category);
+			$('#passwordModal').modal('show');
+		});
+		
+		$('.open-modal-m').on('click', function() {
+			var category = $(this).data('containercategory');
+			$('#containercategorymodalmuted').val(category);
+			var id = $(this).data('containerid');
+			$('#containeridmodalMute').val(id);
+			$('#muteComponent').modal('show');
+		});
+		
+		$('#attemptReboot').on('click', function() {
+			var password = $('#passwordInput').val();
+			var id = $('#containeridmodal').val();
+			var category = $('#containercategorymodal').val();
+			var result_loc = document.getElementById(id+"-reboot-result");
+			result_loc.innerHTML='Rebooting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			var string = new Date().toLocaleString();
+			if (password) {
+				try {
+					$.ajax({
+						url: './reboot_container_advanced',
+						data: {id: id, psw: password},
+						type: 'POST',
+						success: function(response) {
+							logging('<b>' + id + "</b> was rebooted!", category+"-logs");
+							$('#passwordModal').modal('hide');
+							if (id.includes('proxy')) {
+								alert("By restarting the proxy, you will lose connection to the Snap4Sentinel backend. By closing this alert, you will reload the page.");
+								location.reload();
+							}
+						},
+						error: function(error) {
+							logging('<b>' + id + "</b> was not rebooted! Reason: " + error, category+"-logs");
+							$('#passwordModal').modal('hide');
+						},
+						timeout: {{timeout}}
+					});
+				}
+				catch (exception_var) {
+					console.log(exception_var);
+				}
+			}
+			else {
+				alert('Please enter a password');
+			}
+		});
+
+		$('#muteContainer').on('click', function() {
+			var password = $('#passwordInputMute').val();
+			var id = $('#containeridmodalMute').val();
+			var category = $('#containercategorymodalmuted').val();
+			var current_date = new Date();
+			current_date.setTime(current_date.getTime()+($('#time-selection').val()*60*60*1000))
+			var muted_until = formatDateForMysql(current_date);
+			if (password) {
+				try {
+					$.ajax({
+						url: './mute_component_by_hours',
+						data: {id: id, psw: password, hours: $('#time-selection').val()},
+						type: 'POST',
+						success: function(response) {
+							if ($('#time-selection').val() == 0) {
+								logging('<b>' + id + "</b> was unmuted!", category+"-logs");
+								$('#muteComponent').modal('hide');
+							}
+							else {
+								logging('<b>' + id + "</b> was muted for"+$('#time-selection').val()+" hours!", category+"-logs");
+								$('#muteComponent').modal('hide');
+							}
+						},
+						error: function(error) {
+							if ($('#time-selection').val() == 0) {
+								logging('<b>' + id + "</b> was not unmuted! Reason: " + error.responseText, category+"-logs");
+								$('#muteComponent').modal('hide');
+							}
+							else {
+								logging('<b>' + id + "</b> was not muted! Reason: " + error.responseText, category+"-logs");
+								$('#muteComponent').modal('hide');
+							}
+						},
+						timeout: {{timeout}}
+					});
+				}
+				catch (exception_var) {
+					console.log(exception_var);
+				}
+			}
+			else {
+				alert('Please enter a password');
+			}
+		});			
+	};
+	
+	async function who_has_issues() {
+		var allTables = $.fn.dataTable.tables();
+		delete allTables[0];
+		$.each(allTables, function(index, table) {
+			if (index===0) return;
+			var dataTable = $(table).DataTable();
+			var hasFailure = false;
+			var columnData = dataTable.column(24).data().toArray();
+			// Check if any cell in the column contains "failure"
+			for (var i = 0; i < columnData.length; i++) //>
+				{
+				if (typeof columnData[i] === 'string' && columnData[i].includes("Failure")) {
+					hasFailure = true;
+					break;
+				}
+			}
+			var string_being_used=$(table).attr('id').slice(6)+"-status";
+			if (hasFailure) {
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="red" /></svg>';
+			} else {
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="green" /></svg>';
+			}
+			dataTable.destroy();
+		});
+	};
+	
+	async function get_summary_new() {
+		var allTables = $.fn.dataTable.tables();
+		delete allTables[0];
+		$.each(allTables, function(index, table) {
+			if (index===0) return;
+			var dataTable = $(table).DataTable();
+			var isNotRunning = true;
+			var columnData = dataTable.column(20).data().toArray();
+			for (var i = 0; i < columnData.length; i++)  //>
+				{
+				if (typeof columnData[i] === 'string' && !columnData[i].includes("running")) {
+					isNotRunning = false;
+					break;
+				}
+			}
+			var string_being_used=$(table).attr('id').slice(6)+"-status";
+			if (isNotRunning) {
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+			} 
+			else {
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+			}
+		});
+	};
+	
+	function toggle_update_this_line(component) {
+		if (container_rows[component.parentElement.parentElement.getAttribute("name")]) {
+			delete container_rows[component.parentElement.parentElement.getAttribute("name")];
+			component.value = "Stop refresh";
+		}
+		else {
+			component.value = "Resume refresh";
+			container_rows[component.parentElement.parentElement.getAttribute("name")] = component.parentElement.parentElement;
+		}
+		console.log("flipped", component.parentElement.parentElement.getAttribute("name"));
+	};
+		
+	function collapse_category(category_element_id, button) {
+		let relative_table = "table-"+category_element_id;
+		element=document.getElementById(category_element_id);
+		if (element.style.display === "none") {
+		button.className="btn btn-light btn-lg";
+			element.style.display = "block";
+			closed_categories.add(category_element_id);
+		} 
+		else {
+			button.className="btn btn-dark btn-lg";
+			element.style.display = "none";
+			closed_categories.delete(category_element_id);
+		}
+		update_routine();
+	};
+	
+	
+	function toggle_hide_extra_columns(button) {
+		less_columns = !less_columns;
+		if (less_columns) {
+			button.innerHTML = "Show additional columns";
+			dict_of_hidden_columns={columnDefs:[{target: 0, visible: false},{target: 2, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 6, visible: false},{target: 7, visible: false},{target: 8, visible: false},{target: 9, visible: false},{target: 10, visible: false},{target: 11, visible: false},{target: 13, visible: false},{target: 14, visible: false},{target: 15, visible: false},{target: 16, visible: false},{target: 17, visible: false},{target: 19, visible: false}]};
+		}
+		else {
+			dict_of_hidden_columns={retrieve: true};
+			button.innerHTML = "Hide additional columns";
+		}
+		update_routine();
+	};
+	
+	function add_complex_test_table_depending_on_category(category) {
+		var final_str = "";
+		button_data.forEach((element) => {
+			if (element["type"] === category) {final_str += element["data"]};
+		});
+		return final_str;
+	};
+	
+	function formatDateForMysql(date) {
+		const year = date.getFullYear();
+		const month = (date.getMonth() + 1).toString().padStart(2, '0');
+		const day = date.getDate().toString().padStart(2, '0');
+		const hours = date.getHours().toString().padStart(2, '0');
+		const minutes = date.getMinutes().toString().padStart(2, '0');
+		const seconds = date.getSeconds().toString().padStart(2, '0');
+		return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+	}
+		
+	function* colorGenerator() {
+		const colors = ['#00abff', '#cf71ff', '#fff466', '#3cb032', '#ff8a38'];
+		let index = 0;
+		
+		while (true) {
+			yield colors[index % colors.length];
+			index++;
+		}
+	};
+	
+	{% block additional_content_code %}{% endblock %}
+</script>
+<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column;width:100%;">
+	<div class="collapse navbar-collapse container-fluid" id="navbarSupportedContent">
+		<ul class="navbar-nav mr-auto">
+			<li class="nav-item active">
+				<a class="navbar-brand">{{platform}}</a>
+			</li>
+		</ul>
+		<ul class="navbar-nav mr-auto">
+			<li class="nav-item active">
+				<a class="navbar-brand">Snap4Sentinel: Platform Process Monitoring and Control</a>
+			</li>
+		</ul>
+		<ul class="dropdown" style="margin-top: auto; margin-bottom: auto;">
+			<button class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Show administrative actions</button>
+			<ul class="dropdown-menu" style="padding: 10px;">
+				<li class="nav-item active">
+					<form action="deauthenticate" method="GET">
+						<input type="submit" class="btn btn-info" value="Logout" />
+					</form>
+				</li>
+				<li class="nav-item active">
+					<form action="generate_clustered_pdf" method="GET">
+						<input type="submit" class="btn btn-info" value="Generate full logs" />
+					</form>
+				</li>
+				{% block additional_content_certification %}{% endblock %}
+			</ul>
+		</ul>
+		<ul class="dropdown" style="margin-top: auto; margin-bottom: auto;">
+			<ul class="navbar-nav mr-auto">
+				<button class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Show operational actions</button>
+				<ul class="dropdown-menu" style="padding: 10px;">
+					<li class="nav-item">
+					<button id="buttonForUpdates" class="btn btn-danger" onClick="toggleUpdate()">Stop refresh</button>
+					</li>
+					<li class="nav-item">
+					<button id="updatenow" class="btn btn-danger" onClick="update_routine()">Refresh now</button>
+					</li>
+					<li class="nav-item">
+					<button id="toggle_columns" class="btn btn-danger" onClick="toggle_hide_extra_columns(this)">Show unimportant columns</button>
+					</li>
+					<li><hr class="dropdown-divider"></li>
+					<li class="nav-item">
+					<div id="last-update" class="nav-link"></div>
+					</li>
+				</ul>
+			</ul>
+			
+		</ul>
+	</div>
+	<div>
+		<div id="category_menu" class="category_menu container-fluid">
+		</div>
+	</div>	
+
+	
+</nav>
+<div id="output" class="main">
+	<br>
+
+<div id="table-container">
+</div>
+
+<div class="modal fade" id="muteComponent" tabindex="-1" role="dialog" aria-labelledby="passwordModalLabel" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="passwordModalLabel">Confirmation for muting a container</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#muteComponent').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="muteComponent">
+					<div class="form-group">
+						<label for="passwordInputMute">Password</label>
+						<input type="password" class="form-control" id="passwordInputMute" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="containeridmodalMute">Container ID</label>
+						<input type="text" class="form-control" id="containeridmodalMute" readonly>
+					</div>
+					<label for="time-selection">Select time duration:</label>
+					<select id="time-selection" name="time-selection" class="form-select">
+						<option value="0">Unmute</option>
+						<option value="1">1 hour</option>
+						<option value="4">4 hours</option>
+						<option value="8">8 hours</option>
+						<option value="24">24 hours</option>
+						<option value="72">72 hours</option>
+					</select>
+					<div class="form-group">
+						<input type="text" class="form-control" id="containercategorymodalmuted" readonly hidden>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#muteComponent').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="muteContainer">Mute component</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="passwordModal" tabindex="-1" role="dialog" aria-labelledby="passwordModalLabel" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="passwordModalLabel">Confirmation for rebooting container</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#passwordModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="passwordForm">
+					<div class="form-group">
+						<label for="passwordInput">Password</label>
+						<input type="password" class="form-control" id="passwordInput" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="containeridmodal">Container ID</label>
+						<input type="text" class="form-control" id="containeridmodal" readonly>
+					</div>
+					<div class="form-group">
+						<input type="text" class="form-control" id="containercategorymodal" readonly hidden>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="attemptReboot">Attempt Reboot</button>
+			</div>
+		</div>
+	</div>
+</div>
+<div id="notDraggable" class="ui-widget-content">
+	<p>Console Log</p>
+	<p class="ui-widget-header" id="see_logs"></p>
+</div>
+{% block additional_content_admin_log %}{% endblock %}
+<nav class="navbar sticky-bottom bg-body-tertiary">
+	<div class="container-fluid">
+		<a class="navbar-brand">Welcome, {{user}}</a>
+		<a class="navbar-brand" href="mailto: replaceme">Need help? Send us an Email!</a>
+		<a class="navbar-brand" href="#">
+			<img src="./{{ url_for('static', filename = 'snap4.png') }}" alt="Logo" width="80px" class="d-inline-block align-text-top">
+		</a>
+	</div>
+</nav>
+<style>
+	.category_menu {
+	display: flex;
+	justify-content: space-evenly;
+	}
+	.tooltip-inner {
+	user-select: text;
+	}
+	table th, table td {
+	max-width: 200px;
+	overflow: auto;
+	}
+	.main {
+	position:relative;
+	}
+	.ui-widget-header {
+    color: white;
+    background-color: #1e1e1e;
+    padding: 10px;
+    font-family: 'Courier New', Courier, monospace;
+	overflow: scroll;
+	max-height: 300px;
+	}
+	#draggable { max-width: 700px; max-height: 300px; padding: 0.5em; float: left; margin: 0 10px 10px 0; border-style: solid; border-color: blue; background: white;}
+	#draggable p { cursor: move; }
+</style>
+{% endblock %}

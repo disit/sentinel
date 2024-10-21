@@ -1,0 +1,51 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="files">
+  <thead>
+	  <tr>
+		<th>Name</th>
+		<th>Action</th>
+	  </tr>
+  </thead>
+  <tbody>
+    {% for file in files %}
+        <tr>
+            <td>{{ file.name }}</td>
+            <td>
+			{% if file.data[1] == "dir" %}
+                <a class="btn btn-primary" href="{{ file.data[0] }}">Open folder</a>
+			{% else %}
+				<a class="btn btn-primary" href="{{ file.data[0] }}">{{ file.data[1] }}</a>
+			{% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<button class="btn btn-primary" onclick="goToParentPath()">Go to Parent Path</button>
+<script>
+	$("#files").DataTable();
+	function goToParentPath() {
+            // Get the current URL
+            let currentUrl = window.location.href;
+
+            // Remove the trailing slash if there is one
+            if (currentUrl.endsWith('/')) {
+                currentUrl = currentUrl.slice(0, -1);
+            }
+
+            // Find the last slash in the URL
+            let lastSlashIndex = currentUrl.lastIndexOf('/');
+
+            // Get the parent path by slicing the URL up to the last slash
+            let parentPath = currentUrl.slice(0, lastSlashIndex);
+
+            // Redirect to the parent path
+            window.location.href = parentPath + '/';
+        }
+</script>
+{% endblock %}
