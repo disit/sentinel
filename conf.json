@@ -1,0 +1,19 @@
+{
+	"admin-log-length": 200,
+	"default-log-length": 1000,
+	"requests-timeout": 15000,
+	"is-master": true,
+	"telegram-api-token": "replaceme",
+	"telegram-channel":123456789,
+	"db-user": "root",
+	"db-passwd": "password",
+	"db-host": "localhost",
+	"db-port":3306,
+	"smtp-server": "change.me.com",
+	"smtp-port":587,
+	"sender-email": "change@at.me",
+	"sender-email-password": "replacethispassword",
+	"email-recipients": ["first_address@to.besent", "second_address@to.besent", "more_addresses@to.besent"],
+	"platform-url": "http://example.org",
+	"platform-explanation": "Some information"
+}
