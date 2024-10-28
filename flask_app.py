@@ -57,7 +57,7 @@ db_conn_info = {
     }
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(","))
+    using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     if because:
         becauses=because.split(",")
     with mysql.connector.connect(**db_conn_info) as conn:
@@ -91,7 +91,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     msg['From'] = sender_email
     msg['To'] = ','.join(receiver_emails)
     msg['Subject'] = subject
-    msg.attach(MIMEText(str(composite_message), 'html'))
+    msg.attach(MIMEText(str(composite_message), 'text/plain'))
     server.send_message(msg)
     server.quit()
     return
@@ -282,7 +282,8 @@ def send_advanced_alerts(message):
             em3 = format_error_to_send("wasn't found running in docker ",", ".join(message[2]))
             text_for_email+= "These containers weren't found in docker: "+ ", ".join(message[2])+"\n"
         try:
-            send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", em1+"\n"+em2+"\n"+em3)
+            if len(em1+"\n"+em2+"\n"+em3) > 5:
+                send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", em1+"\n"+em2+"\n"+em3)
         except:
             print("[ERROR] while sending email:",text_for_email)
         text_for_telegram, t1, t2, t3 = "", "", "", ""
@@ -295,7 +296,7 @@ def send_advanced_alerts(message):
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
             t3=format_error_to_send("wasn't found running in docker ",filter_out_muted_containers_for_telegram(message[2]))
             text_for_telegram+= "These containers weren't found in docker: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
-        if len(text_for_telegram)>0:
+        if len(text_for_telegram)>5:  #todo check me better
             try:
                 send_telegram(config['telegram-channel'], t1+"\n"+t2+"\n"+t3)
             except:

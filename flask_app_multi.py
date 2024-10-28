@@ -55,7 +55,7 @@ db_conn_info = {
     }
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(","))
+    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(", "))
     if because:
         becauses=because.split(",")
     with mysql.connector.connect(**db_conn_info) as conn:
@@ -108,7 +108,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     msg['From'] = sender_email
     msg['To'] = ','.join(receiver_emails)
     msg['Subject'] = subject
-    msg.attach(MIMEText(str(message), 'html'))
+    msg.attach(MIMEText(str(composite_message), 'text/plain'))
     server.send_message(msg)
     server.quit()
     return
