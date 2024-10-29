@@ -106,7 +106,8 @@ def get_top():
         'system_info': {},
         'cpu_usage': {},
         'memory_usage': {},
-        'processes': []
+        'processes': [],
+        "memory_measuring_unit": "B"
     }
     
     # Split output into lines
@@ -138,6 +139,7 @@ def get_top():
     # Parse memory usage (usually line 4)
     memory_usage_line = lines[3]
     mem_values = re.findall(r'(\d+)', memory_usage_line)
+    parsed_data["memory_measuring_unit"]=re.findall(r'^(\w+)', memory_usage_line)[0]
     parsed_data['memory_usage'] = {
         'total': mem_values[0],
         'free': mem_values[1],
@@ -716,6 +718,8 @@ def create_app():
                 except:
                     try:
                         obtained = requests.post(r[0]+"/sentinel/get_local_top", headers=request.headers).text
+                        currentjson=json.loads(obtained)
+                        currentjson["source"]=r[0]
                         total_answer.append(json.loads(obtained))
                     except:
                         pass

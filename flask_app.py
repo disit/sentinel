@@ -270,7 +270,8 @@ def get_top():
         'system_info': {},
         'cpu_usage': {},
         'memory_usage': {},
-        'processes': []
+        'processes': [],
+        'memory_measuring_unit': "B"
     }
     
     # Split output into lines
@@ -281,7 +282,7 @@ def get_top():
     parsed_data['system_info'] = {
         'time': re.search(r'\d{2}:\d{2}:\d{2}', system_info_line).group(),
         'up_time': re.search(r'up\s+([^,]+)', system_info_line).group(1),
-        'users': re.search(r'(\d+)\s+users', system_info_line).group(1),
+        'users': re.search(r'(\d+)\s+user', system_info_line).group(1),
         'load_average': re.search(r'load average:\s+(.+)', system_info_line).group(1)
     }
 
@@ -302,6 +303,7 @@ def get_top():
     # Parse memory usage (usually line 4)
     memory_usage_line = lines[3]
     mem_values = re.findall(r'(\d+)', memory_usage_line)
+    parsed_data["memory_measuring_unit"]=re.findall(r'^(\w+)', memory_usage_line)[0]
     parsed_data['memory_usage'] = {
         'total': mem_values[0],
         'free': mem_values[1],

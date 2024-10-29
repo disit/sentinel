@@ -139,9 +139,9 @@
 	$('#addContainerButton').on('click', function() {
 		var password = $('#passwordInputAdd').val();
 		var id = $('#containeridmodalAdd').val();
-		var category = $('category-selection').val();
-		var contacts = $('ContactsAdd').val();
-		var position = $('PositionAdd').val();
+		var category = $('#category-selection').val();
+		var contacts = $('#ContactsAdd').val();
+		var position = $('#PositionAdd').val();
 		if (password) {
 			try {
 				$.ajax({
