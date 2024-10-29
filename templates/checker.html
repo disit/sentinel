@@ -944,13 +944,16 @@
 				<button class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Show operational actions</button>
 				<ul class="dropdown-menu" style="padding: 10px;">
 					<li class="nav-item">
-					<button id="buttonForUpdates" class="btn btn-danger" onClick="toggleUpdate()">Stop refresh</button>
+						<button id="buttonForUpdates" class="btn btn-danger" onClick="toggleUpdate()">Stop refresh</button>
 					</li>
 					<li class="nav-item">
-					<button id="updatenow" class="btn btn-danger" onClick="update_routine()">Refresh now</button>
+						<button id="updatenow" class="btn btn-danger" onClick="update_routine()">Refresh now</button>
 					</li>
 					<li class="nav-item">
-					<button id="toggle_columns" class="btn btn-danger" onClick="toggle_hide_extra_columns(this)">Show unimportant columns</button>
+						<button id="toggle_columns" class="btn btn-danger" onClick="toggle_hide_extra_columns(this)">Show unimportant columns</button>
+					</li>
+					<li class="nav-item">
+						<button id="open_top" class="btn btn-danger" onClick="window.open('./get_top')">View host resource usage</button>
 					</li>
 					<li><hr class="dropdown-divider"></li>
 					<li class="nav-item">

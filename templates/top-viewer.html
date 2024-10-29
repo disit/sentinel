@@ -1,0 +1,132 @@
+{% extends "main.html" %}
+{% block title %}Hosts resource viewer{% endblock %}
+{% block head %}
+{{ super() }}
+
+{% endblock %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple Top Command Snapshots</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h2 { color: #333; }
+        .data-section { margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f4f4f4; }
+    </style>
+</head>
+<body>
+
+    <h1>System Status Snapshots from Top Command</h1>
+    
+    <label for="snapshot-select">Select Snapshot:</label>
+    <select id="snapshot-select">
+        <!-- Options will be dynamically populated -->
+    </select>
+
+    <div class="data-section" id="system-info">
+        <h2>System Information</h2>
+        <p><strong>Time:</strong> <span id="time"></span></p>
+        <p><strong>Uptime:</strong> <span id="up_time"></span></p>
+        <p><strong>Users:</strong> <span id="users"></span></p>
+        <p><strong>Load Average:</strong> <span id="load_average"></span></p>
+    </div>
+
+    <div class="data-section" id="cpu-usage">
+        <h2>CPU Usage</h2>
+        <ul>
+            <li>User: <span id="cpu_us"></span>%</li>
+            <li>System: <span id="cpu_sy"></span>%</li>
+            <li>Idle: <span id="cpu_id"></span>%</li>
+        </ul>
+    </div>
+
+    <div class="data-section" id="memory-usage">
+        <h2>Memory Usage</h2>
+        <ul>
+            <li>Total: <span id="mem_total"></span> kB</li>
+            <li>Free: <span id="mem_free"></span> kB</li>
+            <li>Used: <span id="mem_used"></span> kB</li>
+        </ul>
+    </div>
+
+    <div class="data-section" id="process-list">
+        <h2>Process List</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>PID</th>
+                    <th>User</th>
+                    <th>CPU (%)</th>
+                    <th>Memory (%)</th>
+                    <th>Command</th>
+                </tr>
+            </thead>
+            <tbody id="process-table">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const snapshots = {{data | tojson}}
+        ;
+        const snapshotSelect = document.getElementById('snapshot-select');
+        snapshots.forEach((_, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `Snapshot ${index + 1}`;
+            snapshotSelect.appendChild(option);
+        });
+
+        // Function to display selected snapshot
+        function displaySnapshot(snapshot) {
+            document.getElementById('time').textContent = snapshot.system_info.time;
+            document.getElementById('up_time').textContent = snapshot.system_info.up_time;
+            document.getElementById('users').textContent = snapshot.system_info.users;
+            document.getElementById('load_average').textContent = snapshot.system_info.load_average;
+
+            document.getElementById('cpu_us').textContent = snapshot.cpu_usage.us;
+            document.getElementById('cpu_sy').textContent = snapshot.cpu_usage.sy;
+            document.getElementById('cpu_id').textContent = snapshot.cpu_usage.id;
+
+            document.getElementById('mem_total').textContent = snapshot.memory_usage.total;
+            document.getElementById('mem_free').textContent = snapshot.memory_usage.free;
+            document.getElementById('mem_used').textContent = snapshot.memory_usage.used;
+
+            // Clear existing process rows
+            const processTable = document.getElementById('process-table');
+            processTable.innerHTML = '';
+
+            // Populate process list
+            snapshot.processes.forEach(proc => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${proc.pid}</td>
+                    <td>${proc.user}</td>
+                    <td>${proc.cpu}</td>
+                    <td>${proc.mem}</td>
+                    <td>${proc.command}</td>
+                `;
+                processTable.appendChild(row);
+            });
+        }
+
+        // Display the first snapshot by default
+        displaySnapshot(snapshots[0]);
+
+        // Update display when a different snapshot is selected
+        snapshotSelect.addEventListener('change', (event) => {
+            const selectedIndex = event.target.value;
+            displaySnapshot(snapshots[selectedIndex]);
+        });
+    </script>
+
+</body>
+</html>
+
+{% endblock %}

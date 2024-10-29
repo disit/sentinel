@@ -32,6 +32,7 @@ import base64
 import random
 import string
 import traceback
+import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 
@@ -55,7 +56,7 @@ db_conn_info = {
     }
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(", "))
+    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(","))
     if because:
         becauses=because.split(",")
     with mysql.connector.connect(**db_conn_info) as conn:
@@ -96,8 +97,77 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             newstr += curstr+"\n"
     return newstr
 
-def send_email(sender_email, sender_password, receiver_emails, subject, message):
+def get_top():
+    process = subprocess.Popen(['top', '-b', '-n', '1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    stdout, _ = process.communicate()
+
+    # Initialize dictionaries to hold parsed data
+    parsed_data = {
+        'system_info': {},
+        'cpu_usage': {},
+        'memory_usage': {},
+        'processes': []
+    }
     
+    # Split output into lines
+    lines = stdout.splitlines()
+    
+    # Parse system information (first line typically)
+    system_info_line = lines[0]
+    parsed_data['system_info'] = {
+        'time': re.search(r'\d{2}:\d{2}:\d{2}', system_info_line).group(),
+        'up_time': re.search(r'up\s+([^,]+)', system_info_line).group(1),
+        'users': re.search(r'(\d+)\s+users', system_info_line).group(1),
+        'load_average': re.search(r'load average:\s+(.+)', system_info_line).group(1)
+    }
+
+    # Parse CPU usage (usually line 3)
+    cpu_usage_line = lines[2]
+    cpu_values = re.findall(r'(\d+\.\d+)', cpu_usage_line)
+    parsed_data['cpu_usage'] = {
+        'us': cpu_values[0],  # User CPU usage
+        'sy': cpu_values[1],  # System CPU usage
+        'ni': cpu_values[2],  # Nice CPU usage
+        'id': cpu_values[3],  # Idle CPU percentage
+        'wa': cpu_values[4],  # IO wait
+        'hi': cpu_values[5],  # Hardware interrupt
+        'si': cpu_values[6],  # Software interrupt
+        'st': cpu_values[7]   # Steal time
+    }
+
+    # Parse memory usage (usually line 4)
+    memory_usage_line = lines[3]
+    mem_values = re.findall(r'(\d+)', memory_usage_line)
+    parsed_data['memory_usage'] = {
+        'total': mem_values[0],
+        'free': mem_values[1],
+        'used': mem_values[2],
+        'buff_cache': mem_values[3]
+    }
+
+    # Parse process list (starts from line 7 onwards)
+    for line in lines[7:]:
+        columns = line.split()
+        if len(columns) >= 12:  # Ensure we have enough columns for parsing
+            process_info = {
+                'pid': columns[0],
+                'user': columns[1],
+                'pr': columns[2],
+                'ni': columns[3],
+                'virt': columns[4],
+                'res': columns[5],
+                'shr': columns[6],
+                's': columns[7],
+                'cpu': columns[8],
+                'mem': columns[9],
+                'time': columns[10],
+                'command': ' '.join(columns[11:])
+            }
+            parsed_data['processes'].append(process_info)
+    
+    return parsed_data
+
+def send_email(sender_email, sender_password, receiver_emails, subject, message):
     composite_message = config['platform-explanation'] + "\n" + message
     smtp_server = config['smtp-server']
     smtp_port = config['smtp-port']
@@ -629,6 +699,42 @@ def create_app():
         except Exception:
             print("Something went wrong during rebooting because of:",traceback.format_exc())
             return render_template("error_showing.html", r = traceback.format_exc()), 500
+        
+    @app.route("/get_top", methods=["GET"])
+    def get_all_top():
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''SELECT distinct position FROM checker.component_to_category;'''
+            cursor.execute(query)
+            conn.commit()
+            results = cursor.fetchall()
+            total_answer=[]
+            for r in results:
+                obtained = requests.post(r[0]+"/get_local_top", headers=request.headers).text
+                try:
+                    total_answer.append(json.loads(obtained))
+                except:
+                    try:
+                        obtained = requests.post(r[0]+"/sentinel/get_local_top", headers=request.headers).text
+                        total_answer.append(json.loads(obtained))
+                    except:
+                        pass
+            return total_answer
+        return render_template("top-viewer.html", data=total_answer), 200
+        
+
+    @app.route("/get_local_top", methods=["GET"])
+    def get_local_top():
+        json_data=get_top()
+        try:
+            form_dict = request.form.to_dict()
+            amount_of_lines = form_dict.pop('top_lines')
+            json_data['processes']=json_data['processes'][:int(amount_of_lines)]
+        except Exception as E:
+            json_data['processes']=json_data['processes'][:40]
+            pass
+    # Convert parsed data to JSON
+        return json_data
         
         
     @app.route("/test_all_ports", methods=['GET'])
