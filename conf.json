@@ -15,5 +15,7 @@
 	"sender-email-password": "replacethispassword",
 	"email-recipients": ["first_address@to.besent", "second_address@to.besent", "more_addresses@to.besent"],
 	"platform-url": "http://example.org",
-	"platform-explanation": "Some information"
+	"platform-explanation": "Some information",
+	"load-threshold": 30,
+	"memory_threshold": 1
 }
