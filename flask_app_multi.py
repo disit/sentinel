@@ -55,23 +55,6 @@ db_conn_info = {
         "auth_plugin": 'mysql_native_password'
     }
 
-def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(","))
-    if because:
-        becauses=because.split(",")
-    with mysql.connector.connect(**db_conn_info) as conn:
-        cursor = conn.cursor(buffered=True)
-        query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
-        cursor.execute(query2)
-        now_it_is = cursor.fetchall()
-    newstr=""
-    for a in now_it_is:
-        curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
-        if because:
-            newstr += curstr + explain_reason + becauses.pop(0)+"\n"
-        else:
-            newstr += curstr+"\n"
-    return newstr
 
 def send_telegram(chat_id, message):
     if isinstance(message, list):
@@ -80,7 +63,7 @@ def send_telegram(chat_id, message):
     return
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(","))
+    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(", "))
     if because:
         becauses=because.split(",")
     with mysql.connector.connect(**db_conn_info) as conn:
