@@ -56,6 +56,13 @@ db_conn_info = {
         "auth_plugin": 'mysql_native_password'
     }
 
+
+def send_telegram(chat_id, message):
+    if isinstance(message, list):
+        message[2]=filter_out_muted_containers_for_telegram(message[2])
+    asyncio.run(bot.send_message(chat_id=chat_id, text=str(message)))
+    return
+
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
     using_these = ', '.join('"{0}"'.format(w) for w in containers.split(","))
     if because:
@@ -73,13 +80,6 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         else:
             newstr += curstr+"\n"
     return newstr
-
-def send_telegram(chat_id, message):
-    if isinstance(message, list):
-        message[2]=filter_out_muted_containers_for_telegram(message[2])
-    asyncio.run(bot.send_message(chat_id=chat_id, text=str(message)))
-    return
-
 
 def get_top():
     process = subprocess.Popen(['top', '-b', '-n', '1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
