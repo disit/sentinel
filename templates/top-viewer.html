@@ -23,10 +23,12 @@
 <body>
 
     <h1>System Status Snapshots from Top Command</h1>
+	<div class="floating-div" id="floating-div"></div>
+    <button id="alerts" class="btn btn-danger" onClick="alerts()">No alerts to be shown</button>
+    <button id="alerts" class="btn btn-info" onClick="location.replace()">Refresh</button>
     
     <label for="snapshot-select">Select Snapshot:</label>
     <select id="snapshot-select">
-        <!-- Options will be dynamically populated -->
     </select>
 
     <div class="data-section" id="system-info">
@@ -49,9 +51,9 @@
     <div class="data-section" id="memory-usage">
         <h2>Memory Usage</h2>
         <ul>
-            <li>Total: <span id="mem_total"></span> kB</li>
-            <li>Free: <span id="mem_free"></span> kB</li>
-            <li>Used: <span id="mem_used"></span> kB</li>
+            <li>Total: <span id="mem_total"></span> <span id="mem_measuring_unit_1"></span></li>
+            <li>Free: <span id="mem_free"></span> <span id="mem_measuring_unit_2"></span></li>
+            <li>Used: <span id="mem_used"></span> <span id="mem_measuring_unit_3"></span></li>
         </ul>
     </div>
 
@@ -73,18 +75,23 @@
     </div>
 
     <script>
-        const snapshots = {{data | tojson}};
+		var data = {{data | tojson}};
+        var snapshots = data.result;
+		var errors = data.error;
         if (typeof snapshots === 'object' && snapshots !== null && !Array.isArray(snapshots))
             snapshots = [snapshots];
         const snapshotSelect = document.getElementById('snapshot-select');
         snapshots.forEach((_, index) => {
             const option = document.createElement('option');
             option.value = index;
-            option.textContent = `Snapshot ${index + 1}`;
+            option.textContent = _.source;
             snapshotSelect.appendChild(option);
         });
+		
+		errors.forEach((_, index) => {
+            add_alert(_);
+        });
 
-        // Function to display selected snapshot
         function displaySnapshot(snapshot) {
             document.getElementById('time').textContent = snapshot.system_info.time;
             document.getElementById('up_time').textContent = snapshot.system_info.up_time;
@@ -99,11 +106,13 @@
             document.getElementById('mem_free').textContent = snapshot.memory_usage.free;
             document.getElementById('mem_used').textContent = snapshot.memory_usage.used;
 
-            // Clear existing process rows
+            document.getElementById('mem_measuring_unit_1').textContent = snapshot.memory_measuring_unit;
+            document.getElementById('mem_measuring_unit_2').textContent = snapshot.memory_measuring_unit;
+            document.getElementById('mem_measuring_unit_3').textContent = snapshot.memory_measuring_unit;
+
             const processTable = document.getElementById('process-table');
             processTable.innerHTML = '';
 
-            // Populate process list
             snapshot.processes.forEach(proc => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -117,17 +126,49 @@
             });
         }
 
-        // Display the first snapshot by default
         displaySnapshot(snapshots[0]);
 
-        // Update display when a different snapshot is selected
         snapshotSelect.addEventListener('change', (event) => {
             const selectedIndex = event.target.value;
             displaySnapshot(snapshots[selectedIndex]);
         });
+		
+		function alerts() {
+			if (document.getElementById("alerts").innerHTML == "No alerts to be shown") 
+				{return}
+			var floatdiv = document.getElementById("floating-div");
+			if (floatdiv.style["display"] == "none" || floatdiv.style["display"] == "") {
+				floatdiv.style["display"] = "flex";
+				document.getElementById("alerts").innerHTML = "Hide alerts";
+			}
+			else {
+				floatdiv.style["display"] = "none";
+				document.getElementById("alerts").innerHTML = "Show alerts";
+			}
+		}
+		
+		function add_alert(body) {
+			var floatdiv = document.getElementById("floating-div");
+			floatdiv.innerHTML+='<div class="alert my-alert alert-danger" role="alert"><div>'+body+'</div></div>';
+			if (document.getElementById("alerts").innerHTML == "No alerts to be shown") 
+				{document.getElementById("alerts").innerHTML = "Show alerts";}
+		}
     </script>
-
+<style>
+	.floating-div {
+			display: none;
+            position: fixed;
+            bottom: 2cm;
+            left: 1cm;
+            padding: 20px;
+            color: white;
+            border-radius: 10px;
+        }
+	.my-alert {
+			background-color: #f8d7d2e0;
+			margin-right: 10px;
+	}
+</style>
 </body>
 </html>
-
 {% endblock %}

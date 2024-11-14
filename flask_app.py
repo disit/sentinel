@@ -92,7 +92,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     msg['From'] = sender_email
     msg['To'] = ','.join(receiver_emails)
     msg['Subject'] = subject
-    msg.attach(MIMEText(str(composite_message), 'text/plain'))
+    msg.attach(MIMEText(str(composite_message), 'plain'))
     server.send_message(msg)
     server.quit()
     return
@@ -234,15 +234,28 @@ def auto_alert_status():
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
     containers_which_are_not_expected = list(set(components_original)-set([a["Names"] for a in containers_merged]))
     containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a.endswith("*")]
+    top = get_top()
+    load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
+    load_issues=""
+    for average, timing in zip(load_averages, [1, 5, 15]):
+        if float(average) > config["load-threshold"]:
+            load_issues += "Load threshold above "+str(config["load-threshold"]) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
+    memory_issues = ""
+    if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > config["memory_threshold"]:
+        memory_issues = "Memory usage above " + str(config["memory_threshold"]) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected):
         try:
-            issues = ["","",""]
+            issues = ["","","",""]
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
                 issues[2]=containers_which_are_not_expected
+            if len(load_issues)>0:
+                issues[3]=load_issues
+            if len(memory_issues)>0:
+                issues[4]=memory_issues
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -330,7 +343,6 @@ def get_top():
                 'command': ' '.join(columns[11:])
             }
             parsed_data['processes'].append(process_info)
-    
     return parsed_data
 
 def send_alerts(message):
@@ -353,9 +365,13 @@ def send_advanced_alerts(message):
         if len(message[2])>0:
             em3 = format_error_to_send("wasn't found running in docker ",", ".join(message[2]))
             text_for_email+= "These containers weren't found in docker: "+ ", ".join(message[2])+"\n"
+        if len(message[3])>0:
+            text_for_email+= message[3]
+        if len(message[4])>0:
+            text_for_email+= message[4]
         try:
-            if len(em1+"\n"+em2+"\n"+em3) > 5:
-                send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", em1+"\n"+em2+"\n"+em3)
+            if len(text_for_email) > 5:
+                send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
         except:
             print("[ERROR] while sending email:",text_for_email)
         text_for_telegram, t1, t2, t3 = "", "", "", ""
@@ -368,17 +384,21 @@ def send_advanced_alerts(message):
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
             t3=format_error_to_send("wasn't found running in docker ",filter_out_muted_containers_for_telegram(message[2]))
             text_for_telegram+= "These containers weren't found in docker: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
+        if len(message[3])>0:
+            text_for_telegram+= message[3]
+        if len(message[4])>0:
+            text_for_telegram+= message[4]
         if len(text_for_telegram)>5:  #todo check me better
             try:
-                send_telegram(config['telegram-channel'], t1+"\n"+t2+"\n"+t3)
+                send_telegram(config['telegram-channel'], t1+"\n"+t2+"\n"+t3+"\n"+message[3]+"\n"+message[4])
             except:
-                print("[ERROR] while sending telegram:",t1+"\n"+t2+"\n"+t3,"\nDue to",traceback.format_exc())
+                print("[ERROR] while sending telegram:",t1+"\n"+t2+"\n"+t3+"\n"+message[3]+"\n"+message[4],"\nDue to",traceback.format_exc())
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
     
 scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=15)
+scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.start()
@@ -421,14 +441,15 @@ def create_app():
     @app.route("/get_local_top", methods=["GET"])
     def get_local_top():
         json_data=get_top()
+        json_data["source"] = config["platform-url"]
         try:
             form_dict = request.form.to_dict()
             amount_of_lines = form_dict.pop('top_lines')
             json_data['processes']=json_data['processes'][:int(amount_of_lines)]
         except Exception as E:
             json_data['processes']=json_data['processes'][:40]
-    # Convert parsed data to JSON
-        return render_template("top-viewer.html", data=json_data), 200
+        jsontobereturned = {"result":json_data, "error":[]}
+        return render_template("top-viewer.html", data=jsontobereturned), 200
     
     @app.route("/get_top", methods=["GET"])
     def get_top_single():
@@ -570,16 +591,12 @@ def create_app():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
-                # concurrent
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                     futures = [executor.submit(send_request, r[0]+"/sentinel/read_containers", request.headers) for r in results]
                     for future in concurrent.futures.as_completed(futures):
                         total_answer += json.loads(future.result().text)
-                # consecutive
-                #for r in results:
-                #    obtained = requests.post(r[0]+"/sentinel/read_containers", headers=request.headers).text
-                #    total_answer = total_answer + json.loads(obtained)
-                return total_answer
+                tobereturned_answer = {"result":total_answer, "error":[]}
+                return tobereturned_answer
         except Exception:
             print("Something went wrong because of:",traceback.format_exc())
             return render_template("error_showing.html", r = traceback.format_exc()), 500

@@ -36,6 +36,7 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 
+
 f = open("conf.json")
 config = json.load(f)
 
@@ -79,23 +80,6 @@ def send_telegram(chat_id, message):
     asyncio.run(bot.send_message(chat_id=chat_id, text=str(message)))
     return
 
-def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    using_these = ', '.join('"{0}"'.format(w) for w in containers.split(","))
-    if because:
-        becauses=because.split(",")
-    with mysql.connector.connect(**db_conn_info) as conn:
-        cursor = conn.cursor(buffered=True)
-        query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
-        cursor.execute(query2)
-        now_it_is = cursor.fetchall()
-    newstr=""
-    for a in now_it_is:
-        curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
-        if because:
-            newstr += curstr + explain_reason + becauses.pop(0)+"\n"
-        else:
-            newstr += curstr+"\n"
-    return newstr
 
 def get_top():
     process = subprocess.Popen(['top', '-b', '-n', '1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -180,7 +164,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     msg['From'] = sender_email
     msg['To'] = ','.join(receiver_emails)
     msg['Subject'] = subject
-    msg.attach(MIMEText(str(composite_message), 'text/plain'))
+    msg.attach(MIMEText(str(composite_message), 'plain'))
     server.send_message(msg)
     server.quit()
     return
@@ -417,7 +401,7 @@ def send_advanced_alerts(message):
         
     
 scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=15)
+scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.start()
@@ -587,6 +571,7 @@ def create_app():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
+                errors=[]
                 for r in results:
                     obtained = requests.post(r[0]+"/read_containers", headers=request.headers).text
                     try:
@@ -595,9 +580,10 @@ def create_app():
                         try:
                             obtained = requests.post(r[0]+"/sentinel/read_containers", headers=request.headers).text
                             total_answer = total_answer + json.loads(obtained)
-                        except:
-                            pass
-                return total_answer
+                        except Exception as E:
+                            errors.append("Reading containers from "+r[0]+" failed: the backed received this exception: "+str(E))
+                tobereturned_answer = {"result":total_answer, "error":errors}
+                return tobereturned_answer
         except Exception:
             print("Something went wrong because of:",traceback.format_exc())
             return render_template("error_showing.html", r = traceback.format_exc()), 500
@@ -711,6 +697,7 @@ def create_app():
             conn.commit()
             results = cursor.fetchall()
             total_answer=[]
+            errors = []
             for r in results:
                 obtained = requests.post(r[0]+"/get_local_top", headers=request.headers).text
                 try:
@@ -721,9 +708,10 @@ def create_app():
                         currentjson=json.loads(obtained)
                         currentjson["source"]=r[0]
                         total_answer.append(json.loads(obtained))
-                    except:
-                        pass
-            return total_answer
+                    except Exception as E:
+                        errors.append("Reading top from "+r[0]+" failed: the backed received this exception: "+str(E))
+            tobereturned_answer = {"result":total_answer, "error":errors}
+            return tobereturned_answer
         return render_template("top-viewer.html", data=total_answer), 200
         
 
@@ -737,7 +725,6 @@ def create_app():
         except Exception as E:
             json_data['processes']=json_data['processes'][:40]
             pass
-    # Convert parsed data to JSON
         return json_data
         
         
