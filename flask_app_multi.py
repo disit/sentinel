@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.'''
 import subprocess
+from threading import Lock
 from flask import Flask, jsonify, render_template, request, send_file, send_from_directory, redirect
 import requests
 import mysql.connector
@@ -355,6 +356,16 @@ def auto_alert_status():
             send_alerts("Couldn't reach database while not needing to send error messages: "+traceback.format_exc())
             return
 
+
+mutex = Lock()
+def queued_running(command):
+    answer = None
+    print("Locking executor due to running", command)
+    with mutex:
+        answer = subprocess.run('command', shell=True, capture_output=True, text=True, encoding="utf_8")
+    print ("Unlocked executor")
+    return answer
+    
     
 def send_alerts(message):
     try:
@@ -701,7 +712,9 @@ def create_app():
             for r in results:
                 obtained = requests.post(r[0]+"/get_local_top", headers=request.headers).text
                 try:
-                    total_answer.append(json.loads(obtained))
+                    currentjson=json.loads(obtained)
+                    currentjson["source"]=r[0]
+                    total_answer.append(currentjson)
                 except:
                     try:
                         obtained = requests.post(r[0]+"/sentinel/get_local_top", headers=request.headers).text
@@ -710,8 +723,8 @@ def create_app():
                         total_answer.append(json.loads(obtained))
                     except Exception as E:
                         errors.append("Reading top from "+r[0]+" failed: the backed received this exception: "+str(E))
-            tobereturned_answer = {"result":total_answer, "error":errors}
-            return tobereturned_answer
+            #tobereturned_answer = {"result":total_answer, "error":errors}
+            #return tobereturned_answer
         return render_template("top-viewer.html", data=total_answer), 200
         
 
@@ -755,7 +768,7 @@ def create_app():
             something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
             psw = something[something.find(":")+1:]
             if psw == request.form.to_dict()['psw']:
-                result = subprocess.run('docker restart '+request.form.to_dict()['id'], shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
                 log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                 return result
             else:

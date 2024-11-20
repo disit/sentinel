@@ -721,9 +721,9 @@
 				centerer.setAttribute("name", i);
 				const name_of_table = document.createElement("h1");
 				if (!closed_categories.has(i)) 
-					name_of_table.setAttribute("class", "btn btn-dark btn-lg"); 
+					name_of_table.setAttribute("class", "btn btn-dark btn-lg button-cat"); 
 				else 
-					name_of_table.setAttribute("class", "btn btn-light btn-lg");
+					name_of_table.setAttribute("class", "btn btn-light btn-lg button-cat");
 				name_of_table.setAttribute("onclick", "collapse_category('"+i+"', this)");
 				name_of_table.setAttribute("id", i+"-status");
 				name_of_table.innerHTML = i;
@@ -756,9 +756,9 @@
 			else console.log("Skipped unmanaged containers");
 			
 			});
-		get_summary_new();
 		who_has_issues();
 		data_tables=$("table[id^='table-']").DataTable(dict_of_hidden_columns);
+		get_summary_new();
 		get_complex_tests();
 		
 		$('.open-modal').on('click', function() {
@@ -777,42 +777,7 @@
 			$('#muteComponent').modal('show');
 		});
 		
-		$('#attemptReboot').on('click', function() {
-			var password = $('#passwordInput').val();
-			var id = $('#containeridmodal').val();
-			var category = $('#containercategorymodal').val();
-			var result_loc = document.getElementById(id+"-reboot-result");
-			result_loc.innerHTML='Rebooting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
-			var string = new Date().toLocaleString();
-			if (password) {
-				try {
-					$.ajax({
-						url: './reboot_container_advanced',
-						data: {id: id, psw: password},
-						type: 'POST',
-						success: function(response) {
-							logging('<b>' + id + "</b> was rebooted!", category+"-logs");
-							$('#passwordModal').modal('hide');
-							if (id.includes('proxy')) {
-								alert("By restarting the proxy, you will lose connection to the Snap4Sentinel backend. By closing this alert, you will reload the page.");
-								location.reload();
-							}
-						},
-						error: function(error) {
-							logging('<b>' + id + "</b> was not rebooted! Reason: " + error, category+"-logs");
-							$('#passwordModal').modal('hide');
-						},
-						timeout: {{timeout}}
-					});
-				}
-				catch (exception_var) {
-					console.log(exception_var);
-				}
-			}
-			else {
-				alert('Please enter a password');
-			}
-		});
+		
 
 		$('#muteContainer').on('click', function() {
 			var password = $('#passwordInputMute').val();
@@ -859,6 +824,43 @@
 			}
 		});			
 	};
+	
+	function attempt_reboot() {
+			var password = $('#passwordInput').val();
+			var id = $('#containeridmodal').val();
+			var category = $('#containercategorymodal').val();
+			var result_loc = document.getElementById(id+"-reboot-result");
+			result_loc.innerHTML='Rebooting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			var string = new Date().toLocaleString();
+			if (password) {
+				try {
+					$.ajax({
+						url: './reboot_container_advanced/'+id,
+						data: {id: id, psw: password},
+						type: 'POST',
+						success: function(response) {
+							logging('<b>' + id + "</b> was rebooted!", category+"-logs");
+							$('#passwordModal').modal('hide');
+							if (id.includes('proxy')) {
+								alert("By restarting the proxy, you will lose connection to the Snap4Sentinel backend. By closing this alert, you will reload the page.");
+								location.reload();
+							}
+						},
+						error: function(error) {
+							logging('<b>' + id + "</b> was not rebooted! Reason: " + error, category+"-logs");
+							$('#passwordModal').modal('hide');
+						},
+						timeout: {{timeout}}
+					});
+				}
+				catch (exception_var) {
+					console.log(exception_var);
+				}
+			}
+			else {
+				alert('Please enter a password');
+			}
+		};
 	
 	async function who_has_issues() {
 		var allTables = $.fn.dataTable.tables();
@@ -927,12 +929,12 @@
 		let relative_table = "table-"+category_element_id;
 		element=document.getElementById(category_element_id);
 		if (element.style.display === "none") {
-		button.className="btn btn-light btn-lg";
+			button.className="btn btn-light btn-lg button-cat";
 			element.style.display = "block";
 			closed_categories.add(category_element_id);
 		} 
 		else {
-			button.className="btn btn-dark btn-lg";
+			button.className="btn btn-dark btn-lg button-cat";
 			element.style.display = "none";
 			closed_categories.delete(category_element_id);
 		}
@@ -1047,6 +1049,7 @@
 	<br>
 
 <div id="table-container">
+<h1 style="text-align: center;">Loading, please wait...</h1>
 </div>
 
 <div class="modal fade" id="muteComponent" tabindex="-1" role="dialog" aria-labelledby="passwordModalLabel" aria-hidden="true">
@@ -1116,7 +1119,7 @@
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
-				<button type="button" class="btn btn-primary" data-dismiss="modal" id="attemptReboot">Attempt Reboot</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="attemptReboot" onClick="attempt_reboot()">Attempt Reboot</button>
 			</div>
 		</div>
 	</div>
@@ -1140,10 +1143,6 @@
     <div class="floating-div" id="floating-div">
     </div>
 <style>
-	.category_menu {
-	display: flex;
-	justify-content: space-evenly;
-	}
 	.tooltip-inner {
 	user-select: text;
 	}
@@ -1166,16 +1165,17 @@
 	#draggable p { cursor: move; }
 	.floating-div {
 			display: none;
-            position: fixed;     /* Stays in place while scrolling */
-            bottom: 2cm;           /* Anchored to the bottom */
-            left: 1cm;             /* Anchored to the left */
-            padding: 20px;       /* Space inside the div */
-            color: white;        /* Text color */
-            border-radius: 10px; /* Optional rounded corner */
+            position: fixed;
+            bottom: 2cm;
+            left: 1cm;
+            padding: 20px;
+            color: white;
+            border-radius: 10px;
         }
 	.my-alert {
 			background-color: #f8d7d2e0;
 			margin-right: 10px;
 	}
+	.button-cat {margin-right: 5px; margin-left: 5px}
 </style>
 {% endblock %}

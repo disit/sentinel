@@ -14,6 +14,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.'''
 import subprocess
+from threading import Lock
 from flask import Flask, jsonify, render_template, request, send_file, send_from_directory, redirect
 import requests
 import mysql.connector
@@ -351,6 +352,17 @@ def send_alerts(message):
         send_telegram(config['telegram-channel'], message)
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
+        
+        
+mutex = Lock()
+def queued_running(command):
+    answer = None
+    print("Locking executor due to running", command)
+    with mutex:
+        answer = subprocess.run('command', shell=True, capture_output=True, text=True, encoding="utf_8")
+    print ("Unlocked executor")
+    return answer
+    
 
 
 def send_advanced_alerts(message):
@@ -448,8 +460,11 @@ def create_app():
             json_data['processes']=json_data['processes'][:int(amount_of_lines)]
         except Exception as E:
             json_data['processes']=json_data['processes'][:40]
-        jsontobereturned = {"result":json_data, "error":[]}
-        return render_template("top-viewer.html", data=jsontobereturned), 200
+        if config['is-master']:
+            jsontobereturned = {"result":json_data, "error":[]}
+            return render_template("top-viewer.html", data=jsontobereturned), 200
+        else:
+            return json_data
     
     @app.route("/get_top", methods=["GET"])
     def get_top_single():
@@ -728,7 +743,7 @@ def create_app():
             something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
             psw = something[something.find(":")+1:]
             if psw == request.form.to_dict()['psw']:
-                result = subprocess.run('docker restart '+request.form.to_dict()['id'], shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
                 log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                 return result
             else:
