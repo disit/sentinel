@@ -373,6 +373,55 @@ def send_alerts(message):
         send_telegram(config["telegram-channel"], message)
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
+        
+def update_container_state_db():        
+    results = None
+    # grab all but containers on this host
+    with mysql.connector.connect(**db_conn_info) as conn:
+        cursor = conn.cursor(buffered=True)
+        query = '''SELECT distinct position FROM checker.component_to_category;'''
+        cursor.execute(query)
+        conn.commit()
+        results = cursor.fetchall()
+        total_answer=[]
+        for r in results:
+            obtained = requests.post(r[0]+"/read_containers").text
+            try:
+                total_answer = total_answer + json.loads(obtained)
+            except:
+                try:
+                    obtained = requests.post(r[0]+"/sentinel/read_containers", headers=request.headers).text
+                    total_answer = total_answer + json.loads(obtained)
+                except:
+                    pass
+        
+    # now grab containers from this host
+    containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+    containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+    containers_merged = []
+    for container_stats in containers_stats:
+        for container_ps in containers_ps:
+            for key1, value1 in json.loads(container_stats).items():
+                for key2, value2 in json.loads(container_ps).items():
+                    if key1 == "Name" and key2 == "Names":
+                        if value1 == value2:
+                            containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''SELECT * FROM checker.component_to_category;'''
+            cursor.execute(query)
+            conn.commit()
+            results = cursor.fetchall()
+    except Exception:
+        send_alerts("Can't reach db, didn't update cluster status:"+ traceback.format_exc())
+        return
+    containers_merged = containers_merged + total_answer
+    with mysql.connector.connect(**db_conn_info) as conn:
+        cursor = conn.cursor(buffered=True)
+        query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
+        cursor.execute(query,(json.dumps(containers_merged),))
+        conn.commit()
 
 
 def send_advanced_alerts(message):
@@ -413,6 +462,7 @@ def send_advanced_alerts(message):
     
 scheduler = BackgroundScheduler()
 scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
+scheduler.add_job(update_container_state_db, trigger='interval', minutes=5)
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.start()
@@ -568,6 +618,22 @@ def create_app():
     @app.route("/read_containers", methods=['POST'])
     def check():
         return get_container_data()
+    
+    @app.route("/read_containers_db", methods=['GET'])
+    def check_container_db():
+        if not config['is-master']:
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+        with mysql.connector.connect(**db_conn_info) as conn:
+            try:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT containers, sampled_at FROM checker.container_data order by sampled_at desc limit 1;'''
+                cursor.execute(query)
+                conn.commit()
+                result = cursor.fetchone()
+                tobereturned_answer = {"result":json.loads(result[0]), "error":[]}
+            except Exception as E:
+                tobereturned_answer = {"result": {}, "error":["Couldn't load container data because of "+str(E)]}
+            return tobereturned_answer
             
     @app.route("/advanced_read_containers", methods=['POST'])
     def check_adv():
