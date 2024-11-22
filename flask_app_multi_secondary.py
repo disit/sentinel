@@ -59,6 +59,8 @@ db_conn_info = {
 
 
 def send_telegram(chat_id, message):
+    if not config['is-master']:
+        return
     if isinstance(message, list):
         message[2]=filter_out_muted_containers_for_telegram(message[2])
     asyncio.run(bot.send_message(chat_id=chat_id, text=str(message)))
@@ -155,6 +157,8 @@ def get_top():
     return parsed_data
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
+    if not config['is-master']:
+        return
     composite_message = config['platform-explanation'] + "\n" + message
     smtp_server = config['smtp-server']
     smtp_port = config['smtp-port']
@@ -249,8 +253,9 @@ def filter_out_wrong_status_containers_for_telegram(containers):
     return ", ".join([a["Name"] for a in new_elements])
 
 def isalive():
-    send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is alive", config["platform-url"]+" is alive")
-    send_telegram(config['telegram-channel'], config["platform-url"]+" is alive")
+    if config['is-master']:
+        send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is alive", config["platform-url"]+" is alive")
+        send_telegram(config['telegram-channel'], config["platform-url"]+" is alive")
     return
 
 def auto_run_tests():
@@ -368,13 +373,17 @@ def queued_running(command):
     
     
 def send_alerts(message):
+    if not config['is-master']:
+        return
     try:
         send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", message)
         send_telegram(config["telegram-channel"], message)
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
-def update_container_state_db():        
+def update_container_state_db():
+    if not config['is-master']:
+        return        
     results = None
     # grab all but containers on this host
     with mysql.connector.connect(**db_conn_info) as conn:
@@ -425,6 +434,8 @@ def update_container_state_db():
 
 
 def send_advanced_alerts(message):
+    if not config['is-master']:
+        return
     try:
         text_for_email, em1, em2, em3 = "", "", "", ""
         if len(message[0])>0:
@@ -462,7 +473,6 @@ def send_advanced_alerts(message):
     
 scheduler = BackgroundScheduler()
 scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=5)
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.start()

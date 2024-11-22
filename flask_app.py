@@ -385,7 +385,7 @@ def queued_running(command):
     answer = None
     print("Locking executor due to running", command)
     with mutex:
-        answer = subprocess.run('command', shell=True, capture_output=True, text=True, encoding="utf_8")
+        answer = subprocess.run(command, shell=True, capture_output=True, text=True, encoding="utf_8")
     print ("Unlocked executor")
     return answer
     
@@ -481,6 +481,19 @@ def create_app():
     def get_local_top():
         json_data=get_top()
         json_data["source"] = config["platform-url"]
+        with mysql.connector.connect(**db_conn_info) as conn:
+            try:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT ip FROM checker.ip_table where hostname = %s'''
+                cursor.execute(query,(config["platform-url"],))
+                conn.commit()
+                result = cursor.fetchone()
+                print(result)
+                if len(result) > 0:
+                    json_data["source"].append(" - " + result[0])
+            except Exception as E:
+                pass
+                # no conversion for ip, not a big deal
         try:
             form_dict = request.form.to_dict()
             amount_of_lines = form_dict.pop('top_lines')
