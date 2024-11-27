@@ -329,15 +329,28 @@ def auto_alert_status():
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
     containers_which_are_not_expected = list(set(components_original)-set([a["Names"] for a in containers_merged]))
     containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a.endswith("*")]
+    top = get_top()
+    load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
+    load_issues=""
+    for average, timing in zip(load_averages, [1, 5, 15]):
+        if float(average) > config["load-threshold"]:
+            load_issues += "Load threshold above "+str(config["load-threshold"]) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
+    memory_issues = ""
+    if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > config["memory_threshold"]:
+        memory_issues = "Memory usage above " + str(config["memory_threshold"]) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected):
         try:
-            issues = ["","",""] # maybe make this a real object, later
+            issues = ["","","","",""] # maybe make this a real object, later
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports #this has to be refined
             if len(containers_which_are_not_expected) > 0:
                 issues[2]=containers_which_are_not_expected
+            if len(load_issues)>0:
+                issues[3]=load_issues
+            if len(memory_issues)>0:
+                issues[4]=memory_issues
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -436,8 +449,12 @@ def send_advanced_alerts(message):
         if len(message[2])>0:
             em3 = format_error_to_send("wasn't found running in docker ",", ".join(message[2]))
             text_for_email+= "These containers weren't found in docker: "+ ", ".join(message[2])+"\n"
+        if len(message[3])>0:
+            text_for_email+= message[3]
+        if len(message[4])>0:
+            text_for_email+= message[4]
         try:
-            send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", em1+"\n"+em2+"\n"+em3)
+            send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
         except:
             print("[ERROR] while sending email:",text_for_email)
         text_for_telegram, t1, t2, t3 = "", "", "", ""
@@ -450,11 +467,15 @@ def send_advanced_alerts(message):
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
             t3=format_error_to_send("wasn't found running in docker ",filter_out_muted_containers_for_telegram(message[2]))
             text_for_telegram+= "These containers weren't found in docker: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
+        if len(message[3])>0:
+            text_for_telegram+= message[3]
+        if len(message[4])>0:
+            text_for_telegram+= message[4]
         if len(text_for_telegram)>0:
             try:
-                send_telegram(config['telegram-channel'], t1+"\n"+t2+"\n"+t3)
+                send_telegram(config['telegram-channel'], t1+"\n"+t2+"\n"+t3+"\n"+message[3]+"\n"+message[4])
             except:
-                print("[ERROR] while sending telegram:",t1+"\n"+t2+"\n"+t3,"\nDue to",traceback.format_exc())
+                print("[ERROR] while sending telegram:",t1+"\n"+t2+"\n"+t3+"\n"+message[3]+"\n"+message[4],"\nDue to",traceback.format_exc())
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
  
