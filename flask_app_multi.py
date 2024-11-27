@@ -165,7 +165,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     msg['From'] = sender_email
     msg['To'] = ','.join(receiver_emails)
     msg['Subject'] = subject
-    msg.attach(MIMEText(str(composite_message), 'plain'))
+    msg.attach(MIMEText(str(composite_message), 'html'))
     server.send_message(msg)
     server.quit()
     return
@@ -769,29 +769,32 @@ def create_app():
     def get_all_top():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''SELECT distinct position FROM checker.component_to_category;'''
+            query = '''SELECT distinct position, ip_table.ip FROM checker.component_to_category left join ip_table on component_to_category.position = ip.table.hostname;'''
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
             total_answer=[]
             errors = []
             for r in results:
+                hostposition = ""
+                if hostposition != None:
+                    hostposition = " - " + r[1]
                 obtained = requests.post(r[0]+"/get_local_top", headers=request.headers).text
                 try:
                     currentjson=json.loads(obtained)
-                    currentjson["source"]=r[0]
+                    currentjson["source"]=r[0] + hostposition
                     total_answer.append(currentjson)
                 except:
                     try:
                         obtained = requests.post(r[0]+"/sentinel/get_local_top", headers=request.headers).text
                         currentjson=json.loads(obtained)
-                        currentjson["source"]=r[0]
-                        total_answer.append(json.loads(obtained))
+                        currentjson["source"]=r[0] + hostposition
+                        total_answer.append(currentjson)
                     except Exception as E:
                         errors.append("Reading top from "+r[0]+" failed: the backed received this exception: "+str(E))
-            #tobereturned_answer = {"result":total_answer, "error":errors}
+            tobereturned_answer = {"result":total_answer, "error":errors}
             #return tobereturned_answer
-        return render_template("top-viewer.html", data=total_answer), 200
+        return render_template("top-viewer.html", data=tobereturned_answer), 200
         
 
     @app.route("/get_local_top", methods=["GET"])
