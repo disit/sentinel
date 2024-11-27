@@ -8,7 +8,7 @@ CREATE TABLE `asking_containers` (
   `log` text DEFAULT NULL,
   `perpetrator` varchar(45) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 LOCK TABLES `asking_containers` WRITE;
 INSERT INTO `asking_containers` VALUES (1205,'2024-05-22 10:31:55',"POST wasn\'t used in the request",'');
 UNLOCK TABLES;
@@ -20,7 +20,7 @@ CREATE TABLE `container_data` (
   `containers` json NOT NULL,
   `sampled_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
 
 DROP TABLE IF EXISTS `categories`;
@@ -28,7 +28,7 @@ CREATE TABLE `categories` (
   `idcategories` int(11) NOT NULL AUTO_INCREMENT,
   `category` varchar(45) NOT NULL,
   PRIMARY KEY (`idcategories`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 LOCK TABLES `categories` WRITE;
 INSERT INTO `categories` VALUES (1,'Dashboard'),
 (2,'Authorization and Authentication'),
@@ -49,7 +49,7 @@ CREATE TABLE `category_test` (
   KEY `category_foreign_key_idx` (`category`),
   CONSTRAINT `category_foreign_key` FOREIGN KEY (`category`) REFERENCES `categories` (`idcategories`),
   CONSTRAINT `test_foreign_key` FOREIGN KEY (`test`) REFERENCES `complex_tests` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 LOCK TABLES `category_test` WRITE;
 INSERT INTO `category_test` VALUES (5,2),
 (8,2);
@@ -65,7 +65,7 @@ CREATE TABLE `complex_tests` (
   `explanation` tinytext DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name_of_test_UNIQUE` (`name_of_test`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 LOCK TABLES `complex_tests` WRITE;
 INSERT INTO `complex_tests` VALUES (4,'Check iotapps','bash scripts/check_iotapps.sh',NULL,'#20ff14','Check all iotapps, no matter how many they are'),
 (5,'Add Device','bash scripts/add_device.sh',NULL,'#ff7f00','Calls the test for adding a new device, then adds some test data'),
@@ -80,7 +80,7 @@ CREATE TABLE `component_to_category` (
   `references` varchar(200) NOT NULL DEFAULT 'Contact information not set',
   `position` varchar(45) NOT NULL DEFAULT '$#base-url#$',
   PRIMARY KEY (`component`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 LOCK TABLES `component_to_category` WRITE;
 INSERT INTO `component_to_category` VALUES ('certbot','Authorization and Authentication','Contact information not set','$#base-url#$'),
 ('dashboard-backend','Dashboard','Contact information not set','$#base-url#$'),
@@ -126,7 +126,7 @@ CREATE TABLE `extra_resources` (
   `resource_description` varchar(45) NOT NULL,
   PRIMARY KEY (`id_category`,`resource_address`),
   CONSTRAINT `category_fk` FOREIGN KEY (`id_category`) REFERENCES `categories` (`idcategories`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 LOCK TABLES `extra_resources` WRITE;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `getting_tests`;
@@ -136,7 +136,7 @@ CREATE TABLE `getting_tests` (
   `log` text DEFAULT NULL,
   `perpetrator` varchar(45) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 DROP TABLE IF EXISTS `rebooting_containers`;
 CREATE TABLE `rebooting_containers` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -144,13 +144,13 @@ CREATE TABLE `rebooting_containers` (
   `log` text DEFAULT NULL,
   `perpetrator` varchar(45) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 DROP TABLE IF EXISTS `summary_status`;
 CREATE TABLE `summary_status` (
   `category` varchar(50) NOT NULL,
   `status` varchar(200) NOT NULL,
   PRIMARY KEY (`category`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 LOCK TABLES `summary_status` WRITE;
 INSERT INTO `summary_status` VALUES ('Authorization and Authentication',''),
 ('Broker','<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>'),
@@ -171,7 +171,7 @@ CREATE TABLE `test_ran` (
   `datetime` varchar(45) DEFAULT NULL,
   `perpetrator` varchar(45) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 DROP TABLE IF EXISTS `tests_results`;
 CREATE TABLE `tests_results` (
   `id_test` int(11) NOT NULL AUTO_INCREMENT,
@@ -180,7 +180,7 @@ CREATE TABLE `tests_results` (
   `container` text DEFAULT NULL,
   `command` text DEFAULT NULL,
   PRIMARY KEY (`id_test`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 DROP TABLE IF EXISTS `tests_table`;
 CREATE TABLE `tests_table` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -188,7 +188,7 @@ CREATE TABLE `tests_table` (
   `command` varchar(500) DEFAULT NULL,
   `command_explained` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
 
 
 DROP TABLE IF EXISTS `ip_table`;
@@ -196,7 +196,7 @@ CREATE TABLE `ip_table` (
   `ip` varchar(45) NOT NULL,
   `hostname` varchar(45) NOT NULL,
   PRIMARY KEY (`ip`,`hostname`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 INSERT INTO ip_table VALUES ("$#ip-0#$", "$#base-url#$");
 
 LOCK TABLES `tests_table` WRITE;
@@ -232,7 +232,7 @@ INSERT INTO `tests_table` VALUES (2,'opensearch-dashboards','curl -I -s $#base-u
 UNLOCK TABLES;
 
 DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` FUNCTION `GetHighContrastColor`(hexColor CHAR(7)) RETURNS char(7) CHARSET utf8mb4 COLLATE utf8mb4_general_ci
+CREATE DEFINER=`root`@`localhost` FUNCTION `GetHighContrastColor`(hexColor CHAR(7)) RETURNS char(7) CHARSET utf8mb4 
     DETERMINISTIC
 BEGIN
   DECLARE colorR INT;

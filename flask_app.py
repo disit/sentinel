@@ -377,7 +377,7 @@ def update_container_state_db():
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
         query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
-        cursor.execute(query,(json.dumps(results),))
+        cursor.execute(query,(json.dumps(containers_merged),))
         conn.commit()
         
 mutex = Lock()
