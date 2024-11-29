@@ -39,12 +39,49 @@ from datetime import datetime, timedelta
 import concurrent.futures
 import re
 
+
+class Snap4SentinelTelegramBot:
+    def __init__(self, bot_token, chat_id=None, actually_send=True):
+        self._bot_token = bot_token
+        self._chat_id = chat_id
+        self._actually_send = actually_send
+
+    def set_chat_id(self, chat_id, force=False):
+        if not isinstance(chat_id, str):
+            return False
+        if self._chat_id == None or force is True:
+            self._chat_id = chat_id
+            return True
+
+    def send_message(self, message, chat_id=None):
+        if not self._actually_send:
+            return True, "Did not sent but was told not to"
+        url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
+        payload = {}
+        if chat_id is None:
+            if self._chat_id is None:
+                return False, "Chat id was not set"
+            else:
+                payload["chat_id"] = self._chat_id
+        else:
+            payload["chat_id"] = chat_id
+        if not isinstance(message, str):
+            return False, "Message wasn't text"
+        payload["text"] = message
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            return True, "Message was sent"
+        else:
+            return False, f"Failed to send message: {response.text}"
+        
+
 f = open("conf.json")
 config = json.load(f)
 
 
 API_TOKEN = config['telegram-api-token']
 bot = telegram.Bot(token=API_TOKEN)
+bot_2 = Snap4SentinelTelegramBot(API_TOKEN, config['telegram-channel'])
 greendot = """&#128994"""
 reddot = """&#128308"""
 
@@ -79,7 +116,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
 def send_telegram(chat_id, message):
     if isinstance(message, list):
         message[2]=filter_out_muted_containers_for_telegram(message[2])
-    asyncio.run(bot.send_message(chat_id=chat_id, text=str(message)))
+    bot_2.send_message(message, chat_id)
     return
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
