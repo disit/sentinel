@@ -781,10 +781,10 @@
 			else console.log("Skipped unmanaged containers");
 			
 			});
-		who_has_issues();
 		data_tables=$("table[id^='table-']").DataTable(dict_of_hidden_columns);
 		get_summary_new();
 		get_complex_tests();
+		who_has_issues();
 		
 		$('.open-modal').on('click', function() {
 			var id = $(this).data('containerid');
@@ -895,8 +895,7 @@
 			var dataTable = $(table).DataTable();
 			var hasFailure = false;
 			var columnData = dataTable.column(24).data().toArray();
-			// Check if any cell in the column contains "failure"
-			for (var i = 0; i < columnData.length; i++) //>
+			for (var i = 0; i < columnData.length; i++)
 				{
 				if (typeof columnData[i] === 'string' && columnData[i].includes("Failure")) {
 					hasFailure = true;
