@@ -28,7 +28,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import telegram
-import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
 import base64
 import random
@@ -283,6 +282,8 @@ def auto_alert_status():
         memory_issues = "Memory usage above " + str(config["memory_threshold"]) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected):
         try:
+            # todo
+            # UPDATE `checker`.`summary_status` SET `status` = "&#128308" where `category` in ("System","Broker") # join, set of a list
             issues = ["","","","",""]
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
@@ -401,16 +402,6 @@ def update_container_state_db():
                     if key1 == "Name" and key2 == "Names":
                         if value1 == value2:
                             containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            query = '''SELECT * FROM checker.component_to_category;'''
-            cursor.execute(query)
-            conn.commit()
-            results = cursor.fetchall()
-    except Exception:
-        send_alerts("Can't reach db, didn't update cluster status:"+ traceback.format_exc())
-        return
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
         query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''

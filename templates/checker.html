@@ -920,7 +920,7 @@
 			var dataTable = $(table).DataTable();
 			var isNotRunning = true;
 			var columnData = dataTable.column(20).data().toArray();
-			for (var i = 0; i < columnData.length; i++)  //>
+			for (var i = 0; i < columnData.length; i++)
 				{
 				if (typeof columnData[i] === 'string' && !columnData[i].includes("running")) {
 					isNotRunning = false;
