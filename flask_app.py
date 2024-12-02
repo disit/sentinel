@@ -54,7 +54,7 @@ class Snap4SentinelTelegramBot:
 
     def send_message(self, message, chat_id=None):
         if not self._actually_send:
-            return True, "Did not sent but was told not to"
+            return True, "Did not send but was told not to"
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         payload = {}
         if chat_id is None:
