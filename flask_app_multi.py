@@ -59,6 +59,9 @@ db_conn_info = {
 
 
 def send_telegram(chat_id, message):
+    if not config["sendsend_notifications"]:
+        print("Would have sent notification but was told not to")
+        return
     if isinstance(message, list):
         message[2]=filter_out_muted_containers_for_telegram(message[2])
     asyncio.run(bot.send_message(chat_id=chat_id, text=str(message)))
@@ -155,6 +158,9 @@ def get_top():
     return parsed_data
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
+    if not config["sendsend_notifications"]:
+        print("Would have sent notification but was told not to")
+        return
     composite_message = config['platform-explanation'] + "\n" + message
     smtp_server = config['smtp-server']
     smtp_port = config['smtp-port']
@@ -344,7 +350,7 @@ def auto_alert_status():
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
-                issues[1]=is_alive_with_ports #this has to be refined
+                issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
                 issues[2]=containers_which_are_not_expected
             if len(load_issues)>0:

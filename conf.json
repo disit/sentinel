@@ -17,5 +17,6 @@
 	"platform-url": "http://example.org",
 	"platform-explanation": "Some information",
 	"load-threshold": 30,
-	"memory_threshold": 1
+	"memory_threshold": 1,
+	"send_notifications": true
 }
