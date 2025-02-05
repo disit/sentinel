@@ -503,7 +503,7 @@ def create_app():
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
     
     @app.route("/get_local_top", methods=["GET"])
     def get_local_top():
@@ -566,7 +566,7 @@ def create_app():
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         
     @app.route("/add_container", methods=["POST"])
     def add_container():
@@ -590,7 +590,7 @@ def create_app():
             except Exception:
                 print("Something went wrong during the addition of a new container because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         
     @app.route("/delete_container", methods=["POST"])
     def delete_container():
@@ -614,7 +614,7 @@ def create_app():
             except Exception:
                 print("Something went wrong during the deletion of a container because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
 
     @app.route("/get_data_from_source", methods=["GET"])
     def get_additional_data():
@@ -664,7 +664,7 @@ def create_app():
     @app.route("/read_containers_db", methods=['GET'])
     def check_container_db():
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         with mysql.connector.connect(**db_conn_info) as conn:
             try:
                 cursor = conn.cursor(buffered=True)
@@ -681,7 +681,7 @@ def create_app():
     @app.route("/advanced_read_containers", methods=['POST'])
     def check_adv():
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         try:
             results = None
             with mysql.connector.connect(**db_conn_info) as conn:
@@ -819,7 +819,7 @@ def create_app():
     @app.route("/deauthenticate", methods=['POST','GET'])
     def deauthenticate():
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         return "You have been deauthenticated", 401
         
     @app.route("/reboot_container", methods=['POST','GET'])
@@ -841,7 +841,7 @@ def create_app():
     @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
     def reboot_container_advanced(container_id):
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         if request.method == "POST":
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -885,7 +885,7 @@ def create_app():
     @app.route("/mute_component_by_hours", methods=['POST'])
     def mute_component_by_hours():
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         if request.method == "POST":
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -989,8 +989,19 @@ def create_app():
         except Exception:
             print("Probably fucked up the authentication:",traceback.format_exc())
             return render_template("error_showing.html", r = traceback.format_exc()), 401
-        r = '<br>'.join(subprocess.run('docker logs '+container_id+" --tail "+str(config["default-log-length"]), shell=True, capture_output=True, text=True, encoding="utf_8").stderr.split('\n'))
-        print('docker logs '+container_id+" --tail "+str(config["default-log-length"]))
+        process = subprocess.Popen(
+            'docker logs '+container_id+" --tail "+str(config["default-log-length"]),
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+            text=True
+        )
+        out=[]
+        for line in iter(process.stdout.readline, ''):
+            out.append(line[:-1])
+        process.stdout.close()
+        r = '<br>'.join(out)
+        #print('docker logs '+container_id+" --tail "+str(config["default-log-length"]))
         #container_name = subprocess.run('docker ps -a -f id='+container_id+' --format "{{.Names}}"', shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n')[0]
         return render_template('log_show.html', container_id = container_id, r = r, container_name=container_id)
         
@@ -999,7 +1010,7 @@ def create_app():
     @app.route("/advanced-container/<container_id>")
     def get_container_logs_advanced(container_id):
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
@@ -1011,7 +1022,7 @@ def create_app():
                 conn.commit()
                 results = cursor.fetchall()
                 if len(results) == 0:
-                    return render_template("error_showing.html", r = "It appears that the container "+container_id+" doesn't exist in the cluster."), 500
+                    return render_template("error_showing.html", r = "It appears that the container "+container_id+" doesn't exist in the cluster"), 500
                 r = requests.get(results[0][0]+"/sentinel/container/"+container_id, headers=request.headers, data={"id": container_id, "psw": psw})
                 return r.text
         except Exception:
@@ -1047,7 +1058,7 @@ def create_app():
     @app.route('/generate_clustered_pdf', methods=['GET'])
     def generate_clustered_pdf():
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         user = ""
         try:
             user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
@@ -1097,7 +1108,19 @@ def create_app():
     def generate_pdf():
         data_stored = []
         for container_data in get_container_data(True):
-            r = '<br>'.join(subprocess.run('docker logs '+container_data['ID'] + ' --tail '+config["default-log-length"], shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n'))
+            process = subprocess.Popen(
+                'docker logs '+container_data['ID']+" --tail "+str(config["default-log-length"]),
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                text=True
+            )
+            out=[]
+            for line in iter(process.stdout.readline, ''):
+                out.append(line[:-1])
+            process.stdout.close()
+            r = '<br>'.join(out)
+            #r = '<br>'.join(subprocess.run('docker logs '+container_data['ID'] + ' --tail '+config["default-log-length"], shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n'))
             data_stored.append({"header": container_data['Name'], "string": r})
         
         # Create a PDF document
@@ -1261,7 +1284,7 @@ def create_app():
     @app.route('/clustered_certification', methods=['GET'])
     def clustered_certification():
         if not config['is-master']:
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster."), 403
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         user = ""
         try:
             user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
@@ -1269,7 +1292,7 @@ def create_app():
         except Exception:
             return render_template("error_showing.html", r = "Issues during the establishing of the user: "+ traceback.format_exc()), 500
         if user != "admin":
-            return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
+            return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
         try:
             results = None
             with mysql.connector.connect(**db_conn_info) as conn:

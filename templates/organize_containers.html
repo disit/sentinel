@@ -21,7 +21,7 @@
 	  <td>{{item[1]}}</td>
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
-	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}">Delete</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Delete</button></td>
 	</tr>
 {% endfor %}
   </tbody>
