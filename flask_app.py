@@ -1001,8 +1001,6 @@ def create_app():
             out.append(line[:-1])
         process.stdout.close()
         r = '<br>'.join(out)
-        #print('docker logs '+container_id+" --tail "+str(config["default-log-length"]))
-        #container_name = subprocess.run('docker ps -a -f id='+container_id+' --format "{{.Names}}"', shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n')[0]
         return render_template('log_show.html', container_id = container_id, r = r, container_name=container_id)
         
 
