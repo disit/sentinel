@@ -99,15 +99,15 @@
 	</div>
 </div>
 <script>
-	$("#containers").DataTable();
-	$('.open-modal').on('click', function() {
-		$('#addComponentModal').modal('show');
-	});
 
 	$('.open-modal-m').on('click', function() {
 		var id = $(this).data('component');
 		$('#componentDeleteId').val(id);
 		$('#deleteComponent').modal('show');
+	});
+	$("#containers").DataTable();
+	$('.open-modal').on('click', function() {
+		$('#addComponentModal').modal('show');
 	});
 	$('#deleteComponentButton').on('click', function() {
 		var password = $('#passwordInputDelete').val();
