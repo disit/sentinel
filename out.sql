@@ -3,7 +3,7 @@ USE `checker`;
 
 DROP TABLE IF EXISTS `asking_containers`;
 CREATE TABLE `asking_containers` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int NOT NULL AUTO_INCREMENT,
   `date` text DEFAULT NULL,
   `log` text DEFAULT NULL,
   `perpetrator` varchar(45) NOT NULL,

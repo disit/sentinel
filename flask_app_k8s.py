@@ -20,6 +20,7 @@ import requests
 import mysql.connector
 import json
 import os
+import copy
 from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak
@@ -103,7 +104,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         now_it_is = cursor.fetchall()
     newstr=""
     for a in now_it_is:
-        curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
+        curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         if because:
             newstr += curstr + explain_reason + becauses.pop(0)+"\n"
         else:
@@ -238,16 +239,76 @@ def auto_run_tests():
         return badstuff
 
 def auto_alert_status():
-    containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-    containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-    containers_merged = []
-    for container_stats in containers_stats:
-        for container_ps in containers_ps:
-            for key1, value1 in json.loads(container_stats).items():
-                for key2, value2 in json.loads(container_ps).items():
-                    if key1 == "Name" and key2 == "Names":
-                        if value1 == value2:
-                            containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+    if not os.getenv("running_as_kubernetes"):
+        containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+        containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+        containers_merged = []
+        for container_stats in containers_stats:
+            for container_ps in containers_ps:
+                for key1, value1 in json.loads(container_stats).items():
+                    for key2, value2 in json.loads(container_ps).items():
+                        if key1 == "Name" and key2 == "Names":
+                            if value1 == value2:
+                                containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+    else:
+        raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+        conversions=[]
+        for item in raw_json["items"]:
+            conversion = {}
+            try:
+                command = item.get("command", [])
+                args = item.get("args", [])
+                full_command = command + args
+                if full_command:
+                    conversion["Command"] = full_command
+            except Exception as E: # no command set, read from image
+                #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                conversion["Command"] = "Whatever"
+            conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
+            conversion["ID"] = item["metadata"]["uid"]
+            conversion["Image"] = item["spec"]["containers"][0]["image"]
+            conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
+            conversion["LocalVolumes"] = "Whatever"
+            conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+            conversion["Names"] = item["metadata"]["name"]
+            conversion["Networks"] = "Whatever"
+            conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+
+            fmt = "%Y-%m-%dT%H:%M:%SZ"
+            dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
+            dt2 = datetime.now()
+            try:
+                conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
+            except Exception as E:
+                print(E)
+                conversion["RunningFor"] = "Not running"
+            conversion["Size"] = "Whatever"
+            conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+            conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
+            conversion["BlockIO"] = "Whatever"
+            conversion["CPUPerc"] = "Whatever"
+            conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+            conversion["MemPerc"] = "Whatever"
+            conversion["MemUsage"] = "Whatever"
+            conversion["Name"] = item["metadata"]["name"]
+            conversion["NetIO"] = "Whatever"
+            conversion["PIDs"] = "Whatever"
+
+            # new things
+            conversion["Node"] = item["spec"]["nodeName"]
+            temp_vols=copy.deepcopy(item["spec"]["volumes"])
+            temp_str = ""
+            for vol_num in range(len(item["spec"]["volumes"])):
+                temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                del temp_vols[vol_num]["name"]
+                temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                
+            conversion["Volumes"] = temp_str
+            conversion["Namespace"] = item["metadata"]["namespace"]
+            
+            
+            conversions.append(conversion)
+        containers_merged = conversions
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -390,21 +451,86 @@ def send_alerts(message):
         print("Error sending alerts:",traceback.format_exc())
         
 def update_container_state_db():
-    containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-    containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-    containers_merged = []
-    for container_stats in containers_stats:
-        for container_ps in containers_ps:
-            for key1, value1 in json.loads(container_stats).items():
-                for key2, value2 in json.loads(container_ps).items():
-                    if key1 == "Name" and key2 == "Names":
-                        if value1 == value2:
-                            containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-    with mysql.connector.connect(**db_conn_info) as conn:
-        cursor = conn.cursor(buffered=True)
-        query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
-        cursor.execute(query,(json.dumps(containers_merged),))
-        conn.commit()
+    if not os.getenv("running_as_kubernetes"):
+        containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+        containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+        containers_merged = []
+        for container_stats in containers_stats:
+            for container_ps in containers_ps:
+                for key1, value1 in json.loads(container_stats).items():
+                    for key2, value2 in json.loads(container_ps).items():
+                        if key1 == "Name" and key2 == "Names":
+                            if value1 == value2:
+                                containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+        
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
+            cursor.execute(query,(json.dumps(containers_merged),))
+            conn.commit()
+    else:
+        raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+        conversions=[]
+        for item in raw_json["items"]:
+            conversion = {}
+            try:
+                command = item.get("command", [])
+                args = item.get("args", [])
+                full_command = command + args
+                if full_command:
+                    conversion["Command"] = full_command
+            except Exception as E: # no command set, read from image
+                #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                conversion["Command"] = "Whatever"
+            conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
+            conversion["ID"] = item["metadata"]["uid"]
+            conversion["Image"] = item["spec"]["containers"][0]["image"]
+            conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
+            conversion["LocalVolumes"] = "Whatever"
+            conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+            conversion["Names"] = item["metadata"]["name"]
+            conversion["Networks"] = "Whatever"
+            conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+
+            fmt = "%Y-%m-%dT%H:%M:%SZ"
+            dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
+            dt2 = datetime.now()
+            try:
+                conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
+            except Exception as E:
+                print(E)
+                conversion["RunningFor"] = "Not running"
+            conversion["Size"] = "Whatever"
+            conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+            conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
+            conversion["BlockIO"] = "Whatever"
+            conversion["CPUPerc"] = "Whatever"
+            conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+            conversion["MemPerc"] = "Whatever"
+            conversion["MemUsage"] = "Whatever"
+            conversion["Name"] = item["metadata"]["name"]
+            conversion["NetIO"] = "Whatever"
+            conversion["PIDs"] = "Whatever"
+
+            # new things
+            conversion["Node"] = item["spec"]["nodeName"]
+            temp_vols=copy.deepcopy(item["spec"]["volumes"])
+            temp_str = ""
+            for vol_num in range(len(item["spec"]["volumes"])):
+                temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                del temp_vols[vol_num]["name"]
+                temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                
+            conversion["Volumes"] = temp_str
+            conversion["Namespace"] = item["metadata"]["namespace"]
+            
+            conversions.append(conversion)
+            
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
+            cursor.execute(query,(json.dumps(conversions),))
+            conn.commit()
         
 mutex = Lock()
 def queued_running(command):
@@ -427,8 +553,8 @@ def send_advanced_alerts(message):
             em2 = format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")
             text_for_email+= 'These containers are not answering correctly to their "is alive" test: '+ ", ".join([a["container"] for a in message[1]])+"\n"
         if len(message[2])>0:
-            em3 = format_error_to_send("wasn't found running in docker ",", ".join(message[2]))
-            text_for_email+= "These containers weren't found in docker: "+ ", ".join(message[2])+"\n"
+            em3 = format_error_to_send("wasn't found running in kubernetes ",", ".join(message[2]))
+            text_for_email+= "These containers weren't found in kubernetes: "+ ", ".join(message[2])+"\n"
         if len(message[3])>0:
             text_for_email+= message[3]
         if len(message[4])>0:
@@ -446,8 +572,8 @@ def send_advanced_alerts(message):
             t2=format_error_to_send("is not answering correctly to its 'is alive' test ",filter_out_muted_failed_are_alive_for_telegram(message[1]))
             text_for_telegram+= 'These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1]))+"\n"
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
-            t3=format_error_to_send("wasn't found running in docker ",filter_out_muted_containers_for_telegram(message[2]))
-            text_for_telegram+= "These containers weren't found in docker: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
+            t3=format_error_to_send("wasn't found running in kubernetes ",filter_out_muted_containers_for_telegram(message[2]))
+            text_for_telegram+= "These containers weren't found in kubernetes: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
         if len(message[3])>0:
             text_for_telegram+= message[3]
         if len(message[4])>0:
@@ -826,8 +952,8 @@ def create_app():
             something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
             psw = something[something.find(":")+1:]
             if psw == request.form.to_dict()['psw']:
-                result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
-                log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                result = queued_running('kubectl rollout restart deployments/'+request.form.to_dict()['id']).stdout
+                log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                 return result
             else:
                 log_to_db('rebooting_containers', 'wrong authentication while restarting '+request.form.to_dict()['id'], request)
@@ -1037,19 +1163,79 @@ def create_app():
             print("Something went wrong during db logging because of:",traceback.format_exc())
     
     def get_container_data(do_not_jsonify=False):
-        containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-        containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-        containers_merged = []
-        for container_stats in containers_stats:
-            for container_ps in containers_ps:
-                for key1, value1 in json.loads(container_stats).items():
-                    for key2, value2 in json.loads(container_ps).items():
-                        if key1 == "Name" and key2 == "Names":
-                            if value1 == value2:
-                                containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        if do_not_jsonify:
-            return containers_merged
-        return jsonify(containers_merged)
+        if not os.getenv("running_as_kubernetes"):
+            containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+            containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
+            containers_merged = []
+            for container_stats in containers_stats:
+                for container_ps in containers_ps:
+                    for key1, value1 in json.loads(container_stats).items():
+                        for key2, value2 in json.loads(container_ps).items():
+                            if key1 == "Name" and key2 == "Names":
+                                if value1 == value2:
+                                    containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+            if do_not_jsonify:
+                return containers_merged
+            return jsonify(containers_merged)
+        else:
+            raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+            conversions=[]
+        for item in raw_json["items"]:
+            conversion = {}
+            try:
+                command = item.get("command", [])
+                args = item.get("args", [])
+                full_command = command + args
+                if full_command:
+                    conversion["Command"] = full_command
+            except Exception as E: # no command set, read from image
+                #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                conversion["Command"] = "Whatever"
+            conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
+            conversion["ID"] = item["metadata"]["uid"]
+            conversion["Image"] = item["spec"]["containers"][0]["image"]
+            conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
+            conversion["LocalVolumes"] = "Whatever"
+            conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+            conversion["Names"] = item["metadata"]["name"]
+            conversion["Networks"] = "Whatever"
+            conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+
+            fmt = "%Y-%m-%dT%H:%M:%SZ"
+            dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
+            dt2 = datetime.now()
+            try:
+                conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
+            except Exception as E:
+                print(E)
+                conversion["RunningFor"] = "Not running"
+            conversion["Size"] = "Whatever"
+            conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+            conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
+            conversion["BlockIO"] = "Whatever"
+            conversion["CPUPerc"] = "Whatever"
+            conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+            conversion["MemPerc"] = "Whatever"
+            conversion["MemUsage"] = "Whatever"
+            conversion["Name"] = item["metadata"]["name"]
+            conversion["NetIO"] = "Whatever"
+            conversion["PIDs"] = "Whatever"
+
+            # new things
+            conversion["Node"] = item["spec"]["nodeName"]
+            temp_vols=copy.deepcopy(item["spec"]["volumes"])
+            temp_str = ""
+            for vol_num in range(len(item["spec"]["volumes"])):
+                temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                del temp_vols[vol_num]["name"]
+                temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                
+            conversion["Volumes"] = temp_str
+            conversion["Namespace"] = item["metadata"]["namespace"]
+            
+            
+            conversions.append(conversion)
+        return jsonify(conversions)
     
     @app.route('/generate_clustered_pdf', methods=['GET'])
     def generate_clustered_pdf():

@@ -14,4 +14,8 @@ COPY /. /app
 
 RUN pip install -r image/requirements.txt 
 
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+
+RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
 CMD ["waitress-serve", "--port", "9080", "--call", "flask_app_k8s:create_app"]
