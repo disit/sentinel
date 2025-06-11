@@ -263,15 +263,15 @@ def auto_alert_status():
                     conversion["Command"] = full_command
             except Exception as E: # no command set, read from image
                 #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
-                conversion["Command"] = "Whatever"
+                conversion["Command"] = "Command not found"
             conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
             conversion["ID"] = item["metadata"]["uid"]
             conversion["Image"] = item["spec"]["containers"][0]["image"]
             conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            conversion["LocalVolumes"] = "Whatever"
+            #conversion["LocalVolumes"] = "Whatever"
             conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
             conversion["Names"] = item["metadata"]["name"]
-            conversion["Networks"] = "Whatever"
+            #conversion["Networks"] = "Whatever"
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -282,17 +282,17 @@ def auto_alert_status():
             except Exception as E:
                 print(E)
                 conversion["RunningFor"] = "Not running"
-            conversion["Size"] = "Whatever"
+            #conversion["Size"] = "Whatever"
             conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
             conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            conversion["BlockIO"] = "Whatever"
-            conversion["CPUPerc"] = "Whatever"
+            #conversion["BlockIO"] = "Whatever"
+            #conversion["CPUPerc"] = "Whatever"
             conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            conversion["MemPerc"] = "Whatever"
-            conversion["MemUsage"] = "Whatever"
+            #conversion["MemPerc"] = "Whatever"
+            #conversion["MemUsage"] = "Whatever"
             conversion["Name"] = item["metadata"]["name"]
-            conversion["NetIO"] = "Whatever"
-            conversion["PIDs"] = "Whatever"
+            #conversion["NetIO"] = "Whatever"
+            #conversion["PIDs"] = "Whatever"
 
             # new things
             conversion["Node"] = item["spec"]["nodeName"]
@@ -481,15 +481,15 @@ def update_container_state_db():
                     conversion["Command"] = full_command
             except Exception as E: # no command set, read from image
                 #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
-                conversion["Command"] = "Whatever"
+                conversion["Command"] = "Command not found"
             conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
             conversion["ID"] = item["metadata"]["uid"]
             conversion["Image"] = item["spec"]["containers"][0]["image"]
             conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            conversion["LocalVolumes"] = "Whatever"
+            #conversion["LocalVolumes"] = "Whatever"
             conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
             conversion["Names"] = item["metadata"]["name"]
-            conversion["Networks"] = "Whatever"
+            #conversion["Networks"] = "Whatever"
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -500,17 +500,17 @@ def update_container_state_db():
             except Exception as E:
                 print(E)
                 conversion["RunningFor"] = "Not running"
-            conversion["Size"] = "Whatever"
+            #conversion["Size"] = "Whatever"
             conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
             conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            conversion["BlockIO"] = "Whatever"
-            conversion["CPUPerc"] = "Whatever"
+            #conversion["BlockIO"] = "Whatever"
+            #conversion["CPUPerc"] = "Whatever"
             conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            conversion["MemPerc"] = "Whatever"
-            conversion["MemUsage"] = "Whatever"
+            #conversion["MemPerc"] = "Whatever"
+            #conversion["MemUsage"] = "Whatever"
             conversion["Name"] = item["metadata"]["name"]
-            conversion["NetIO"] = "Whatever"
-            conversion["PIDs"] = "Whatever"
+            #conversion["NetIO"] = "Whatever"
+            #conversion["PIDs"] = "Whatever"
 
             # new things
             conversion["Node"] = item["spec"]["nodeName"]
@@ -1190,15 +1190,15 @@ def create_app():
                     conversion["Command"] = full_command
             except Exception as E: # no command set, read from image
                 #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
-                conversion["Command"] = "Whatever"
+                conversion["Command"] = "Command not found"
             conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
             conversion["ID"] = item["metadata"]["uid"]
             conversion["Image"] = item["spec"]["containers"][0]["image"]
             conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            conversion["LocalVolumes"] = "Whatever"
+            #conversion["LocalVolumes"] = "Whatever"
             conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
             conversion["Names"] = item["metadata"]["name"]
-            conversion["Networks"] = "Whatever"
+            #conversion["Networks"] = "Whatever"
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -1209,17 +1209,17 @@ def create_app():
             except Exception as E:
                 print(E)
                 conversion["RunningFor"] = "Not running"
-            conversion["Size"] = "Whatever"
+            #conversion["Size"] = "Whatever"
             conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
             conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            conversion["BlockIO"] = "Whatever"
-            conversion["CPUPerc"] = "Whatever"
+            #conversion["BlockIO"] = "Whatever"
+            #conversion["CPUPerc"] = "Whatever"
             conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            conversion["MemPerc"] = "Whatever"
-            conversion["MemUsage"] = "Whatever"
+            #conversion["MemPerc"] = "Whatever"
+            #conversion["MemUsage"] = "Whatever"
             conversion["Name"] = item["metadata"]["name"]
-            conversion["NetIO"] = "Whatever"
-            conversion["PIDs"] = "Whatever"
+            #conversion["NetIO"] = "Whatever"
+            #conversion["PIDs"] = "Whatever"
 
             # new things
             conversion["Node"] = item["spec"]["nodeName"]
