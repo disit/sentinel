@@ -37,6 +37,51 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import concurrent.futures
 import re
+from flask import Flask, render_template, request, redirect, url_for, session
+from werkzeug.security import check_password_hash
+from datetime import timedelta
+
+
+os.environ["PYTHONUNBUFFERED"]="1"
+os.environ["admin-log-length"]="200"
+os.environ["default-log-length"]="1000"
+os.environ["requests-timeout"]="15000"
+os.environ["is-master"]="true"
+os.environ["telegram-api-token"]="replaceme"
+os.environ["telegram-channel"]="123456789"
+os.environ["db-user"]="root"
+os.environ["db-passwd"]="cPehkP5bbNJMt6Ao"
+os.environ["db-host"]="sentineldb"
+os.environ["db-port"]="3306"
+os.environ["smtp-server"]="change.me.com"
+os.environ["smtp-port"]="587"
+os.environ["sender-email"]="change@at.me"
+os.environ["sender-email-password"]="replacethispassword"
+os.environ["email-recipients"]="['first_address@to.besent', 'second_address@to.besent', 'more_addresses@to.besent']"
+os.environ["platform-url"]="http://example.org"
+os.environ["platform-explanation"]="Some information"
+os.environ["load-threshold"]="30"
+os.environ["memory-threshold"]="1"
+os.environ["running_as_kubernetes"]="True"
+
+def string_of_list_to_list(string):
+    try:
+        a = string[1:-1]
+        a = a.replace('"',"")
+        a = a.replace("'","")
+        ret = a.split(",")
+        return [b.strip() for b in ret]
+    except:
+        raise Exception("Couldn't do it")
+
+USERS_FILE = 'authtest/users.txt'
+
+users = {}
+with open(USERS_FILE, 'r') as f:
+    for line in f:
+        if ' ' in line:
+            username, hashed = line.strip().split(': ', 1)
+            users[username] = hashed
 
 
 class Snap4SentinelTelegramBot:
@@ -213,7 +258,7 @@ def filter_out_wrong_status_containers_for_telegram(containers):
     return ", ".join([a["Name"] for a in new_elements])
 
 def isalive():
-    send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), json.loads(os.getenv("email-recipients")), os.getenv("platform-url")+" is alive", os.getenv("platform-url")+" is alive")
+    send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is alive", os.getenv("platform-url")+" is alive")
     send_telegram(int(os.getenv("telegram-channel")), os.getenv("platform-url")+" is alive")
     return
 
@@ -445,7 +490,7 @@ def get_top():
 
 def send_alerts(message):
     try:
-        send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), json.loads(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", message)
+        send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", message)
         send_telegram(int(os.getenv("telegram-channel")), message)
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
@@ -561,7 +606,7 @@ def send_advanced_alerts(message):
             text_for_email+= message[4]
         try:
             if len(text_for_email) > 5:
-                send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), json.loads(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
+                send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
         except:
             print("[ERROR] while sending email:",text_for_email)
         text_for_telegram, t1, t2, t3 = "", "", "", ""
@@ -598,83 +643,77 @@ auto_alert_status()
 def create_app():
     app = Flask(__name__)
     app.secret_key = b'\x8a\x17\x93kT\xc0\x0b6;\x93\xfdp\x8bLl\xe6u\xa9\xf5x'
+    app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
 
     @app.route("/")
     def main_page():
-        if os.getenv("is-master"):
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    user = ""
-                    try:
-                        user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-                        user = user[:user.find(":")]
-                    except Exception:
-                        pass
+        try:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                if 'username' in session:
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join category_test on id = category_test.test left join categories on categories.idcategories = category_test.category;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
-                    if user != "admin":
-                        return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=user)
+                    if session['username'] != "admin":
+                        return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
                         cursor.execute(query_2, (int(os.getenv("admin-log-length")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=user,platform=os.getenv("platform-url"))
-            except Exception:
-                print("Something went wrong because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+                        return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
+                return redirect(url_for('login'))
+        except Exception:
+            print("Something went wrong because of",traceback.format_exc())
+            return render_template("error_showing.html", r = traceback.format_exc()), 500
     
     @app.route("/get_local_top", methods=["GET"])
     def get_local_top():
-        json_data=get_top()
-        json_data["source"] = os.getenv("platform-url")
-        with mysql.connector.connect(**db_conn_info) as conn:
+        if 'username' in session:
+            json_data=get_top()
+            json_data["source"] = os.getenv("platform-url")
+            with mysql.connector.connect(**db_conn_info) as conn:
+                try:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT ip FROM checker.ip_table where hostname = %s'''
+                    cursor.execute(query,(os.getenv("platform-url"),))
+                    conn.commit()
+                    result = cursor.fetchone()
+                    print(result)
+                    if len(result) > 0:
+                        json_data["source"].append(" - " + result[0])
+                except Exception as E:
+                    pass
+                    # no conversion for ip, not a big deal
             try:
-                cursor = conn.cursor(buffered=True)
-                query = '''SELECT ip FROM checker.ip_table where hostname = %s'''
-                cursor.execute(query,(os.getenv("platform-url"),))
-                conn.commit()
-                result = cursor.fetchone()
-                print(result)
-                if len(result) > 0:
-                    json_data["source"].append(" - " + result[0])
+                form_dict = request.form.to_dict()
+                amount_of_lines = form_dict.pop('top_lines')
+                json_data['processes']=json_data['processes'][:int(amount_of_lines)]
             except Exception as E:
-                pass
-                # no conversion for ip, not a big deal
-        try:
-            form_dict = request.form.to_dict()
-            amount_of_lines = form_dict.pop('top_lines')
-            json_data['processes']=json_data['processes'][:int(amount_of_lines)]
-        except Exception as E:
-            json_data['processes']=json_data['processes'][:40]
-        if os.getenv("is-master"):
-            jsontobereturned = {"result":json_data, "error":[]}
-            return render_template("top-viewer.html", data=jsontobereturned), 200
-        else:
-            return json_data
+                json_data['processes']=json_data['processes'][:40]
+            if os.getenv("is-master"):
+                jsontobereturned = {"result":json_data, "error":[]}
+                return render_template("top-viewer.html", data=jsontobereturned), 200
+            else:
+                return json_data
+        return render_template("error_showing.html", r = "You are not authenticated"), 403
     
+
     @app.route("/get_top", methods=["GET"])
     def get_top_single():
-        return get_local_top()
+        if 'username' in session:
+            return get_local_top()
+        return render_template("error_showing.html", r = "You are not authenticated"), 403
         
 
     @app.route("/organize_containers", methods=["GET"])
     def organize_containers():
-        if os.getenv("is-master"):
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    user = ""
-                    try:
-                        user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-                        user = user[:user.find(":")]
-                    except Exception:
-                        pass
-                    if user!="admin":
+                    if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
@@ -690,20 +729,14 @@ def create_app():
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+        return redirect(url_for('login'))
         
     @app.route("/add_container", methods=["POST"])
     def add_container():
-        if os.getenv("is-master"):
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    user = ""
-                    try:
-                        user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-                        user = user[:user.find(":")]
-                    except Exception:
-                        pass
-                    if user!="admin":
+                    if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
@@ -714,116 +747,134 @@ def create_app():
             except Exception:
                 print("Something went wrong during the addition of a new container because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+        return redirect(url_for('login'))
         
     @app.route("/delete_container", methods=["POST"])
     def delete_container():
-        if os.getenv("is-master"):
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    user = ""
-                    try:
-                        user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-                        user = user[:user.find(":")]
-                    except Exception:
-                        pass
-                    if user!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    cursor = conn.cursor(buffered=True)
-                    # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''DELETE FROM `checker`.`component_to_category` WHERE (`component` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['id'],))
-                    conn.commit()
-                    return "ok", 201
-            except Exception:
-                print("Something went wrong during the deletion of a container because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+        if 'username' in session:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                cursor = conn.cursor(buffered=True)
+                # to run malicious code, malicious code must be present in the db or the machine in the first place
+                query = '''DELETE FROM `checker`.`component_to_category` WHERE (`component` = %s);'''
+                cursor.execute(query, (request.form.to_dict()['id'],))
+                conn.commit()
+                return "ok", 201
+        return redirect(url_for('login'))
+    
+    @app.route("/login", methods=['GET', 'POST'])
+    def login():
+        if request.method == 'POST':
+            username = request.form['username']
+            password = request.form['password']
+            print(username)
+            print(check_password_hash(users[username], password))
+            if username in users and check_password_hash(users[username], password):
+                session.permanent = True
+                session['username'] = username
+                return redirect(url_for('dashboard'))
+            return "Invalid credentials", 401
+        return render_template('login.html')
+
+    @app.route("/logout")
+    def logout():
+        session.clear()
+        return redirect(url_for('login'))
 
     @app.route("/get_data_from_source", methods=["GET"])
     def get_additional_data():
-        try:
-            response = requests.get(request.args.to_dict()['url_of_resource'])
-            response.raise_for_status()
-            return response.text
-        except Exception:
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
+        if 'username' in session:
+            try:
+                response = requests.get(request.args.to_dict()['url_of_resource'])
+                response.raise_for_status()
+                return response.text
+            except Exception:
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
     
     @app.route("/get_complex_test_buttons")
     def get_complex_test_buttons():
-        try:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                # to run malicious code, malicious code must be present in the db or the machine in the first place
-                query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join category_test on id = category_test.test left join categories on categories.idcategories = category_test.category;'''
-                cursor.execute(query)
-                conn.commit()
-                results = cursor.fetchall()
-                return results
-        except Exception:
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
-        
-    @app.route("/container_is_okay", methods=['POST'])
-    def make_category_green():
-        if request.method == "POST":
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    update_categories_query=f"""UPDATE `checker`.`summary_status` SET `status` = %s WHERE (`category` = %s);"""
-                    cursor.execute(update_categories_query, (greendot, request.form.to_dict()['container'],))
+                    # to run malicious code, malicious code must be present in the db or the machine in the first place
+                    query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join category_test on id = category_test.test left join categories on categories.idcategories = category_test.category;'''
+                    cursor.execute(query)
                     conn.commit()
-                    return "👌"
+                    results = cursor.fetchall()
+                    return results
             except Exception:
-                send_alerts("Can't reach db due to",traceback.format_exc())
-                return render_template("error_showing.html", r =  "There was a problem: "+traceback.format_exc()), 500
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+        
+    @app.route("/container_is_okay", methods=['POST'])
+    def make_category_green():
+        if 'username' in session:
+            if request.method == "POST":
+                try:
+                    with mysql.connector.connect(**db_conn_info) as conn:
+                        cursor = conn.cursor(buffered=True)
+                        update_categories_query=f"""UPDATE `checker`.`summary_status` SET `status` = %s WHERE (`category` = %s);"""
+                        cursor.execute(update_categories_query, (greendot, request.form.to_dict()['container'],))
+                        conn.commit()
+                        return "👌"
+                except Exception:
+                    send_alerts("Can't reach db due to",traceback.format_exc())
+                    return render_template("error_showing.html", r =  "There was a problem: "+traceback.format_exc()), 500
+        return redirect(url_for('login'))
         
     @app.route("/read_containers", methods=['POST'])
     def check():
-        return get_container_data()
-            
+        if 'username' in session:
+            return get_container_data()
+        return redirect(url_for('login'))
             
     def send_request(url, headers):
         return requests.post(url, headers=headers)
     
     @app.route("/read_containers_db", methods=['GET'])
     def check_container_db():
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        with mysql.connector.connect(**db_conn_info) as conn:
-            try:
-                cursor = conn.cursor(buffered=True)
-                query = '''SELECT containers, sampled_at FROM checker.container_data order by sampled_at desc limit 1;'''
-                cursor.execute(query)
-                conn.commit()
-                result = cursor.fetchone()
-                tobereturned_answer = {"result":json.loads(result[0]), "error":[]}
-            except Exception as E:
-                tobereturned_answer = {"result": {}, "error":["Couldn't load container data because of "+str(E)]}
-            return tobereturned_answer
+        if 'username' in session:
+            if not os.getenv("is-master"):
+                return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+            with mysql.connector.connect(**db_conn_info) as conn:
+                try:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT containers, sampled_at FROM checker.container_data order by sampled_at desc limit 1;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    result = cursor.fetchone()
+                    tobereturned_answer = {"result":json.loads(result[0]), "error":[]}
+                except Exception as E:
+                    tobereturned_answer = {"result": {}, "error":["Couldn't load container data because of "+str(E)]}
+                return tobereturned_answer
+        return redirect(url_for('login'))
             
             
     @app.route("/advanced_read_containers", methods=['POST'])
     def check_adv():
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        try:
-            results = None
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
-                cursor.execute(query)
-                conn.commit()
-                results = cursor.fetchall()
-                total_answer=[]
-                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                    futures = [executor.submit(send_request, r[0]+"/sentinel/read_containers", request.headers) for r in results]
-                    for future in concurrent.futures.as_completed(futures):
-                        total_answer += json.loads(future.result().text)
-                tobereturned_answer = {"result":total_answer, "error":[]}
-                return tobereturned_answer
-        except Exception:
-            print("Something went wrong because of:",traceback.format_exc())
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
+        if 'username' in session:
+            try:
+                results = None
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT distinct position FROM checker.component_to_category;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    total_answer=[]
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                        futures = [executor.submit(send_request, r[0]+"/sentinel/read_containers", request.headers) for r in results]
+                        for future in concurrent.futures.as_completed(futures):
+                            total_answer += json.loads(future.result().text)
+                    tobereturned_answer = {"result":total_answer, "error":[]}
+                    return tobereturned_answer
+            except Exception:
+                print("Something went wrong because of:",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
 
     def get_container_categories():
         try:
@@ -851,9 +902,9 @@ def create_app():
             print("Something went wrong because of:",traceback.format_exc())
             return "Error in get extra data!"
         
-    @app.route("/run_test", methods=['POST','GET'])
+    @app.route("/run_test", methods=['POST'])
     def run_test():
-        if request.method == "POST":
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
@@ -876,13 +927,12 @@ def create_app():
             except Exception:
                 print("Something went wrong during tests running because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        else:
-            log_to_db('asking_containers', "POST wasn't used in the request", request)
-            return "False"
+        return redirect(url_for('login'))
+    
         
-    @app.route("/run_test_complex", methods=['POST','GET'])
+    @app.route("/run_test_complex", methods=['POST'])
     def run_test_complex():
-        if request.method == "POST":
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
@@ -912,83 +962,83 @@ def create_app():
             except Exception:
                 print("Something went wrong during tests running because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        else:
-            log_to_db('asking_containers', "POST wasn't used in the request", request)
-            return "False"
+        return redirect(url_for('login'))
         
     @app.route("/reboot/<container_id>", methods=['POST', 'GET'])
     def reboot(container_id):
-        try:
-            return render_template("reboot.html", container=container_id)
-        except Exception:
-            print("Something went wrong during rebooting because of:",traceback.format_exc())
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
+        if 'username' in session:
+            try:
+                return render_template("reboot.html", container=container_id)
+            except Exception:
+                print("Something went wrong during rebooting because of:",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
         
         
     @app.route("/test_all_ports", methods=['GET'])
     def test_all_ports():
-        result = {}
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            # to run malicious code, malicious code must be present in the db or the machine in the first place
-            query = '''select container_name, command from tests_table;'''
-            cursor.execute(query)
-            conn.commit()
-            results = cursor.fetchall()
-            for r in list(results):
-                command_ran = subprocess.run(r[1], shell=True, capture_output=True, text=True, encoding="cp437").stdout
-                result[r[0]]=command_ran
-        return result
+        if 'username' in session:
+            result = {}
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                # to run malicious code, malicious code must be present in the db or the machine in the first place
+                query = '''select container_name, command from tests_table;'''
+                cursor.execute(query)
+                conn.commit()
+                results = cursor.fetchall()
+                for r in list(results):
+                    command_ran = subprocess.run(r[1], shell=True, capture_output=True, text=True, encoding="cp437").stdout
+                    result[r[0]]=command_ran
+            return result
+        return redirect(url_for('login'))
             
     @app.route("/deauthenticate", methods=['POST','GET'])
     def deauthenticate():
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+        session.clear()
         return "You have been deauthenticated", 401
         
-    @app.route("/reboot_container", methods=['POST','GET'])
+    @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
-        if request.method == "POST":
-            something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-            psw = something[something.find(":")+1:]
-            if psw == request.form.to_dict()['psw']:
-                result = queued_running('kubectl rollout restart deployments/'+request.form.to_dict()['id']).stdout
-                log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
-                return result
-            else:
-                log_to_db('rebooting_containers', 'wrong authentication while restarting '+request.form.to_dict()['id'], request)
-                return "Container not rebooted", 401
-        else: 
-            log_to_db('rebooting_containers', "POST wasn't used in the request", request)
-            return "False"
+        if 'username' in session:
+            if request.method == "POST":
+                something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
+                psw = something[something.find(":")+1:]
+                if psw == request.form.to_dict()['psw']:
+                    result = queued_running('kubectl rollout restart deployments/'+request.form.to_dict()['id']).stdout
+                    log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                    return result
+                else:
+                    log_to_db('rebooting_containers', 'wrong authentication while restarting '+request.form.to_dict()['id'], request)
+                    return "Container not rebooted", 401
+            else: 
+                log_to_db('rebooting_containers', "POST wasn't used in the request", request)
+                return "False"
+        return redirect(url_for('login'))
             
-    @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
-    def reboot_container_advanced(container_id):
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        if request.method == "POST":
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-                    psw = something[something.find(":")+1:]
-                    cursor = conn.cursor(buffered=True)
-                    # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''SELECT position FROM checker.component_to_category where component=%s;'''
-                    cursor.execute(query, (container_id,))
-                    conn.commit()
-                    results = cursor.fetchall()
-                    r = requests.post(results[0][0]+"/sentinel/reboot_container", headers=request.headers, data={"id": container_id, "psw": psw})
-                    return r.text
-            except Exception:
-                print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        else: 
-            log_to_db('rebooting_containers', "POST wasn't used in the request", request)
-            return "False"
+    @app.route("/reboot_container_advanced/<container_id>", methods=['POST'])
+    def reboot_container_advanced(container_id): #probably unneeded
+        if 'username' in session:
+            if request.method == "POST":
+                try:
+                    with mysql.connector.connect(**db_conn_info) as conn:
+                        something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
+                        psw = something[something.find(":")+1:]
+                        cursor = conn.cursor(buffered=True)
+                        # to run malicious code, malicious code must be present in the db or the machine in the first place
+                        query = '''SELECT position FROM checker.component_to_category where component=%s;'''
+                        cursor.execute(query, (container_id,))
+                        conn.commit()
+                        results = cursor.fetchall()
+                        r = requests.post(results[0][0]+"/sentinel/reboot_container", headers=request.headers, data={"id": container_id, "psw": psw})
+                        return r.text
+                except Exception:
+                    print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
+                    return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
             
     @app.route("/get_muted_components", methods=['GET'])
     def get_muted_components():
-        if request.method == "GET":
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
@@ -1003,18 +1053,13 @@ def create_app():
             except Exception:
                 print("Something went wrong during getting the muted components because:",traceback.format_exc())
                 return traceback.format_exc(), 500
-        else: 
-            return "You can't use a POST here.", 400
+        return redirect(url_for('login'))
             
     @app.route("/mute_component_by_hours", methods=['POST'])
     def mute_component_by_hours():
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        if request.method == "POST":
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-                    psw = something[something.find(":")+1:]
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''INSERT INTO telegram_alert_pauses (`component`, `until`) VALUES (%s, %s);'''
@@ -1024,12 +1069,11 @@ def create_app():
             except Exception:
                 print("Something went wrong during muting a component because of:",traceback.format_exc())
                 return traceback.format_exc(), 500
-        else: 
-            return "You may only use a POST here.", 400
+        return redirect(url_for('login'))
         
-    @app.route("/tests_results", methods=['POST','GET'])
+    @app.route("/tests_results", methods=['POST'])
     def get_tests():
-        if request.method == "POST":
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
@@ -1045,45 +1089,40 @@ def create_app():
             except Exception:
                 print("Something went wrong because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        else: 
-            log_to_db('getting_tests', "POST wasn't used in the request", request)
-            return "False"
+        return redirect(url_for('login'))
         
     # this is only called serverside
-    def log_to_db(table, log, request=None, which_test=""):
-        if (request):
-            user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-            user = user[:user.find(":")] 
-        else:
-            user = "Unidentified user"
+    def log_to_db(table, log, _=None, which_test=""): #FIXME, remove 3rd param from other calls
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 if table != "test_ran":
-                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator) VALUES (NOW(),'{}','{}')'''.format(table, log.replace("'","''"), user))
+                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator) VALUES (NOW(),'{}','{}')'''.format(table, log.replace("'","''"), session['username']))
                 else:
-                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator, test) VALUES (NOW(),'{}','{}','{}')'''.format(table, log.replace("'","''"), user, which_test))
+                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator, test) VALUES (NOW(),'{}','{}','{}')'''.format(table, log.replace("'","''"), session['username'], which_test))
                 conn.commit()
         except Exception:
             print("Something went wrong during db logging because of:",traceback.format_exc(), "- in:",table)
             
     @app.route("/load_db",methods=['POST'])
     def load_db():
-        trying_to_load_db_resulted_in = subprocess.run(f'mysql -u {os.getenv("db-user")} --password={os.getenv("db-passwd")} -D checker < just_complex.sql', shell=True, capture_output=True, text=True, encoding="utf_8")
-        out = trying_to_load_db_resulted_in.stdout
-        err = trying_to_load_db_resulted_in.stderr
-        if "mysql: [Warning] Using a password on the command line interface can be insecure" in err:
-            err = ""
-        else:
-            err = '<p style="color:#FF0000";>'+err+'</p>'
-        if len(err)==0 and len(out)==0:
-            out = '<input type="button" name="db-success" id="db-success" value="Success! Click to reload" class="form-control" onclick="location.reload()"/>'
-        return err+out
+        if 'username' in session:
+            trying_to_load_db_resulted_in = subprocess.run(f'mysql -u {os.getenv("db-user")} --password={os.getenv("db-passwd")} -D checker < just_complex.sql', shell=True, capture_output=True, text=True, encoding="utf_8")
+            out = trying_to_load_db_resulted_in.stdout
+            err = trying_to_load_db_resulted_in.stderr
+            if "mysql: [Warning] Using a password on the command line interface can be insecure" in err:
+                err = ""
+            else:
+                err = '<p style="color:#FF0000";>'+err+'</p>'
+            if len(err)==0 and len(out)==0:
+                out = '<input type="button" name="db-success" id="db-success" value="Success! Click to reload" class="form-control" onclick="location.reload()"/>'
+            return err+out
+        return redirect(url_for('login'))
     
     
     @app.route("/get_complex_tests", methods=["GET"])
     def get_complex_tests():
-        if request.method == "GET":
+        if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
@@ -1099,68 +1138,62 @@ def create_app():
             except Exception:
                 print("Something went wrong because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        else: 
-            log_to_db('getting_tests', "POST wasn't used in the request", request)
-            return "False"
+        return redirect(url_for('login'))
     
     @app.route("/container/<podname>")
     def get_container_logs(podname):
-        something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-        try:
-            user = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-            psw = something[something.find(":")+1:]
-            # maybe use user and psw later
-        except Exception:
-            print("Probably fucked up the authentication:",traceback.format_exc())
-            return render_template("error_showing.html", r = traceback.format_exc()), 401
-        process = subprocess.Popen(
-            'kubectl logs '+podname+" --tail "+str(int(os.getenv("default-log-length"))),
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-            text=True
-        )
-        out=[]
-        for line in iter(process.stdout.readline, ''):
-            out.append(line[:-1])
-        process.stdout.close()
-        r = '<br>'.join(out)
-        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+        if 'username' in session:
+            process = subprocess.Popen(
+                'kubectl logs '+podname+" --tail "+str(int(os.getenv("default-log-length"))),
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                text=True
+            )
+            out=[]
+            for line in iter(process.stdout.readline, ''):
+                out.append(line[:-1])
+            process.stdout.close()
+            r = '<br>'.join(out)
+            return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+        return redirect(url_for('login'))
         
 
     
     @app.route("/advanced-container/<container_id>")
     def get_container_logs_advanced(container_id):
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        try:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-                psw = something[something.find(":")+1:]
-                cursor = conn.cursor(buffered=True)
-                # to run malicious code, malicious code must be present in the db or the machine in the first place
-                query = '''SELECT position FROM checker.component_to_category where component=%s;'''
-                cursor.execute(query, (container_id,))
-                conn.commit()
-                results = cursor.fetchall()
-                if len(results) == 0:
-                    return render_template("error_showing.html", r = "It appears that the container "+container_id+" doesn't exist in the cluster"), 500
-                r = requests.get(results[0][0]+"/sentinel/container/"+container_id, headers=request.headers, data={"id": container_id, "psw": psw})
-                return r.text
-        except Exception:
-            print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
-            return render_template("error_showing.html", r = traceback.format_exc() + str(results)), 500
+        if 'username' in session: # probably unneeded
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
+                    psw = something[something.find(":")+1:]
+                    cursor = conn.cursor(buffered=True)
+                    # to run malicious code, malicious code must be present in the db or the machine in the first place
+                    query = '''SELECT position FROM checker.component_to_category where component=%s;'''
+                    cursor.execute(query, (container_id,))
+                    conn.commit()
+                    results = cursor.fetchall()
+                    if len(results) == 0:
+                        return render_template("error_showing.html", r = "It appears that the container "+container_id+" doesn't exist in the cluster"), 500
+                    r = requests.get(results[0][0]+"/sentinel/container/"+container_id, headers=request.headers, data={"id": container_id, "psw": psw})
+                    return r.text
+            except Exception:
+                print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc() + str(results)), 500
+        return redirect(url_for('login'))
     
     @app.route("/get_summary_status")
     def get_summary_status():
-        try:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                cursor.execute('''SELECT * FROM summary_status;''')
-                results = cursor.fetchall()
-                return jsonify(results)
-        except Exception:
-            print("Something went wrong during db logging because of:",traceback.format_exc())
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    cursor.execute('''SELECT * FROM summary_status;''')
+                    results = cursor.fetchall()
+                    return jsonify(results)
+            except Exception:
+                print("Something went wrong during db logging because of:",traceback.format_exc())
+        return redirect(url_for('login'))
     
     def get_container_data(do_not_jsonify=False):
         if not os.getenv("running_as_kubernetes"):
@@ -1237,188 +1270,188 @@ def create_app():
             conversions.append(conversion)
         return jsonify(conversions)
     
-    @app.route('/generate_clustered_pdf', methods=['GET'])
-    def generate_clustered_pdf():
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        user = ""
-        try:
-            user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-            user = user[:user.find(":")]
-        except Exception:
-            return render_template("error_showing.html", r = "Issues during the establishing of the user: "+ traceback.format_exc()), 500
-        if user != "admin":
-            return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
-        try:
-            results = None
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
-                cursor.execute(query)
-                conn.commit()
-                results = cursor.fetchall()
-                error = False
-                errorText = ""
-                subprocess.run(f'rm -f *-*logs.pdf snap4city-clustered-reports.pdf.rar', shell=True)
-                for r in results:
-                    file_name, content_disposition = "", ""
-                    obtained = requests.get(r[0]+"/sentinel/generate_pdf", headers=request.headers)
-                    if 'Content-Disposition' in obtained.headers:
-                        content_disposition = obtained.headers['Content-Disposition']
-                    if 'filename=' in content_disposition:
-                        file_name = content_disposition.split('filename=')[1].strip('"')
-                    if len(file_name) < 1:
-                        errorText += "Couldn't quite get the file: " + r[0] + "\n"
-                        error = True
-                    if obtained.status_code == 200 and len(file_name) > 1:
-                        with open(urlparse(r[0]).hostname + ' - ' +file_name, "wb+") as file:
-                            if not error:
-                                file.write(obtained.content)
+    @app.route("/generate_clustered_pdf", methods=['GET'])
+    def generate_clustered_pdf(): #probably not needed
+        if 'username' in session:
+            if session['username'] != "admin":
+                return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
+            try:
+                results = None
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT distinct position FROM checker.component_to_category;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    error = False
+                    errorText = ""
+                    subprocess.run(f'rm -f *-*logs.pdf snap4city-clustered-reports.pdf.rar', shell=True)
+                    for r in results:
+                        file_name, content_disposition = "", ""
+                        obtained = requests.get(r[0]+"/sentinel/generate_pdf", headers=request.headers)
+                        if 'Content-Disposition' in obtained.headers:
+                            content_disposition = obtained.headers['Content-Disposition']
+                        if 'filename=' in content_disposition:
+                            file_name = content_disposition.split('filename=')[1].strip('"')
+                        if len(file_name) < 1:
+                            errorText += "Couldn't quite get the file: " + r[0] + "\n"
+                            error = True
+                        if obtained.status_code == 200 and len(file_name) > 1:
+                            with open(urlparse(r[0]).hostname + ' - ' +file_name, "wb+") as file:
+                                if not error:
+                                    file.write(obtained.content)
+                        else:
+                            error = True
+                            errorText += "Couldn't read file from sentinel located at " + r[0] + " because of error in request: "+ str(obtained.status_code) + '\n'
+                    if error:
+                        return render_template("error_showing.html", r = errorText.replace("\n","<br>")), 500
                     else:
-                        error = True
-                        errorText += "Couldn't read file from sentinel located at " + r[0] + " because of error in request: "+ str(obtained.status_code) + '\n'
-                if error:
-                    return render_template("error_showing.html", r = errorText.replace("\n","<br>")), 500
-                else:
-                    subfolder = "pdf-cluster-"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                    print(subprocess.run(f"rar a snap4city-clustered-reports.pdf.rar *-*logs.pdf; mkdir {subfolder}; cp snap4city-clustered-reports.pdf.rar {subfolder}/snap4city-clustered-reports.pdf.rar", shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
-                    return send_file(f'snap4city-clustered-reports.pdf.rar')
-        except Exception:
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
+                        subfolder = "pdf-cluster-"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                        print(subprocess.run(f"rar a snap4city-clustered-reports.pdf.rar *-*logs.pdf; mkdir {subfolder}; cp snap4city-clustered-reports.pdf.rar {subfolder}/snap4city-clustered-reports.pdf.rar", shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+                        return send_file(f'snap4city-clustered-reports.pdf.rar')
+            except Exception:
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
     
-    @app.route('/generate_pdf', methods=['GET'])
+    @app.route("/generate_pdf", methods=['GET'])
     def generate_pdf():
-        data_stored = []
-        for container_data in get_container_data(True):
-            process = subprocess.Popen(
-                'kubectl logs '+container_data['ID']+" --tail "+str(os.getenv("default-log-length")),
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                text=True
-            )
-            out=[]
-            for line in iter(process.stdout.readline, ''):
-                out.append(line[:-1])
-            process.stdout.close()
-            r = '<br>'.join(out)
-            #r = '<br>'.join(subprocess.run('docker logs '+container_data['ID'] + ' --tail '+os.getenv("default-log-length"), shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n'))
-            data_stored.append({"header": container_data['Name'], "string": r})
-        
-        # Create a PDF document
-        subfolder = "pdf"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        pdf_output_path = subfolder+"/logs.pdf"
-        os.makedirs(subfolder)
-        doc = SimpleDocTemplate(pdf_output_path, pagesize=letter, leftMargin=0.5*inch, rightMargin=0.5*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
-        styles = getSampleStyleSheet()
-        # Initialize list to store content
-        content = []
-        extra_logs = []
-        tests_out = None
-        extra_tests = []
-        
-        try:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                query = '''WITH RankedEntries AS ( 
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY container ORDER BY datetime DESC) AS row_num FROM tests_results
-                    ) 
-                    SELECT * FROM RankedEntries WHERE row_num = 1;'''
-                cursor.execute(query)
-                conn.commit()
-                log_to_db('getting_tests', 'Tests results were read', request)
-                results = cursor.fetchall()
-                tests_out = results
-        except Exception:
-            print("Something went wrong because of:",traceback.format_exc())
-        # index
-        content.append(Paragraph("The following are hyperlinks to logs of each container.", styles["Heading1"]))
-        for pair in data_stored:
-            if pair["header"] in ['dashboard-backend','myldap']:
-                continue
-            content.append(Paragraph(f'<a href="#c-{pair["header"]}" color="blue">Container {pair["header"]}</a>', styles["Normal"]))
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        for root, dirs, files in os.walk(os.path.join(current_dir, os.pardir)): #maybe doesn't find the files while clustered but continues gracefully
-            if 'log.txt' in files:
-                logs_file_path = os.path.join(root, 'log.txt')
-                log_output = subprocess.run(f'cd {root}; tail -n {os.getenv("default-log-length")} log.txt', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
-                content.append(Paragraph('<a href="#iot-directory-log" color="blue">iot-directory-log</a>', styles["Normal"]))
-                extra_logs.append(Paragraph(f'<b><a name="iot-directory-log"></a>iot-directory-log</b>', styles["Heading1"]))
-                extra_logs.append(Paragraph(log_output.replace("\n","<br></br>"), styles["Normal"]))
-                break  # Stop searching after finding the first occurrence
-        for test in tests_out:
-            if not test:
-                break
-            content.append(Paragraph(f'<a href="#t-{test[3]}" color="blue">Test of {test[3]}</a>', styles["Normal"]))
-            extra_tests.append(test)
-        content.append(PageBreak())
-        
-        
-        # Iterate over pairs
-        for pair in data_stored:
-            if pair["header"] in ['dashboard-backend','myldap']:
-                continue
-            header = pair["header"]
-            string = pair["string"]
-            strings = string.split("<br>")
-            # Add header to content
-            content.append(Paragraph(f'<b><a name="c-{header}"></a>{header}</b>', styles["Heading1"]))
-            # Add normal string if it exists
-            for substring in strings:
-                content.append(Paragraph(substring, styles["Normal"]))
+        if 'username' in session:
+            data_stored = []
+            for container_data in get_container_data(True):
+                process = subprocess.Popen(
+                    'kubectl logs '+container_data['ID']+" --tail "+str(os.getenv("default-log-length")),
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                out=[]
+                for line in iter(process.stdout.readline, ''):
+                    out.append(line[:-1])
+                process.stdout.close()
+                r = '<br>'.join(out)
+                #r = '<br>'.join(subprocess.run('docker logs '+container_data['ID'] + ' --tail '+os.getenv("default-log-length"), shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n'))
+                data_stored.append({"header": container_data['Name'], "string": r})
+            
+            # Create a PDF document
+            subfolder = "pdf"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            pdf_output_path = subfolder+"/logs.pdf"
+            os.makedirs(subfolder)
+            doc = SimpleDocTemplate(pdf_output_path, pagesize=letter, leftMargin=0.5*inch, rightMargin=0.5*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
+            styles = getSampleStyleSheet()
+            # Initialize list to store content
+            content = []
+            extra_logs = []
+            tests_out = None
+            extra_tests = []
+            
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''WITH RankedEntries AS ( 
+                        SELECT *, ROW_NUMBER() OVER (PARTITION BY container ORDER BY datetime DESC) AS row_num FROM tests_results
+                        ) 
+                        SELECT * FROM RankedEntries WHERE row_num = 1;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    log_to_db('getting_tests', 'Tests results were read', request)
+                    results = cursor.fetchall()
+                    tests_out = results
+            except Exception:
+                print("Something went wrong because of:",traceback.format_exc())
+            # index
+            content.append(Paragraph("The following are hyperlinks to logs of each container.", styles["Heading1"]))
+            for pair in data_stored:
+                if pair["header"] in ['dashboard-backend','myldap']:
+                    continue
+                content.append(Paragraph(f'<a href="#c-{pair["header"]}" color="blue">Container {pair["header"]}</a>', styles["Normal"]))
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            for root, dirs, files in os.walk(os.path.join(current_dir, os.pardir)): #maybe doesn't find the files while clustered but continues gracefully
+                if 'log.txt' in files:
+                    logs_file_path = os.path.join(root, 'log.txt')
+                    log_output = subprocess.run(f'cd {root}; tail -n {os.getenv("default-log-length")} log.txt', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                    content.append(Paragraph('<a href="#iot-directory-log" color="blue">iot-directory-log</a>', styles["Normal"]))
+                    extra_logs.append(Paragraph(f'<b><a name="iot-directory-log"></a>iot-directory-log</b>', styles["Heading1"]))
+                    extra_logs.append(Paragraph(log_output.replace("\n","<br></br>"), styles["Normal"]))
+                    break  # Stop searching after finding the first occurrence
+            for test in tests_out:
+                if not test:
+                    break
+                content.append(Paragraph(f'<a href="#t-{test[3]}" color="blue">Test of {test[3]}</a>', styles["Normal"]))
+                extra_tests.append(test)
             content.append(PageBreak())
-        for extra in extra_logs:
-            content.append(extra)
-        content.append(PageBreak())
-        for test in extra_tests:
-            content.append(Paragraph(f'<b><a name="t-{test[3]}"></a>{test[3]}</b>', styles["Heading1"]))
-            content.append(Paragraph(test[2].replace("<br>","<br></br>"), styles["Normal"]))
+            
+            
+            # Iterate over pairs
+            for pair in data_stored:
+                if pair["header"] in ['dashboard-backend','myldap']:
+                    continue
+                header = pair["header"]
+                string = pair["string"]
+                strings = string.split("<br>")
+                # Add header to content
+                content.append(Paragraph(f'<b><a name="c-{header}"></a>{header}</b>', styles["Heading1"]))
+                # Add normal string if it exists
+                for substring in strings:
+                    content.append(Paragraph(substring, styles["Normal"]))
+                content.append(PageBreak())
+            for extra in extra_logs:
+                content.append(extra)
             content.append(PageBreak())
-        # Add content to the PDF document
-        doc.build(content)
-        # Send the PDF file as a response
-        response = send_file(pdf_output_path)
-        return response
-    
-    def find_target_folder(parent_folder):
+            for test in extra_tests:
+                content.append(Paragraph(f'<b><a name="t-{test[3]}"></a>{test[3]}</b>', styles["Heading1"]))
+                content.append(Paragraph(test[2].replace("<br>","<br></br>"), styles["Normal"]))
+                content.append(PageBreak())
+            # Add content to the PDF document
+            doc.build(content)
+            # Send the PDF file as a response
+            response = send_file(pdf_output_path)
+            return response
+        return redirect(url_for('login'))
+        
+    def find_target_folder(parent_folder):  #TODO won't work as intended in k8s
         for root, dirs, files in os.walk(parent_folder):
             if "docker-compose.yml" in files and "setup.sh" in files:
                 return root
         return None
-    
-    @app.route('/download')
+        
+    @app.route("/download")
     def redirect_to_download():
-        return redirect('/sentinel/downloads/')
+        if 'username' in session:
+            return redirect('/sentinel/downloads/')
+        return redirect(url_for('login'))
     
-    @app.route('/downloads/')
-    @app.route('/downloads/<path:subpath>')
+    @app.route("/downloads/")
+    @app.route("/downloads/<path:subpath>")
     def list_files(subpath=''):
-        # Determine the full path relative to the base directory
-        full_path = os.path.join(os.path.join(os.getcwd(), "certifications/"), subpath)
-        if ".." in subpath:
-            return render_template("error_showing.html", r = "Issues during the retrieving of the resource: illegal path"), 500
-        # If it's a directory, list contents
-        if os.path.isdir(full_path):
-            try:
-                files = os.listdir(full_path)
-                files_list = [{"name": f, "data": [os.path.join(subpath, f)]} for f in files]
-                for a in files_list:
-                    if a['name'] in next(os.walk(full_path))[1]:
-                        a['data'].append('dir')
-                    else:
-                        a['data'].append('file')
-                return render_template("download_files.html", files=files_list, subpath=subpath)
-            except FileNotFoundError:
-                return render_template("error_showing.html", r = "Issues during the retrieving of the folder: "+ traceback.format_exc()), 500
-        # If it's a file, serve the file
-        elif os.path.isfile(full_path):
-            directory = os.path.dirname(full_path)
-            filename = os.path.basename(full_path)
-            return send_from_directory(directory, filename, as_attachment=True)
-        else:
-            return render_template("error_showing.html", r = "Issues during the retrieving of the file: "+ traceback.format_exc()), 500
+        if 'username' in session:
+            # Determine the full path relative to the base directory
+            full_path = os.path.join(os.path.join(os.getcwd(), "certifications/"), subpath)
+            if ".." in subpath:
+                return render_template("error_showing.html", r = "Issues during the retrieving of the resource: illegal path"), 500
+            # If it's a directory, list contents
+            if os.path.isdir(full_path):
+                try:
+                    files = os.listdir(full_path)
+                    files_list = [{"name": f, "data": [os.path.join(subpath, f)]} for f in files]
+                    for a in files_list:
+                        if a['name'] in next(os.walk(full_path))[1]:
+                            a['data'].append('dir')
+                        else:
+                            a['data'].append('file')
+                    return render_template("download_files.html", files=files_list, subpath=subpath)
+                except FileNotFoundError:
+                    return render_template("error_showing.html", r = "Issues during the retrieving of the folder: "+ traceback.format_exc()), 500
+            # If it's a file, serve the file
+            elif os.path.isfile(full_path):
+                directory = os.path.dirname(full_path)
+                filename = os.path.basename(full_path)
+                return send_from_directory(directory, filename, as_attachment=True)
+            else:
+                return render_template("error_showing.html", r = "Issues during the retrieving of the file: "+ traceback.format_exc()), 500
+        return redirect(url_for('login'))
     
-    @app.route('/clear_certifications', methods=['GET'])
+    @app.route("/clear_certifications", methods=['GET'])
     def clear_certifications():
         return "Suppressed", 500
         user = ""
@@ -1437,9 +1470,9 @@ def create_app():
             return "Done"
         
     
-    @app.route('/certification', methods=['GET'])
+    @app.route("/certification", methods=['GET'])
     def certification():
-        return "Suppressed"
+        return "Suppressed", 500
         user = ""
         try:
             user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
@@ -1465,55 +1498,48 @@ def create_app():
         else:
             return render_template("error_showing.html", r = "Couldn't find the snap4city installation."), 500
             
-    @app.route('/clustered_certification', methods=['GET'])
-    def clustered_certification():
-        if not os.getenv("is-master"):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        user = ""
-        try:
-            user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-            user = user[:user.find(":")]
-        except Exception:
-            return render_template("error_showing.html", r = "Issues during the establishing of the user: "+ traceback.format_exc()), 500
-        if user != "admin":
-            return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
-        try:
-            results = None
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
-                cursor.execute(query)
-                conn.commit()
-                results = cursor.fetchall()
-                error = False
-                errorText = ""
-                subfolder = "certifications/certcluster"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                subprocess.run(f'rm -f *snap4city*-certification-*.rar', shell=True)
-                for r in results:
-                    file_name, content_disposition = "", ""
-                    obtained = requests.get(r[0]+"/sentinel/certification", headers=request.headers)
-                    if 'Content-Disposition' in obtained.headers:
-                        content_disposition = obtained.headers['Content-Disposition']
-                    if 'filename=' in content_disposition:
-                        file_name = content_disposition.split('filename=')[1].strip('"')
-                    if len(file_name) < 1:
-                        errorText += "Unable to recover password from sentinel located at " + r[0] + "\n"
-                        error = True
-                    if obtained.status_code == 200 and len(file_name) > 1:
-                        with open(urlparse(r[0]).hostname + ' - ' +file_name, "wb+") as file:
-                            if not error:
-                                file.write(obtained.content)
+    @app.route("/clustered_certification", methods=['GET'])
+    def clustered_certification(): # probably unneeded
+        if 'username' in session:
+            if session['username'] != "admin":
+                return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
+            try:
+                results = None
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT distinct position FROM checker.component_to_category;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    error = False
+                    errorText = ""
+                    subfolder = "certifications/certcluster"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                    subprocess.run(f'rm -f *snap4city*-certification-*.rar', shell=True)
+                    for r in results:
+                        file_name, content_disposition = "", ""
+                        obtained = requests.get(r[0]+"/sentinel/certification", headers=request.headers)
+                        if 'Content-Disposition' in obtained.headers:
+                            content_disposition = obtained.headers['Content-Disposition']
+                        if 'filename=' in content_disposition:
+                            file_name = content_disposition.split('filename=')[1].strip('"')
+                        if len(file_name) < 1:
+                            errorText += "Unable to recover password from sentinel located at " + r[0] + "\n"
+                            error = True
+                        if obtained.status_code == 200 and len(file_name) > 1:
+                            with open(urlparse(r[0]).hostname + ' - ' +file_name, "wb+") as file:
+                                if not error:
+                                    file.write(obtained.content)
+                        else:
+                            error = True
+                            errorText += "Couldn't read file from sentinel located at " + r[0] + " because of error in request: "+ str(obtained.status_code) + '\n'
+                    if error:
+                        return render_template("error_showing.html", r = errorText.replace("\n","<br>")), 500
                     else:
-                        error = True
-                        errorText += "Couldn't read file from sentinel located at " + r[0] + " because of error in request: "+ str(obtained.status_code) + '\n'
-                if error:
-                    return render_template("error_showing.html", r = errorText.replace("\n","<br>")), 500
-                else:
-                    password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
-                    subprocess.run(f'rar a -k -p{password} snap4city-clustered-certification-{password}.rar *snap4city-certification-*.rar; mkdir -p {subfolder}; cp snap4city-clustered-certification-{password}.rar {subfolder}/snap4city-clustered-certification-{password}.rar', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
-                    return send_file(f'snap4city-clustered-certification-{password}.rar')
-        except Exception:
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
+                        password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
+                        subprocess.run(f'rar a -k -p{password} snap4city-clustered-certification-{password}.rar *snap4city-certification-*.rar; mkdir -p {subfolder}; cp snap4city-clustered-certification-{password}.rar {subfolder}/snap4city-clustered-certification-{password}.rar', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                        return send_file(f'snap4city-clustered-certification-{password}.rar')
+            except Exception:
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
     return app
     
 if __name__ == "__main__":
