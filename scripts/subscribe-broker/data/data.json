@@ -1,0 +1,7 @@
+{
+    "url":"$#base-url#$",
+    "password":"$#userrootadmin-pwd#$",
+    "username":"userrootadmin",
+    "latitude":"$#lat-ib-0#$",
+    "longitude":"$#lng-ib-0#$"
+}

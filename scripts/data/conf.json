@@ -1,0 +1,27 @@
+{
+    "token": {
+        "clientID": "php-ownership-api",
+        "clientSecret": "a347fb2d-87f0-4d41-89a9-b746b5273ccd",
+        "username": "changeme",
+        "password": "changemetoo",
+        "token_url": "https://www.snap4city.org/auth/realms/master/protocol/openid-connect/token"
+    },
+    "model": {
+        "model_name": "provaModel8",
+        "model_type": "test",
+        "model_kind": "sensor",
+        "model_frequency": "600",
+        "model_kgenerator": "normal",
+        "model_contextbroker": "orionUNIFI",
+        "model_protocol": "ngsi",
+        "model_format": "json",
+        "model_hc": "refresh_rate",
+        "model_hv": "300",
+        "model_subnature": "Traffic_sensor",
+        "model_url": "https://iotdirectory.snap4city.org/api/model.php?"
+    },
+    "device": {
+        "device_url": "https://iotdirectory.snap4city.org/api/device.php?"
+    },
+    "patch": "https://www.snap4city.org/orionfilter/orionUNIFI/v2/entities/"
+}

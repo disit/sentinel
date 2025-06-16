@@ -1,0 +1,11 @@
+{
+    "token": {
+        "clientID": "js-kpi-client",
+        "clientSecret": "a347fb2d-87f0-4d41-89a9-b746b5273ccd",
+        "username": "................",
+        "password": "................",
+        "token_url": "$#base-url#$/auth/realms/master/protocol/openid-connect/token"
+    },
+    "url": "$#base-url#$"
+
+}

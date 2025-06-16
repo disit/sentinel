@@ -1,0 +1,33 @@
+{% extends "checker-k8.html" %}
+
+{% block additional_content_certification %}
+			<li class="nav-item active">
+				<form action="./certification" method="GET">
+					<input type="submit" class="btn btn-info" value="Generate certification" />
+				</form>
+			</li>
+			<li class="nav-item active">
+				<input type="button" class="btn btn-info" value="Manage containers" onclick="window.open('./organize_containers')"/>
+			</li>
+			<li class="nav-item active">
+				<input type="button" class="btn btn-info" value="Check previous certifications" onclick="window.open('./downloads/')"/>
+			</li>
+{% endblock %}
+
+{% block additional_content_admin_log_datatable_trigger %}
+	$('#admin-log-table').DataTable();
+	$('#admin-log-table').show();
+{% endblock %}
+{% block additional_content_admin_log %}
+	<div id="admin_log">
+	<h4>Administration Log</h4>
+	<table id="admin-log-table" class="table table-striped table-bordered">
+		<thead><tr><th>User</th><th>Action</th><th>Time</th></tr></thead>
+		<tbody>
+		{%for element in admin_log%}
+		<tr><th>{{element[2]|safe}}</th><th>{{element[1]|safe}}</th><th>{{element[0]}}</th></tr>
+	    {%endfor%}
+		</tbody>
+	</table>
+	</div>
+{% endblock %}

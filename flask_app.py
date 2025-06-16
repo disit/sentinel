@@ -37,6 +37,7 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import concurrent.futures
 import re
+import html
 
 
 class Snap4SentinelTelegramBot:
@@ -1181,14 +1182,17 @@ def create_app():
             content.append(Paragraph(f'<b><a name="c-{header}"></a>{header}</b>', styles["Heading1"]))
             # Add normal string if it exists
             for substring in strings:
-                content.append(Paragraph(substring, styles["Normal"]))
+                try:
+                    content.append(Paragraph(substring, styles["Normal"]))
+                except ValueError:
+                    content.append(Paragraph(html.escape(substring), styles["Normal"]))
             content.append(PageBreak())
         for extra in extra_logs:
             content.append(extra)
         content.append(PageBreak())
         for test in extra_tests:
             content.append(Paragraph(f'<b><a name="t-{test[3]}"></a>{test[3]}</b>', styles["Heading1"]))
-            content.append(Paragraph(test[2].replace("<br>","<br></br>"), styles["Normal"]))
+            content.append(Paragraph(test[2].replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
             content.append(PageBreak())
         # Add content to the PDF document
         doc.build(content)

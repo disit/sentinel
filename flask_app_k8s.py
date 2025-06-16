@@ -40,6 +40,7 @@ import re
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import check_password_hash
 from datetime import timedelta
+import html
 
 
 os.environ["PYTHONUNBUFFERED"]="1"
@@ -74,7 +75,7 @@ def string_of_list_to_list(string):
     except:
         raise Exception("Couldn't do it")
 
-USERS_FILE = 'authtest/users.txt'
+USERS_FILE = '/data/users.txt'
 
 users = {}
 with open(USERS_FILE, 'r') as f:
@@ -657,7 +658,7 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
+                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
                         cursor.execute(query_2, (int(os.getenv("admin-log-length")),))
@@ -773,7 +774,7 @@ def create_app():
             if username in users and check_password_hash(users[username], password):
                 session.permanent = True
                 session['username'] = username
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('main_page'))
             return "Invalid credentials", 401
         return render_template('login.html')
 
@@ -957,7 +958,7 @@ def create_app():
                         query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
                         cursor.execute(query_1,(string_used, test_name,r[0],))
                         conn.commit()
-                        log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, request, test_name="advanced test - "+r[1])
+                        log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, request, which_test="advanced test - "+str(r[1]))
                     return jsonify(total_result)
             except Exception:
                 print("Something went wrong during tests running because of",traceback.format_exc())
@@ -1396,11 +1397,14 @@ def create_app():
                     content.append(Paragraph(substring, styles["Normal"]))
                 content.append(PageBreak())
             for extra in extra_logs:
-                content.append(extra)
+                try:
+                    content.append(Paragraph(substring, styles["Normal"]))
+                except ValueError:
+                    content.append(Paragraph(html(substring), styles["Normal"]))
             content.append(PageBreak())
             for test in extra_tests:
                 content.append(Paragraph(f'<b><a name="t-{test[3]}"></a>{test[3]}</b>', styles["Heading1"]))
-                content.append(Paragraph(test[2].replace("<br>","<br></br>"), styles["Normal"]))
+                content.append(Paragraph(test[2].replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
                 content.append(PageBreak())
             # Add content to the PDF document
             doc.build(content)
