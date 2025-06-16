@@ -783,7 +783,7 @@ def create_app():
                         query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
                         cursor.execute(query_1,(string_used, test_name,r[0],))
                         conn.commit()
-                        log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, request, test_name="advanced test - "+r[1])
+                        log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, request, which_test="advanced test - "+str(r[1]))
                     return jsonify(total_result)
             except Exception:
                 print("Something went wrong during tests running because of",traceback.format_exc())

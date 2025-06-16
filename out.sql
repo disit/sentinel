@@ -231,6 +231,15 @@ INSERT INTO `tests_table` VALUES (2,'opensearch-dashboards','curl -I -s $#base-u
 (39,'wsserver','curl -I -s $#base-url#$/wsserver/ | awk \'NR==1{print $2}\' | ( read code && [ \"$code\" -eq 400 ] && echo \'Success <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>\' || echo \'Failure <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>\' ); date "+%F at %H:%M:%S"','curl -I -s $#base-url#$/wsserver/');
 UNLOCK TABLES;
 
+CREATE TABLE `telegram_alert_pauses` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `component` varchar(200) NOT NULL,
+  `until` datetime NOT NULL,
+  `issued` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
 DELIMITER ;;
 CREATE DEFINER=`root`@`localhost` FUNCTION `GetHighContrastColor`(hexColor CHAR(7)) RETURNS char(7) CHARSET utf8mb4 
     DETERMINISTIC
