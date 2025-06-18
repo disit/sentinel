@@ -1464,9 +1464,8 @@ def create_app():
                     script_to_run = "/app/scripts/make_dumps_of_database_k8.sh"
                 make_certification = subprocess.run(f'cd {os.getenv("conf_path")}; mkdir {subfolder}; bash {script_to_run}; rar a -k -p{password} snap4city-certification-{password}.rar iotapp-00*/flows.json d*conf iot-directory-conf m*conf n*conf ownership-conf/config.php nifi/conf servicemap-conf/servicemap.properties ../placeholder_used.txt *dump.* servicemap-iot-conf/iotdeviceapi.dtd servicemap-superservicemap-conf/settings.xml synoptics-conf/ mongo_dump virtuoso_dump php ../checker/*; cp snap4city-certification-{password}.rar {subfolder}/snap4city-certification-{password}.rar', shell=True, capture_output=True, text=True, encoding="utf_8")
                 if len(make_certification.stderr) > 0:
+                    print(make_certification.stderr)
                     return send_file(f'/confs/{subfolder}/snap4city-certification-{password}.rar')
-                    # bypass this shit, for now
-                    return render_template("error_showing.html", r = "There were issues: "+ make_certification.stderr), 500
                 else:
                     return send_file(f'/confs/snap4city-certification-{password}.rar')
             except Exception:
