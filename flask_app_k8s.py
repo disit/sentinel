@@ -1474,6 +1474,7 @@ def create_app():
             
     @app.route("/clustered_certification", methods=['GET'])
     def clustered_certification(): # probably unneeded
+        return "Suppressed", 500
         if 'username' in session:
             if session['username'] != "admin":
                 return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
