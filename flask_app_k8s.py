@@ -374,8 +374,8 @@ def auto_alert_status():
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    containers_which_are_not_expected = list(set(components_original)-set([a["Names"] for a in containers_merged]))
-    containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a.endswith("*")]
+    containers_which_are_not_expected = list(set(components_original)-set([a["Names"] for a in [b for b in containers_which_are_not_expected if not b.endswith("*")]]))
+    '''
     top = get_top()
     load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
     load_issues=""
@@ -385,6 +385,7 @@ def auto_alert_status():
     memory_issues = ""
     if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold")):
         memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold"))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
+    '''
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected):
         try:
             # todo
@@ -396,10 +397,12 @@ def auto_alert_status():
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
                 issues[2]=containers_which_are_not_expected
+            '''
             if len(load_issues)>0:
                 issues[3]=load_issues
             if len(memory_issues)>0:
                 issues[4]=memory_issues
+            '''
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -419,74 +422,117 @@ def auto_alert_status():
             return
 
 def get_top():
-    process = subprocess.Popen(['top', '-b', '-n', '1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    stdout, _ = process.communicate()
+    if os.environ["running_as_kubernetes"] == "True":
+        nodes_output = subprocess.run(
+            ["kubectl", "get", "nodes", "-o", "json"],
+            capture_output=True,
+            text=True
+        )
+        nodes_data = json.loads(nodes_output.stdout)
 
-    # Initialize dictionaries to hold parsed data
-    parsed_data = {
-        'system_info': {},
-        'cpu_usage': {},
-        'memory_usage': {},
-        'processes': [],
-        'memory_measuring_unit': "B"
-    }
-    
-    # Split output into lines
-    lines = stdout.splitlines()
-    
-    # Parse system information (first line typically)
-    system_info_line = lines[0]
-    parsed_data['system_info'] = {
-        'time': re.search(r'\d{2}:\d{2}:\d{2}', system_info_line).group(),
-        'up_time': re.search(r'up\s+([^,]+)', system_info_line).group(1),
-        'users': re.search(r'(\d+)\s+user', system_info_line).group(1),
-        'load_average': re.search(r'load average:\s+(.+)', system_info_line).group(1)
-    }
+        # Get pods JSON (across all namespaces)
+        pods_output = subprocess.run(
+            ["kubectl", "get", "pods", "-A", "-o", "json"],
+            capture_output=True,
+            text=True
+        )
+        pods_data = json.loads(pods_output.stdout)
 
-    # Parse CPU usage (usually line 3)
-    cpu_usage_line = lines[2]
-    cpu_values = re.findall(r'(\d+\.\d+)', cpu_usage_line)
-    parsed_data['cpu_usage'] = {
-        'us': cpu_values[0],  # User CPU usage
-        'sy': cpu_values[1],  # System CPU usage
-        'ni': cpu_values[2],  # Nice CPU usage
-        'id': cpu_values[3],  # Idle CPU percentage
-        'wa': cpu_values[4],  # IO wait
-        'hi': cpu_values[5],  # Hardware interrupt
-        'si': cpu_values[6],  # Software interrupt
-        'st': cpu_values[7]   # Steal time
-    }
+        # Count running pods per node
+        pod_counts = {}
+        for pod in pods_data["items"]:
+            node_name = pod.get("spec", {}).get("nodeName")
+            pod_phase = pod.get("status", {}).get("phase")
+            if node_name and pod_phase == "Running":
+                pod_counts[node_name] = pod_counts.get(node_name, 0) + 1
 
-    # Parse memory usage (usually line 4)
-    memory_usage_line = lines[3]
-    mem_values = re.findall(r'(\d+)', memory_usage_line)
-    parsed_data["memory_measuring_unit"]=re.findall(r'^(\w+)', memory_usage_line)[0]
-    parsed_data['memory_usage'] = {
-        'total': mem_values[0],
-        'free': mem_values[1],
-        'used': mem_values[2],
-        'buff_cache': mem_values[3]
-    }
+        # Construct final node info with pod counts
+        node_info = []
+        for item in nodes_data["items"]:
+            name = item["metadata"]["name"]
+            capacity = item["status"]["capacity"]
 
-    # Parse process list (starts from line 7 onwards)
-    for line in lines[7:]:
-        columns = line.split()
-        if len(columns) >= 12:  # Ensure we have enough columns for parsing
-            process_info = {
-                'pid': columns[0],
-                'user': columns[1],
-                'pr': columns[2],
-                'ni': columns[3],
-                'virt': columns[4],
-                'res': columns[5],
-                'shr': columns[6],
-                's': columns[7],
-                'cpu': columns[8],
-                'mem': columns[9],
-                'time': columns[10],
-                'command': ' '.join(columns[11:])
+            node_data = {
+                "name": name,
+                "capacity": {
+                    "cpu": capacity.get("cpu"),
+                    "memory": capacity.get("memory")
+                },
+                "running_pods": f"{str(pod_counts.get(name, 0))}/{capacity.get('pods')}",
+                "status": ", ".join(["Ready" if a["message"] == "kubelet is posting ready status" else a["message"] for a in item["status"]["conditions"] if a["status"]=="True"])
             }
-            parsed_data['processes'].append(process_info)
+
+            node_info.append(node_data)
+        return render_template("k8s-top.html", json_data=json.dumps(node_info)), 200
+    else:
+        process = subprocess.Popen(['top', '-b', '-n', '1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, _ = process.communicate()
+
+        # Initialize dictionaries to hold parsed data
+        parsed_data = {
+            'system_info': {},
+            'cpu_usage': {},
+            'memory_usage': {},
+            'processes': [],
+            'memory_measuring_unit': "B"
+        }
+        
+        # Split output into lines
+        lines = stdout.splitlines()
+        
+        # Parse system information (first line typically)
+        system_info_line = lines[0]
+        parsed_data['system_info'] = {
+            'time': re.search(r'\d{2}:\d{2}:\d{2}', system_info_line).group(),
+            'up_time': re.search(r'up\s+([^,]+)', system_info_line).group(1),
+            'users': re.search(r'(\d+)\s+user', system_info_line).group(1),
+            'load_average': re.search(r'load average:\s+(.+)', system_info_line).group(1)
+        }
+
+        # Parse CPU usage (usually line 3)
+        cpu_usage_line = lines[2]
+        cpu_values = re.findall(r'(\d+\.\d+)', cpu_usage_line)
+        parsed_data['cpu_usage'] = {
+            'us': cpu_values[0],  # User CPU usage
+            'sy': cpu_values[1],  # System CPU usage
+            'ni': cpu_values[2],  # Nice CPU usage
+            'id': cpu_values[3],  # Idle CPU percentage
+            'wa': cpu_values[4],  # IO wait
+            'hi': cpu_values[5],  # Hardware interrupt
+            'si': cpu_values[6],  # Software interrupt
+            'st': cpu_values[7]   # Steal time
+        }
+
+        # Parse memory usage (usually line 4)
+        memory_usage_line = lines[3]
+        mem_values = re.findall(r'(\d+)', memory_usage_line)
+        parsed_data["memory_measuring_unit"]=re.findall(r'^(\w+)', memory_usage_line)[0]
+        parsed_data['memory_usage'] = {
+            'total': mem_values[0],
+            'free': mem_values[1],
+            'used': mem_values[2],
+            'buff_cache': mem_values[3]
+        }
+
+        # Parse process list (starts from line 7 onwards)
+        for line in lines[7:]:
+            columns = line.split()
+            if len(columns) >= 12:  # Ensure we have enough columns for parsing
+                process_info = {
+                    'pid': columns[0],
+                    'user': columns[1],
+                    'pr': columns[2],
+                    'ni': columns[3],
+                    'virt': columns[4],
+                    'res': columns[5],
+                    'shr': columns[6],
+                    's': columns[7],
+                    'cpu': columns[8],
+                    'mem': columns[9],
+                    'time': columns[10],
+                    'command': ' '.join(columns[11:])
+                }
+                parsed_data['processes'].append(process_info)
     return parsed_data
 
 def send_alerts(message):
@@ -673,32 +719,75 @@ def create_app():
     @app.route("/get_local_top", methods=["GET"])
     def get_local_top():
         if 'username' in session:
-            json_data=get_top()
-            json_data["source"] = os.getenv("platform-url")
-            with mysql.connector.connect(**db_conn_info) as conn:
-                try:
-                    cursor = conn.cursor(buffered=True)
-                    query = '''SELECT ip FROM checker.ip_table where hostname = %s'''
-                    cursor.execute(query,(os.getenv("platform-url"),))
-                    conn.commit()
-                    result = cursor.fetchone()
-                    print(result)
-                    if len(result) > 0:
-                        json_data["source"].append(" - " + result[0])
-                except Exception as E:
-                    pass
-                    # no conversion for ip, not a big deal
-            try:
-                form_dict = request.form.to_dict()
-                amount_of_lines = form_dict.pop('top_lines')
-                json_data['processes']=json_data['processes'][:int(amount_of_lines)]
-            except Exception as E:
-                json_data['processes']=json_data['processes'][:40]
-            if os.getenv("is-master"):
-                jsontobereturned = {"result":json_data, "error":[]}
-                return render_template("top-viewer.html", data=jsontobereturned), 200
+            if os.environ["running_as_kubernetes"] == "True":
+                nodes_output = subprocess.run(
+                    ["kubectl", "get", "nodes", "-o", "json"],
+                    capture_output=True,
+                    text=True
+                )
+                nodes_data = json.loads(nodes_output.stdout)
+
+                # Get pods JSON (across all namespaces)
+                pods_output = subprocess.run(
+                    ["kubectl", "get", "pods", "-A", "-o", "json"],
+                    capture_output=True,
+                    text=True
+                )
+                pods_data = json.loads(pods_output.stdout)
+
+                # Count running pods per node
+                pod_counts = {}
+                for pod in pods_data["items"]:
+                    node_name = pod.get("spec", {}).get("nodeName")
+                    pod_phase = pod.get("status", {}).get("phase")
+                    if node_name and pod_phase == "Running":
+                        pod_counts[node_name] = pod_counts.get(node_name, 0) + 1
+
+                # Construct final node info with pod counts
+                node_info = []
+                for item in nodes_data["items"]:
+                    name = item["metadata"]["name"]
+                    capacity = item["status"]["capacity"]
+
+                    node_data = {
+                        "name": name,
+                        "capacity": {
+                            "cpu": capacity.get("cpu"),
+                            "memory": capacity.get("memory")
+                        },
+                        "running_pods": f"{str(pod_counts.get(name, 0))}/{capacity.get('pods')}",
+                        "status": ", ".join(["Ready" if a["message"] == "kubelet is posting ready status" else a["message"] for a in item["status"]["conditions"] if a["status"]=="True"])
+                    }
+
+                    node_info.append(node_data)
+                return render_template("k8s-top.html", json_data=json.dumps(node_info)), 200
             else:
-                return json_data
+                json_data=get_top()
+                json_data["source"] = os.getenv("platform-url")
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    try:
+                        cursor = conn.cursor(buffered=True)
+                        query = '''SELECT ip FROM checker.ip_table where hostname = %s'''
+                        cursor.execute(query,(os.getenv("platform-url"),))
+                        conn.commit()
+                        result = cursor.fetchone()
+                        print(result)
+                        if len(result) > 0:
+                            json_data["source"].append(" - " + result[0])
+                    except Exception as E:
+                        pass
+                        # no conversion for ip, not a big deal
+                try:
+                    form_dict = request.form.to_dict()
+                    amount_of_lines = form_dict.pop('top_lines')
+                    json_data['processes']=json_data['processes'][:int(amount_of_lines)]
+                except Exception as E:
+                    json_data['processes']=json_data['processes'][:40]
+                if os.getenv("is-master"):
+                    jsontobereturned = {"result":json_data, "error":[]}
+                    return render_template("top-viewer.html", data=jsontobereturned), 200
+                else:
+                    return json_data
         return render_template("error_showing.html", r = "You are not authenticated"), 403
     
 
@@ -741,8 +830,8 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`) VALUES (%s, %s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'], request.form.to_dict()['position'],))
+                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`) VALUES (%s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],))
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -851,30 +940,6 @@ def create_app():
                 except Exception as E:
                     tobereturned_answer = {"result": {}, "error":["Couldn't load container data because of "+str(E)]}
                 return tobereturned_answer
-        return redirect(url_for('login'))
-            
-            
-    @app.route("/advanced_read_containers", methods=['POST'])
-    def check_adv():
-        if 'username' in session:
-            try:
-                results = None
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    cursor = conn.cursor(buffered=True)
-                    query = '''SELECT distinct position FROM checker.component_to_category;'''
-                    cursor.execute(query)
-                    conn.commit()
-                    results = cursor.fetchall()
-                    total_answer=[]
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                        futures = [executor.submit(send_request, r[0]+"/sentinel/read_containers", request.headers) for r in results]
-                        for future in concurrent.futures.as_completed(futures):
-                            total_answer += json.loads(future.result().text)
-                    tobereturned_answer = {"result":total_answer, "error":[]}
-                    return tobereturned_answer
-            except Exception:
-                print("Something went wrong because of:",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
 
     def get_container_categories():
@@ -1016,27 +1081,6 @@ def create_app():
                 return "False"
         return redirect(url_for('login'))
             
-    @app.route("/reboot_container_advanced/<container_id>", methods=['POST'])
-    def reboot_container_advanced(container_id): #probably unneeded
-        if 'username' in session:
-            if request.method == "POST":
-                try:
-                    with mysql.connector.connect(**db_conn_info) as conn:
-                        something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-                        psw = something[something.find(":")+1:]
-                        cursor = conn.cursor(buffered=True)
-                        # to run malicious code, malicious code must be present in the db or the machine in the first place
-                        query = '''SELECT position FROM checker.component_to_category where component=%s;'''
-                        cursor.execute(query, (container_id,))
-                        conn.commit()
-                        results = cursor.fetchall()
-                        r = requests.post(results[0][0]+"/sentinel/reboot_container", headers=request.headers, data={"id": container_id, "psw": psw})
-                        return r.text
-                except Exception:
-                    print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
-                    return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))
-            
     @app.route("/get_muted_components", methods=['GET'])
     def get_muted_components():
         if 'username' in session:
@@ -1158,31 +1202,7 @@ def create_app():
             r = '<br>'.join(out)
             return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
         return redirect(url_for('login'))
-        
-
-    
-    @app.route("/advanced-container/<container_id>")
-    def get_container_logs_advanced(container_id):
-        if 'username' in session: # probably unneeded
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-                    psw = something[something.find(":")+1:]
-                    cursor = conn.cursor(buffered=True)
-                    # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''SELECT position FROM checker.component_to_category where component=%s;'''
-                    cursor.execute(query, (container_id,))
-                    conn.commit()
-                    results = cursor.fetchall()
-                    if len(results) == 0:
-                        return render_template("error_showing.html", r = "It appears that the container "+container_id+" doesn't exist in the cluster"), 500
-                    r = requests.get(results[0][0]+"/sentinel/container/"+container_id, headers=request.headers, data={"id": container_id, "psw": psw})
-                    return r.text
-            except Exception:
-                print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc() + str(results)), 500
-        return redirect(url_for('login'))
-    
+            
     @app.route("/get_summary_status")
     def get_summary_status():
         if 'username' in session:
@@ -1271,49 +1291,6 @@ def create_app():
             conversions.append(conversion)
         return jsonify(conversions)
     
-    @app.route("/generate_clustered_pdf", methods=['GET'])
-    def generate_clustered_pdf(): #probably not needed
-        if 'username' in session:
-            if session['username'] != "admin":
-                return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
-            try:
-                results = None
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    cursor = conn.cursor(buffered=True)
-                    query = '''SELECT distinct position FROM checker.component_to_category;'''
-                    cursor.execute(query)
-                    conn.commit()
-                    results = cursor.fetchall()
-                    error = False
-                    errorText = ""
-                    subprocess.run(f'rm -f *-*logs.pdf snap4city-clustered-reports.pdf.rar', shell=True)
-                    for r in results:
-                        file_name, content_disposition = "", ""
-                        obtained = requests.get(r[0]+"/sentinel/generate_pdf", headers=request.headers)
-                        if 'Content-Disposition' in obtained.headers:
-                            content_disposition = obtained.headers['Content-Disposition']
-                        if 'filename=' in content_disposition:
-                            file_name = content_disposition.split('filename=')[1].strip('"')
-                        if len(file_name) < 1:
-                            errorText += "Couldn't quite get the file: " + r[0] + "\n"
-                            error = True
-                        if obtained.status_code == 200 and len(file_name) > 1:
-                            with open(urlparse(r[0]).hostname + ' - ' +file_name, "wb+") as file:
-                                if not error:
-                                    file.write(obtained.content)
-                        else:
-                            error = True
-                            errorText += "Couldn't read file from sentinel located at " + r[0] + " because of error in request: "+ str(obtained.status_code) + '\n'
-                    if error:
-                        return render_template("error_showing.html", r = errorText.replace("\n","<br>")), 500
-                    else:
-                        subfolder = "pdf-cluster-"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                        print(subprocess.run(f"rar a snap4city-clustered-reports.pdf.rar *-*logs.pdf; mkdir {subfolder}; cp snap4city-clustered-reports.pdf.rar {subfolder}/snap4city-clustered-reports.pdf.rar", shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
-                        return send_file(f'snap4city-clustered-reports.pdf.rar')
-            except Exception:
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))
-    
     @app.route("/generate_pdf", methods=['GET'])
     def generate_pdf():
         if 'username' in session:
@@ -1369,7 +1346,7 @@ def create_app():
             current_dir = os.path.dirname(os.path.abspath(__file__))
             for root, dirs, files in os.walk(os.path.join(current_dir, os.pardir)): #maybe doesn't find the files while clustered but continues gracefully
                 if 'log.txt' in files:
-                    logs_file_path = os.path.join(root, 'log.txt')
+                    #logs_file_path = os.path.join(root, 'log.txt')
                     log_output = subprocess.run(f'cd {root}; tail -n {os.getenv("default-log-length")} log.txt', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
                     content.append(Paragraph('<a href="#iot-directory-log" color="blue">iot-directory-log</a>', styles["Normal"]))
                     extra_logs.append(Paragraph(f'<b><a name="iot-directory-log"></a>iot-directory-log</b>', styles["Heading1"]))
@@ -1394,13 +1371,13 @@ def create_app():
                 content.append(Paragraph(f'<b><a name="c-{header}"></a>{header}</b>', styles["Heading1"]))
                 # Add normal string if it exists
                 for substring in strings:
-                    content.append(Paragraph(substring, styles["Normal"]))
+                    try:
+                        content.append(Paragraph(substring, styles["Normal"]))
+                    except ValueError:
+                        content.append(Paragraph(html(substring), styles["Normal"]))
                 content.append(PageBreak())
             for extra in extra_logs:
-                try:
-                    content.append(Paragraph(substring, styles["Normal"]))
-                except ValueError:
-                    content.append(Paragraph(html(substring), styles["Normal"]))
+                content.append(extra)
             content.append(PageBreak())
             for test in extra_tests:
                 content.append(Paragraph(f'<b><a name="t-{test[3]}"></a>{test[3]}</b>', styles["Heading1"]))
@@ -1476,31 +1453,25 @@ def create_app():
     
     @app.route("/certification", methods=['GET'])
     def certification():
-        return "Suppressed", 500
-        user = ""
-        try:
-            user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-            user = user[:user.find(":")]
-        except Exception:
-            return render_template("error_showing.html", r = "Issues during the establishing of the user: "+ traceback.format_exc()), 500
-        if user != "admin":
-            return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
-        script_folder = os.path.dirname(os.path.abspath(__file__))
-        parent_folder = os.path.dirname(script_folder)
-        subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        target_folder = find_target_folder(parent_folder)
-        
-        if target_folder:
-            password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
-            make_certification = subprocess.run(f'cd {target_folder}; mkdir {subfolder}; bash make_dumps_of_database.sh; rar a -k -p{password} snap4city-certification-{password}.rar iotapp-00*/flows.json d*conf iot-directory-conf m*conf n*conf ownership-conf/config.php nifi/conf servicemap-conf/servicemap.properties ../placeholder_used.txt *dump.* servicemap-iot-conf/iotdeviceapi.dtd servicemap-superservicemap-conf/settings.xml synoptics-conf/ mongo_dump virtuoso_dump php ../checker/*; cp snap4city-certification-{password}.rar {subfolder}/snap4city-certification-{password}.rar', shell=True, capture_output=True, text=True, encoding="utf_8")
-            if len(make_certification.stderr) > 0:
-                return send_file(target_folder + f'/{subfolder}/snap4city-certification-{password}.rar')
-                # bypass this shit, for now
-                return render_template("error_showing.html", r = "There were issues: "+ make_certification.stderr), 500
-            else:
-                return send_file(target_folder + f'/snap4city-certification-{password}.rar')
-        else:
-            return render_template("error_showing.html", r = "Couldn't find the snap4city installation."), 500
+        if 'username' in session:
+            if session['username'] != "admin":
+                return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
+            try:
+                subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
+                script_to_run = "/app/scripts/make_dumps_of_database.sh"
+                if os.getenv("running_as_kubernetes"):
+                    script_to_run = "/app/scripts/make_dumps_of_database_k8.sh"
+                make_certification = subprocess.run(f'cd {os.getenv("conf_path")}; mkdir {subfolder}; bash {script_to_run}; rar a -k -p{password} snap4city-certification-{password}.rar iotapp-00*/flows.json d*conf iot-directory-conf m*conf n*conf ownership-conf/config.php nifi/conf servicemap-conf/servicemap.properties ../placeholder_used.txt *dump.* servicemap-iot-conf/iotdeviceapi.dtd servicemap-superservicemap-conf/settings.xml synoptics-conf/ mongo_dump virtuoso_dump php ../checker/*; cp snap4city-certification-{password}.rar {subfolder}/snap4city-certification-{password}.rar', shell=True, capture_output=True, text=True, encoding="utf_8")
+                if len(make_certification.stderr) > 0:
+                    return send_file(f'/confs/{subfolder}/snap4city-certification-{password}.rar')
+                    # bypass this shit, for now
+                    return render_template("error_showing.html", r = "There were issues: "+ make_certification.stderr), 500
+                else:
+                    return send_file(f'/confs/snap4city-certification-{password}.rar')
+            except Exception:
+                return render_template("error_showing.html", r = f"Fatal error while generating configuration: {traceback.format_exc()}"), 401
+        return redirect(url_for('login'))
             
     @app.route("/clustered_certification", methods=['GET'])
     def clustered_certification(): # probably unneeded

@@ -1,0 +1,11 @@
+[
+  {
+    "name": "docker-desktop",
+    "capacity": {
+      "cpu": "16",
+      "memory": "32698704Ki"
+    },
+    "running_pods": "9/110",
+    "status": "Ready"
+  }
+]

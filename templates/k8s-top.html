@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kubernetes Node Resources</title>
+
+  <!-- Bootstrap 5 CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+
+  <!-- DataTables CSS -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"
+  />
+</head>
+<body class="bg-light">
+  <div class="container my-5">
+    <h2 class="text-center mb-4">Kubernetes Node Resources</h2>
+    <div class="table-responsive">
+      <table id="nodesTable" class="table table-bordered table-striped table-hover align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>Node Name</th>
+            <th>CPU Capacity</th>
+            <th>Memory Capacity</th>
+            <th>Running Pods</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- jQuery, Bootstrap JS, DataTables JS -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+  <script>
+    const data = JSON.parse('[{"name": "docker-desktop", "capacity": {"cpu": "16", "memory": "32698704Ki"}, "running_pods": "9/110", "status": "kubelet is posting ready status"}]');
+    const tbody = document.querySelector('#nodesTable tbody');
+        data.forEach(node => {
+          const row = `
+            <tr>
+              <td>${node.name}</td>
+              <td>${node.capacity.cpu}</td>
+              <td>${node.capacity.memory}</td>
+              <td>${node.running_pods}</td>
+              <td>${node.status}</td>
+            </tr>`;
+          tbody.innerHTML += row;
+        });
+        $('#nodesTable').DataTable(); // Initialize DataTable after rows are added
+  </script>
+</body>
+</html>
