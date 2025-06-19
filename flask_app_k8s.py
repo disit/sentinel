@@ -1314,6 +1314,7 @@ def create_app():
     def generate_pdf():
         if 'username' in session:
             data_stored = []
+            print(type(get_container_data(True)),str(get_container_data(True)))
             for container_data in get_container_data(True):
                 process = subprocess.Popen(
                     'kubectl logs '+container_data['ID']+" --tail "+str(os.getenv("default-log-length")),

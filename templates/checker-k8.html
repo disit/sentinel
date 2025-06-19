@@ -636,10 +636,10 @@
 			});
 			
 			var rebootbutton = document.createElement("td");
-			rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-containerid="`+elements[12]+`" data-containercategory="`+name_of_table_value+`">Reboot</button>`;
+			rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-containerid="`+elements[6]+`" data-containercategory="`+name_of_table_value+`">Reboot</button>`;
 			row.appendChild(rebootbutton);
 			var testsbutton = document.createElement("td");
-			testsbutton.innerHTML=`<input type="button" name="`+elements[12]+`" value="Check the port..." class="btn btn-info" onclick="runTests('`+elements[12]+`', this, '`+name_of_table_value+`')"/>`;
+			testsbutton.innerHTML=`<input type="button" name="`+elements[6]+`" value="Check the port..." class="btn btn-info" onclick="runTests('`+elements[6]+`', this, '`+name_of_table_value+`')"/>`;
 			row.appendChild(testsbutton);
 			tbody.appendChild(row);
 			var testresults = document.createElement("td");
