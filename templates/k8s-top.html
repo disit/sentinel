@@ -43,7 +43,7 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
   <script>
-    const data = JSON.parse('[{"name": "docker-desktop", "capacity": {"cpu": "16", "memory": "32698704Ki"}, "running_pods": "9/110", "status": "kubelet is posting ready status"}]');
+    const data = JSON.parse('{{json_data}}');
     const tbody = document.querySelector('#nodesTable tbody');
         data.forEach(node => {
           const row = `

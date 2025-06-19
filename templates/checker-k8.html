@@ -506,7 +506,7 @@
 			});
 		}
 		catch (exception_var) {
-			console.error(exception_var+", please kill me");
+			console.error(exception_var);
 		}
 	};
 	
@@ -618,12 +618,12 @@
 			elements.forEach(cellData => {
 				const td = document.createElement("td");
 				if (index_of_below_array === 6) {
-					var content_of_id_cell = '<a target="_blank" href="./advanced-container/'+elements[6]+'">'+cellData+'</a>';
+					var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'">'+cellData+'</a>';
 					td.innerHTML = content_of_id_cell;
 				}
 				else if (index_of_below_array === 12) {
 					var content_of_id_cell; 
-					if ((cellData === "running" != (elements[6] === "certbot/certbot")) && !elements[21].includes('unhealthy'))
+					if ((cellData === "running" != (elements[6] === "certbot/certbot")) && !elements[12].includes('unhealthy'))
 						content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 						else content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 					td.innerHTML = '<div id="'+elements[12]+'-reboot-result">'+content_of_id_cell+'</div>';
@@ -664,7 +664,6 @@
 
 			row.appendChild(testresults);
 			row.appendChild(in_case_of_problems);
-			row.appendChild(location_of_component);
 				
 			var do_not_update_this_td = document.createElement("td");
 			var do_not_update_this = document.createElement("input");
@@ -696,7 +695,7 @@
 	};
 	
 	function makeTable(containerdata) {
-		const headerData = ["Container ID", "Created at", "ID", "Image", "Labels", "Mounts", "Name", "Names", "Namespace", "Node", "Ports", "Running For", "State", "Status", "Volumes", "Restart", "Is alive port test", "Last test results", "Contacts", "Location", "Operations"];
+		const headerData = ["Container ID", "Created at", "ID", "Image", "Labels", "Mounts", "Name", "Names", "Namespace", "Node", "Ports", "Running For", "State", "Status", "Volumes", "Restart", "Is alive port test", "Last test results", "Contacts", "Operations"];
 		
 		const tableContainer = document.getElementById("table-container");
 		tableContainer.setAttribute("style", "display: flex; flex-wrap: wrap;")
@@ -894,7 +893,7 @@
 			if (index===0) return;
 			var dataTable = $(table).DataTable();
 			var hasFailure = false;
-			var columnData = dataTable.column(24).data().toArray();
+			var columnData = dataTable.column(17).data().toArray();
 			for (var i = 0; i < columnData.length; i++)
 				{
 				if (typeof columnData[i] === 'string' && columnData[i].includes("Failure")) {
@@ -1030,7 +1029,7 @@
 					</form>
 				</li>
 				<li class="nav-item active">
-					<form action="generate_clustered_pdf" method="GET">
+					<form action="generate_pdf" method="GET">
 						<input type="submit" class="btn btn-info" value="Generate full logs" />
 					</form>
 				</li>

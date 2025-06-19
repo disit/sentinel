@@ -374,7 +374,8 @@ def auto_alert_status():
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    containers_which_are_not_expected = list(set(components_original)-set([a["Names"] for a in [b for b in containers_which_are_not_expected if not b.endswith("*")]]))
+    containers_which_are_not_expected = list(set(components_original)-set([a["Names"] for a in containers_merged]))
+    containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a.endswith("*")]
     '''
     top = get_top()
     load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
@@ -815,7 +816,11 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    return render_template("organize_containers.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    if os.getenv("running_as_kubernetes"):
+                        return render_template("organize_containers_k8s.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    else:
+                        return render_template("organize_containers.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
@@ -846,6 +851,8 @@ def create_app():
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                 cursor = conn.cursor(buffered=True)
+                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 query = '''DELETE FROM `checker`.`component_to_category` WHERE (`component` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['id'],))
