@@ -321,9 +321,9 @@ def auto_alert_status():
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
-            dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
-            dt2 = datetime.now()
             try:
+                dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
+                dt2 = datetime.now()
                 conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
             except Exception as E:
                 print(E)
@@ -664,7 +664,7 @@ def create_app():
                         cursor.execute(query_2, (int(os.getenv("admin-log-length")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
+                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
@@ -1161,26 +1161,14 @@ def create_app():
         
 
     
-    @app.route("/advanced-container/<container_id>")
-    def get_container_logs_advanced(container_id):
+    @app.route("/advanced-container/<container_name>")
+    def get_container_logs_advanced(container_name):
         if 'username' in session: # probably unneeded
             try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-                    psw = something[something.find(":")+1:]
-                    cursor = conn.cursor(buffered=True)
-                    # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''SELECT position FROM checker.component_to_category where component=%s;'''
-                    cursor.execute(query, (container_id,))
-                    conn.commit()
-                    results = cursor.fetchall()
-                    if len(results) == 0:
-                        return render_template("error_showing.html", r = "It appears that the container "+container_id+" doesn't exist in the cluster"), 500
-                    r = requests.get(results[0][0]+"/sentinel/container/"+container_id, headers=request.headers, data={"id": container_id, "psw": psw})
-                    return r.text
+                r = get_container_logs(container_name)
+                return r.text
             except Exception:
                 print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc() + str(results)), 500
         return redirect(url_for('login'))
     
     @app.route("/get_summary_status")
