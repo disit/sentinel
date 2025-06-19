@@ -622,8 +622,8 @@
 					td.innerHTML = content_of_id_cell;
 				}
 				else if (index_of_below_array === 12) {
-					var content_of_id_cell; //probably review me
-					if ((cellData === "running" != (elements[6] === "certbot/certbot")) && !elements[12].includes('unhealthy'))
+					var content_of_id_cell; 
+					if ((cellData === "running" != (elements[6] === "certbot/certbot")) && !elements[21].includes('unhealthy'))
 						content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 						else content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 					td.innerHTML = '<div id="'+elements[12]+'-reboot-result">'+content_of_id_cell+'</div>';

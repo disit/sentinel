@@ -1,0 +1,163 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="containers">
+  <thead>
+	  <tr>
+		<th>Container</th>
+		<th>Category</th>
+		<th>Contacts</th>
+		<th>Delete</th>
+	  </tr>
+  </thead>
+  <tbody>
+{%for item in containers%}
+    <tr>
+	  <td>{{item[0]}}</td>
+	  <td>{{item[1]}}</td>
+	  <td>{{item[2]}}</td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Delete</button></td>
+	</tr>
+{% endfor %}
+  </tbody>
+</table>
+<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addComponentModal" id="addComponent">Add</button>
+<div class="modal fade" id="addComponentModal" tabindex="-1" role="dialog" aria-labelledby="addComponentModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addComponentLabel">Add a new container</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addComponentModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="addComponentForm">
+					<div class="form-group">
+						<label for="passwordInputAdd">Password</label>
+						<input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="containeridmodalAdd">Container ID</label>
+						<input type="text" class="form-control" id="containeridmodalAdd" required>
+					</div>
+					<label for="category-selection">Select category:</label>
+					<select id="category-selection" name="category-selection" class="form-select">
+						{%for item in categories %}
+							<option value="{{item[0]}}">{{item[0]}}</option>
+						{% endfor %}
+					</select>
+					<div class="form-group">
+						<label for="ContactsAdd">Contacts</label>
+						<input type="text" class="form-control" id="ContactsAdd" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addComponentModal').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addContainerButton">Add component</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="deleteComponent" tabindex="-1" role="dialog" aria-labelledby="deleteComponentLabel">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting component</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="deleteComponentForm">
+					<div class="form-group">
+						<label for="passwordInputDelete">Password</label>
+						<input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="componentDeleteId">Container ID</label>
+						<input type="text" class="form-control" id="componentDeleteId" readonly>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteComponentButton" onClick="$('#deleteComponent').modal('hide')">Delete Component</button>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+
+	$('.open-modal-m').on('click', function() {
+		var id = $(this).data('component');
+		$('#componentDeleteId').val(id);
+		$('#deleteComponent').modal('show');
+	});
+	$("#containers").DataTable();
+	$('.open-modal').on('click', function() {
+		$('#addComponentModal').modal('show');
+	});
+	$('#deleteComponentButton').on('click', function() {
+		var password = $('#passwordInputDelete').val();
+		var id = $('#componentDeleteId').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './delete_container',
+					data: {id: id, psw: password},
+					type: 'POST',
+					success: function(response) {
+						alert(id + " was deleted!");
+						location.reload();
+					},
+					error: function(error) {
+						alert(id + " was not deleted because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#addContainerButton').on('click', function() {
+		var password = $('#passwordInputAdd').val();
+		var id = $('#containeridmodalAdd').val();
+		var category = $('#category-selection').val();
+		var contacts = $('#ContactsAdd').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './add_container',
+					data: {id: id, psw: password, category: category, contacts: contacts},
+					type: 'POST',
+					success: function(response) {
+						alert(id + " was added!");
+						location.reload();
+					},
+					error: function(error) {
+						alert(id + " was not added because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+</script>
+{% endblock %}
