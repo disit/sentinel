@@ -1306,8 +1306,9 @@ def create_app():
             conversion["Volumes"] = temp_str
             conversion["Namespace"] = item["metadata"]["namespace"]
             
-            
             conversions.append(conversion)
+        if do_not_jsonify:
+            return conversions
         return jsonify(conversions)
     
     @app.route("/generate_pdf", methods=['GET'])
@@ -1317,7 +1318,7 @@ def create_app():
             print(type(get_container_data(True)),str(get_container_data(True)))
             for container_data in get_container_data(True):
                 process = subprocess.Popen(
-                    'kubectl logs '+container_data['ID']+" --tail "+str(os.getenv("default-log-length")),
+                    'kubectl logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length")),
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order

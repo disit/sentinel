@@ -643,7 +643,7 @@
 			row.appendChild(testsbutton);
 			tbody.appendChild(row);
 			var testresults = document.createElement("td");
-			testresults.setAttribute('id',elements[12]+'-result');
+			testresults.setAttribute('id',elements[6]+'-result');
 
 			var some_value;
 			for (const key in lookupTable) {
@@ -901,7 +901,6 @@
 					break;
 				}
 			}
-			var string_being_used=$(table).attr('id').slice(6)+"-status";
 			if (hasFailure) {
 				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="red" /></svg>';
 			} else {
@@ -918,7 +917,7 @@
 			if (index===0) return;
 			var dataTable = $(table).DataTable();
 			var isNotRunning = true;
-			var columnData = dataTable.column(20).data().toArray();
+			var columnData = dataTable.column(12).data().toArray();
 			for (var i = 0; i < columnData.length; i++)
 				{
 				if (typeof columnData[i] === 'string' && !columnData[i].includes("running")) {
@@ -926,7 +925,6 @@
 					break;
 				}
 			}
-			var string_being_used=$(table).attr('id').slice(6)+"-status";
 			if (isNotRunning) {
 				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 			} 
