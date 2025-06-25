@@ -626,7 +626,7 @@
 					if ((cellData === "running" != (elements[6] === "certbot/certbot")) && !elements[12].includes('unhealthy'))
 						content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 						else content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
-					td.innerHTML = '<div id="'+elements[12]+'-reboot-result">'+content_of_id_cell+'</div>';
+					td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
 				}
 				else {
 					td.textContent = cellData;
@@ -859,7 +859,7 @@
 			if (password) {
 				try {
 					$.ajax({
-						url: './reboot_container_advanced/'+id,
+						url: './reboot_container',
 						data: {id: id, psw: password},
 						type: 'POST',
 						success: function(response) {

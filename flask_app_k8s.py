@@ -43,27 +43,6 @@ from datetime import timedelta
 import html
 
 
-os.environ["PYTHONUNBUFFERED"]="1"
-os.environ["admin-log-length"]="200"
-os.environ["default-log-length"]="1000"
-os.environ["requests-timeout"]="15000"
-os.environ["is-master"]="true"
-os.environ["telegram-api-token"]="replaceme"
-os.environ["telegram-channel"]="123456789"
-os.environ["db-user"]="root"
-os.environ["db-passwd"]="cPehkP5bbNJMt6Ao"
-os.environ["db-host"]="sentineldb"
-os.environ["db-port"]="3306"
-os.environ["smtp-server"]="change.me.com"
-os.environ["smtp-port"]="587"
-os.environ["sender-email"]="change@at.me"
-os.environ["sender-email-password"]="replacethispassword"
-os.environ["email-recipients"]="['first_address@to.besent', 'second_address@to.besent', 'more_addresses@to.besent']"
-os.environ["platform-url"]="http://example.org"
-os.environ["platform-explanation"]="Some information"
-os.environ["load-threshold"]="30"
-os.environ["memory-threshold"]="1"
-os.environ["running_as_kubernetes"]="True"
 
 def string_of_list_to_list(string):
     try:
@@ -865,8 +844,6 @@ def create_app():
         if request.method == 'POST':
             username = request.form['username']
             password = request.form['password']
-            print(username)
-            print(check_password_hash(users[username], password))
             if username in users and check_password_hash(users[username], password):
                 session.permanent = True
                 session['username'] = username
@@ -1073,19 +1050,14 @@ def create_app():
     @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
         if 'username' in session:
-            if request.method == "POST":
-                something = str(base64.b64decode(request.headers["Authorization"][len("Basic "):]))[:-1]
-                psw = something[something.find(":")+1:]
-                if psw == request.form.to_dict()['psw']:
-                    result = queued_running('kubectl rollout restart deployments/'+request.form.to_dict()['id']).stdout
-                    log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
-                    return result
-                else:
-                    log_to_db('rebooting_containers', 'wrong authentication while restarting '+request.form.to_dict()['id'], request)
-                    return "Container not rebooted", 401
-            else: 
-                log_to_db('rebooting_containers', "POST wasn't used in the request", request)
-                return "False"
+            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                return "An incorrect password was provided", 400
+            try:
+                result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:2])).stdout
+                log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                return result
+            except Exception:
+                return f"Issue while rebooting pod: {traceback.format_exc()}", 500
         return redirect(url_for('login'))
             
     @app.route("/get_muted_components", methods=['GET'])
@@ -1483,12 +1455,12 @@ def create_app():
                 script_to_run = "/app/scripts/make_dumps_of_database.sh"
                 if os.getenv("running_as_kubernetes"):
                     script_to_run = "/app/scripts/make_dumps_of_database_k8.sh"
-                make_certification = subprocess.run(f'cd {os.getenv("conf_path")}; mkdir {subfolder}; bash {script_to_run}; rar a -k -p{password} snap4city-certification-{password}.rar iotapp-00*/flows.json d*conf iot-directory-conf m*conf n*conf ownership-conf/config.php nifi/conf servicemap-conf/servicemap.properties ../placeholder_used.txt *dump.* servicemap-iot-conf/iotdeviceapi.dtd servicemap-superservicemap-conf/settings.xml synoptics-conf/ mongo_dump virtuoso_dump php ../checker/*; cp snap4city-certification-{password}.rar {subfolder}/snap4city-certification-{password}.rar', shell=True, capture_output=True, text=True, encoding="utf_8")
+                make_certification = subprocess.run(f'mkdir -p /app/data; mkdir -p {os.getenv("conf_path")}; cp -r {os.getenv("conf_path")} /app/data/{subfolder}; cd /app/data/{subfolder} && bash {script_to_run} && rar a -k -p{password} snap4city-certification-{password}.rar */ *.*', shell=True, capture_output=True, text=True, encoding="utf_8")
                 if len(make_certification.stderr) > 0:
                     print(make_certification.stderr)
-                    return send_file(f'/confs/{subfolder}/snap4city-certification-{password}.rar')
+                    return send_file(f'/app/data/{subfolder}/snap4city-certification-{password}.rar')
                 else:
-                    return send_file(f'/confs/snap4city-certification-{password}.rar')
+                    return send_file(f'/app/data/{subfolder}/snap4city-certification-{password}.rar')
             except Exception:
                 return render_template("error_showing.html", r = f"Fatal error while generating configuration: {traceback.format_exc()}"), 401
         return redirect(url_for('login'))

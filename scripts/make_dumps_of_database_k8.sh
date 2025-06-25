@@ -5,17 +5,10 @@ DB_USER="root"
 DB_PASS="$#dashboard-db-pwd-admin#$"
 DUMP_FILE="backup.sql"
 
-# Check for mysqldump
-if ! command -v mysqldump &> /dev/null; then
-    echo "mysqldump not found. Installing..."
-    apt-get update
-    sudo apt-get install -y mysql-client
-    
-fi
 
 # Run the dump
 echo "Dumping database..."
-mysqldump -h "dashboarddb" -u "root" -p"$#dashboard-db-pwd-admin#$" --all-databases > "backup.sql"
+mysqldump -h $DB_HOST -u $DB_USER -p$DB_PASS --all-databases > "backup.sql"
 
 if [ $? -eq 0 ]; then
     echo "Database dumped successfully to $DUMP_FILE"
@@ -43,7 +36,6 @@ for graph in $graphs; do
     -o "dump_$(basename $encoded).rdf"
 done
 
-#!/bin/bash
 
 # Configuration
 PG_HOST="od-postgis"
@@ -62,7 +54,7 @@ fi
 
 # Dump all databases remotely
 echo "Dumping all PostgreSQL databases from $PG_HOST..."
-pg_dumpall -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" > "$DUMP_FILE"
+pg_dumpall -h $PG_HOST -p $PG_PORT -U $PG_USER > "$DUMP_FILE"
 
 # Check result
 if [ $? -eq 0 ]; then
