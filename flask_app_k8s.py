@@ -1400,7 +1400,7 @@ def create_app():
     def list_files(subpath=''):
         if 'username' in session:
             # Determine the full path relative to the base directory
-            full_path = os.path.join(os.path.join(os.getcwd(), "certifications/"), subpath)
+            full_path = os.path.join(os.path.join(os.getcwd(), "data/"), subpath)
             if ".." in subpath:
                 return render_template("error_showing.html", r = "Issues during the retrieving of the resource: illegal path"), 500
             # If it's a directory, list contents
@@ -1422,7 +1422,7 @@ def create_app():
                 filename = os.path.basename(full_path)
                 return send_from_directory(directory, filename, as_attachment=True)
             else:
-                return render_template("error_showing.html", r = "Issues during the retrieving of the file: "+ traceback.format_exc()), 500
+                return render_template("error_showing.html", r = "No certification was ever produced"), 500
         return redirect(url_for('login'))
     
     @app.route("/clear_certifications", methods=['GET'])
