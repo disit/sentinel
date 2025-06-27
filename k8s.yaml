@@ -116,15 +116,19 @@ spec:
         - name: running_as_kubernetes
           value: "True"
         - name: conf_path
-          value: "/data/192.168.1.1" #eg
-        image: fabriziomereu/sentinel:v0.0.9
+          value: "/mnt/data/sentinel/fakeconf/fakeconf" #eg
+        - name: DB_PASS
+          value: $#dashboard-db-pwd#$ # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
+        image: fabriziomereu/sentinel:v0.0.34
         #command: ["sleep", "3600"]
         name: k8sentinel
         volumeMounts:
         - mountPath: /data/users.txt
           name: sentinel-claim001
-        - mountPath: /confs
+        - mountPath: /mnt/data/sentinel/fakeconf
           name: sentinel-claim002
+        - mountPath: /app/data
+          name: sentinel-claim003
         ports:
         - containerPort: 8080
           protocol: TCP
@@ -132,6 +136,12 @@ spec:
       - name: sentinel-claim001
         persistentVolumeClaim:
           claimName: sentinel-claim001
+      - name: sentinel-claim002
+        persistentVolumeClaim:
+          claimName: sentinel-claim002
+      - name: sentinel-claim003
+        persistentVolumeClaim:
+          claimName: sentinel-claim003
 ---
 apiVersion: v1
 kind: Service
@@ -371,4 +381,35 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
   hostPath:
-    path: "/mnt/data/sentinel/confs"
+    path: "/mnt/data/sentinel/fakeconf"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    io.kompose.service: sentinel-claim003
+  name: sentinel-claim003
+spec:
+  volumeName: sentinel-claim003
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: manual
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sentinel-claim003
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/sentinel/storedcerts"
