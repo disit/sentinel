@@ -106,7 +106,7 @@ spec:
         - name: email-recipients
           value: '["first_address@to.besent", "second_address@to.besent", "more_addresses@to.besent"]'
         - name: platform-url
-          value: http://example.org
+          value: $#base-url#$
         - name: platform-explanation
           value: Some information
         - name: load-threshold
@@ -119,7 +119,7 @@ spec:
           value: "/mnt/data/sentinel/fakeconf/fakeconf" #eg
         - name: DB_PASS
           value: $#dashboard-db-pwd#$ # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
-        image: fabriziomereu/sentinel:v0.0.34
+        image: fabriziomereu/sentinel:v0.0.35
         #command: ["sleep", "3600"]
         name: k8sentinel
         volumeMounts:
@@ -132,6 +132,13 @@ spec:
         ports:
         - containerPort: 8080
           protocol: TCP
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "4g"
+            cpu: "1"
       volumes:
       - name: sentinel-claim001
         persistentVolumeClaim:
@@ -191,7 +198,13 @@ spec:
             value: Europe/Rome
           image: mariadb:10.3
           name: sentineldb
-          resources: {}
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "250m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1"
           ports:
           - containerPort: 3306
           volumeMounts:

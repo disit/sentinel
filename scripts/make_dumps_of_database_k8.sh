@@ -85,5 +85,7 @@ fi
 
 #todo postgres-s geoserver is cursed and doesn't like any user or password
 
-rm -r php-css-dump
-docker exec dashboard-builder sh -c 'cd /var/www/html && tar czf - $(find . "*.php" -o -name "*.css")'
+POD=$(kubectl get pods -l app=dashboard-db -o jsonpath="{.items[0].metadata.name}")
+
+kubectl exec -i $POD -- \
+  sh -c 'cd /var/www/html && tar czf - $(find . \( -name "*.php" -o -name "*.css" \))' > files.tar.gz
