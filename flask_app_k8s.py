@@ -366,11 +366,22 @@ def auto_alert_status():
     if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold")):
         memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold"))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
     '''
-    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected):
+    cron_results = []
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
+            cursor.execute(query)
+            conn.commit()
+            cron_results = cursor.fetchall()
+    except Exception:
+        pass
+    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0:
         try:
             # todo
             # UPDATE `checker`.`summary_status` SET `status` = "&#128308" where `category` in ("System","Broker") # join, set of a list
-            issues = ["","","","",""]
+            issues = ["","","","","",""]
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
@@ -383,6 +394,8 @@ def auto_alert_status():
             if len(memory_issues)>0:
                 issues[4]=memory_issues
             '''
+            if len(cron_results)>0:
+                issues[5]=cron_results
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -613,6 +626,27 @@ def queued_running(command):
     print ("Unlocked executor")
     return answer
     
+def runcronjobs():
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            # to run malicious code, malicious code must be present in the db or the machine in the first place
+            query = '''SELECT * FROM cronjobs;'''
+            cursor.execute(query)
+            conn.commit()
+            results = cursor.fetchall()
+            for r in list(results):
+                print(f"Running {r[1]} cronjob")
+                command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="cp437", timeout=10)
+                if len(command_ran.stderr) > 0:
+                    query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                    cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
+                else:
+                    query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+                    cursor.execute(query, (command_ran.stdout.strip(),r[0],))
+                conn.commit()
+    except Exception:
+        print("Something went wrong during cronjobs running because of:",traceback.format_exc())
 
 
 def send_advanced_alerts(message):
@@ -631,11 +665,15 @@ def send_advanced_alerts(message):
             text_for_email+= message[3]
         if len(message[4])>0:
             text_for_email+= message[4]
+        if len(message[5])>0:
+            print("DEBUG cronjobs: "+str(message[5]))
+            text_for_email+= str(message[5])
         try:
             if len(text_for_email) > 5:
                 send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
         except:
-            print("[ERROR] while sending email:",text_for_email)
+            print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
+            
         text_for_telegram, t1, t2, t3 = "", "", "", ""
         if len(message[0])>0:
             t1=format_error_to_send("is not in the correct status ",filter_out_wrong_status_containers_for_telegram(message[0]))
@@ -664,6 +702,7 @@ scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
 scheduler.add_job(update_container_state_db, trigger='interval', minutes=5)
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
+scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
 scheduler.start()
 auto_alert_status()
 
@@ -1090,6 +1129,23 @@ def create_app():
                     cursor.execute(query, (request.form.to_dict()['id'],(datetime.now() + timedelta(hours=int(request.form.to_dict()['hours']))).strftime("%Y-%m-%d %H:%M:%S"),))
                     conn.commit()
                     return "ok", 200
+            except Exception:
+                print("Something went wrong during muting a component because of:",traceback.format_exc())
+                return traceback.format_exc(), 500
+        return redirect(url_for('login'))
+    
+    @app.route("/cronjobs", methods=['POST', 'GET'])
+    def get_cron_jobs():
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    return jsonify(results)
             except Exception:
                 print("Something went wrong during muting a component because of:",traceback.format_exc())
                 return traceback.format_exc(), 500

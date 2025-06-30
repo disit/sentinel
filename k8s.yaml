@@ -13,7 +13,7 @@ rules:
     resources: ["persistentvolumes", "configmaps"]
     verbs: ["create", "delete", "list", "get", "patch", "watch"]
 
----
+---  # make n of these for n namespaces, use the names of each namespace once and a different name for the clusterrolebinding (metadata[name])
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -106,7 +106,7 @@ spec:
         - name: email-recipients
           value: '["first_address@to.besent", "second_address@to.besent", "more_addresses@to.besent"]'
         - name: platform-url
-          value: $#base-url#$
+          value: http://someurl.com
         - name: platform-explanation
           value: Some information
         - name: load-threshold
@@ -118,8 +118,8 @@ spec:
         - name: conf_path
           value: "/mnt/data/sentinel/fakeconf/fakeconf" #eg
         - name: DB_PASS
-          value: $#dashboard-db-pwd#$ # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
-        image: fabriziomereu/sentinel:v0.0.35
+          value: passpasspass # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
+        image: fabriziomereu/sentinel:v0.1.15
         #command: ["sleep", "3600"]
         name: k8sentinel
         volumeMounts:
@@ -137,8 +137,8 @@ spec:
             memory: "64Mi"
             cpu: "250m"
           limits:
-            memory: "4g"
-            cpu: "1"
+            memory: "4G"
+            cpu: "1.0"
       volumes:
       - name: sentinel-claim001
         persistentVolumeClaim:
@@ -204,7 +204,7 @@ spec:
               cpu: "250m"
             limits:
               memory: "1024Mi"
-              cpu: "1"
+              cpu: "1.0"
           ports:
           - containerPort: 3306
           volumeMounts:

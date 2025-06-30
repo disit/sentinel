@@ -172,6 +172,7 @@
 		getcontainersdb();
 		testsResults();
 		showTestResults();
+		getcrons();
 		$("table[id^='table-']").DataTable();
 		document.getElementById("last-update").innerHTML = "Last update: " + new Date().toLocaleString();
 		cg = colorGenerator();
@@ -269,6 +270,30 @@
 			add_alert(exception_var);
 		}
 	};
+
+	function getcrons(){
+		let a = []; 
+		$.ajax({
+			url: "./cronjobs", 
+			type: "GET", 
+			success: function(data, textStatus, jqXHR) {
+				data.forEach(el => {
+					try {
+						let cronjobmsg = "";
+						if (el[2]) {
+							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1] + "with some errors: " + el[2];
+						}
+						else {
+							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1] + "with no errors.";
+						}
+					}
+					catch (exception_var) {
+						console.log("Issue while printing cronjob log of " + el[3] + " in: " + el[5]+": " + el[1] + " - " + el[2])
+					}
+					});
+				}
+		});
+	}
 	
 	function sendRequest(url_to_be_used, store_location) {
 		try {
@@ -1030,6 +1055,11 @@
 				<li class="nav-item active">
 					<form action="generate_pdf" method="GET">
 						<input type="submit" class="btn btn-info" value="Generate full logs" />
+					</form>
+				</li>
+				<li class="nav-item active">
+					<form action="cronjobs" method="GET">
+						<input type="submit" class="btn btn-info" value="Experimental read cronjobs" />
 					</form>
 				</li>
 				{% block additional_content_certification %}{% endblock %}

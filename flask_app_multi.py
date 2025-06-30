@@ -463,7 +463,7 @@ def send_advanced_alerts(message):
         try:
             send_email(config["sender-email"], config["sender-email-password"], config["email-recipients"], config["platform-url"]+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
         except:
-            print("[ERROR] while sending email:",text_for_email)
+            print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
         text_for_telegram, t1, t2, t3 = "", "", "", ""
         if len(message[0])>0:
             t1=format_error_to_send("is not in the correct status ",filter_out_wrong_status_containers_for_telegram(message[0]))
