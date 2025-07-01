@@ -18,5 +18,7 @@
 	"platform-explanation": "Some information",
 	"load-threshold": 30,
 	"memory_threshold": 1,
-	"send_notifications": true
+	"send_notifications": true,
+	"cluster-secret": "This is a super secret",
+	"is-multi": true
 }

@@ -117,6 +117,8 @@ spec:
           value: "True"
         - name: conf_path
           value: "/mnt/data/sentinel/fakeconf/fakeconf" #eg
+        - name: cluster-secret
+          value: "This is a super secret" #eg
         - name: DB_PASS
           value: passpasspass # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
         image: fabriziomereu/sentinel:v0.1.15

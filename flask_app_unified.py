@@ -37,11 +37,9 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import re
 from flask import Flask, render_template, request, redirect, url_for, session
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import timedelta
 import html
-
-
 
 def string_of_list_to_list(string):
     try:
@@ -101,9 +99,11 @@ class Snap4SentinelTelegramBot:
 f = open("conf.json")
 config = json.load(f)
 
+for key, value in config.items():
+    if not os.getenv(key):
+        os.environ[key] = value
 
-API_TOKEN = os.getenv("telegram-api-token")
-bot_2 = Snap4SentinelTelegramBot(API_TOKEN, int(os.getenv("telegram-channel")))
+bot_2 = Snap4SentinelTelegramBot(os.getenv("telegram-api-token"), int(os.getenv("telegram-channel")))
 greendot = """&#128994"""
 reddot = """&#128308"""
 
@@ -264,6 +264,7 @@ def auto_run_tests():
 
 def auto_alert_status():
     if not os.getenv("running_as_kubernetes"):
+        
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -274,6 +275,25 @@ def auto_alert_status():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+        if os.getenv("is-multi"):
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                cursor.execute(query)
+                conn.commit()
+                results = cursor.fetchall()
+                total_answer=[]
+                for r in results:
+                    obtained = requests.post(r[0]+"/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                    try:
+                        total_answer = total_answer + json.loads(obtained)
+                    except:
+                        try:
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                            total_answer = total_answer + json.loads(obtained)
+                        except:
+                            pass
+            containers_merged = containers_merged + total_answer
     else:
         raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
         conversions=[]
@@ -286,16 +306,13 @@ def auto_alert_status():
                 if full_command:
                     conversion["Command"] = full_command
             except Exception as E: # no command set, read from image
-                #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
                 conversion["Command"] = "Command not found"
             conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
             conversion["ID"] = item["metadata"]["uid"]
             conversion["Image"] = item["spec"]["containers"][0]["image"]
             conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            #conversion["LocalVolumes"] = "Whatever"
             conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
             conversion["Names"] = item["metadata"]["name"]
-            #conversion["Networks"] = "Whatever"
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -306,17 +323,10 @@ def auto_alert_status():
             except Exception as E:
                 print(E)
                 conversion["RunningFor"] = "Not running"
-            #conversion["Size"] = "Whatever"
             conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
             conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            #conversion["BlockIO"] = "Whatever"
-            #conversion["CPUPerc"] = "Whatever"
             conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            #conversion["MemPerc"] = "Whatever"
-            #conversion["MemUsage"] = "Whatever"
             conversion["Name"] = item["metadata"]["name"]
-            #conversion["NetIO"] = "Whatever"
-            #conversion["PIDs"] = "Whatever"
 
             # new things
             conversion["Node"] = item["spec"]["nodeName"]
@@ -354,17 +364,19 @@ def auto_alert_status():
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
     containers_which_are_not_expected = list(set(components_original)-set([a["Names"] for a in containers_merged]))
     containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a.endswith("*")]
-    '''
-    top = get_top()
-    load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
-    load_issues=""
-    for average, timing in zip(load_averages, [1, 5, 15]):
-        if float(average) > int(os.getenv("load-threshold")):
-            load_issues += "Load threshold above "+str(int(os.getenv("load-threshold"))) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
-    memory_issues = ""
-    if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold")):
-        memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold"))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
-    '''
+    if not os.getenv("running_as_kubernetes"):
+        top = get_top()
+        load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
+        load_issues=""
+        for average, timing in zip(load_averages, [1, 5, 15]):
+            if float(average) > int(os.getenv("load-threshold")):
+                load_issues += "Load threshold above "+str(int(os.getenv("load-threshold"))) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
+        memory_issues = ""
+        if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold")):
+            memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold"))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
+    else:
+        load_issues=""
+        memory_issues = ""
     cron_results = []
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -387,12 +399,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
                 issues[2]=containers_which_are_not_expected
-            '''
             if len(load_issues)>0:
                 issues[3]=load_issues
             if len(memory_issues)>0:
                 issues[4]=memory_issues
-            '''
             if len(cron_results)>0:
                 issues[5]=cron_results
             send_advanced_alerts(issues)
@@ -412,7 +422,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             print(traceback.format_exc())
             send_alerts("Couldn't reach database while not needing to send error messages: "+traceback.format_exc())
             return
-
+        
 def get_top():
     if os.environ["running_as_kubernetes"] == "True":
         nodes_output = subprocess.run(
@@ -546,12 +556,31 @@ def update_container_state_db():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        
+        if os.getenv("is-multi"):
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                cursor.execute(query)
+                conn.commit()
+                results = cursor.fetchall()
+                total_answer=[]
+                for r in results:
+                    obtained = requests.post(r[0]+"/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                    try:
+                        total_answer = total_answer + json.loads(obtained)
+                    except:
+                        try:
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                            total_answer = total_answer + json.loads(obtained)
+                        except:
+                            pass
+            containers_merged = containers_merged + total_answer
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
             cursor.execute(query,(json.dumps(containers_merged),))
             conn.commit()
+        
     else:
         raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
         conversions=[]
@@ -564,16 +593,13 @@ def update_container_state_db():
                 if full_command:
                     conversion["Command"] = full_command
             except Exception as E: # no command set, read from image
-                #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
                 conversion["Command"] = "Command not found"
             conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
             conversion["ID"] = item["metadata"]["uid"]
             conversion["Image"] = item["spec"]["containers"][0]["image"]
             conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            #conversion["LocalVolumes"] = "Whatever"
             conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
             conversion["Names"] = item["metadata"]["name"]
-            #conversion["Networks"] = "Whatever"
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -584,19 +610,9 @@ def update_container_state_db():
             except Exception as E:
                 print(E)
                 conversion["RunningFor"] = "Not running"
-            #conversion["Size"] = "Whatever"
             conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
             conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            #conversion["BlockIO"] = "Whatever"
-            #conversion["CPUPerc"] = "Whatever"
             conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            #conversion["MemPerc"] = "Whatever"
-            #conversion["MemUsage"] = "Whatever"
-            conversion["Name"] = item["metadata"]["name"]
-            #conversion["NetIO"] = "Whatever"
-            #conversion["PIDs"] = "Whatever"
-
-            # new things
             conversion["Node"] = item["spec"]["nodeName"]
             temp_vols=copy.deepcopy(item["spec"]["volumes"])
             temp_str = ""
@@ -650,6 +666,11 @@ def runcronjobs():
 
 def send_advanced_alerts(message):
     try:
+        container_source = ""
+        if not os.getenv("running_as_kubernetes"):
+            container_source="docker"
+        else:
+            container_source="kubernetes"
         text_for_email, em1, em2, em3 = "", "", "", ""
         if len(message[0])>0:
             em1 = format_error_to_send("is not in the correct status ",", ".join([a["Name"] for a in message[0]]),", ".join([a["Status"] for a in message[0]]),"as its status currently is: ")
@@ -658,14 +679,13 @@ def send_advanced_alerts(message):
             em2 = format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")
             text_for_email+= 'These containers are not answering correctly to their "is alive" test: '+ ", ".join([a["container"] for a in message[1]])+"\n"
         if len(message[2])>0:
-            em3 = format_error_to_send("wasn't found running in kubernetes ",", ".join(message[2]))
-            text_for_email+= "These containers weren't found in kubernetes: "+ ", ".join(message[2])+"\n"
+            em3 = format_error_to_send(f"wasn't found running in {container_source} ",", ".join(message[2]))
+            text_for_email+= f"These containers weren't found in {container_source}: "+ ", ".join(message[2])+"\n"
         if len(message[3])>0:
             text_for_email+= message[3]
         if len(message[4])>0:
             text_for_email+= message[4]
         if len(message[5])>0:
-            print("DEBUG cronjobs: "+str(message[5]))
             text_for_email+= str(message[5])
         try:
             if len(text_for_email) > 5:
@@ -673,25 +693,23 @@ def send_advanced_alerts(message):
         except:
             print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
             
-        text_for_telegram, t1, t2, t3 = "", "", "", ""
         if len(message[0])>0:
-            t1=format_error_to_send("is not in the correct status ",filter_out_wrong_status_containers_for_telegram(message[0]))
             text_for_telegram = "These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])) +"\n"
         if len(message[1])>0:
-            t2=format_error_to_send("is not answering correctly to its 'is alive' test ",filter_out_muted_failed_are_alive_for_telegram(message[1]))
             text_for_telegram+= 'These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1]))+"\n"
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
-            t3=format_error_to_send("wasn't found running in kubernetes ",filter_out_muted_containers_for_telegram(message[2]))
-            text_for_telegram+= "These containers weren't found in kubernetes: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
+            text_for_telegram+= f"These containers weren't found in {container_source}: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
         if len(message[3])>0:
-            text_for_telegram+= message[3]
+            text_for_telegram+= message[3] +"\n"
         if len(message[4])>0:
-            text_for_telegram+= message[4]
-        if len(text_for_telegram)>5:  #todo check me better
+            text_for_telegram+= message[4] +"\n"
+        if len(message[5])>0:
+            text_for_telegram+= str(message[5])
+        if len(text_for_telegram)>5:  
             try:
-                send_telegram(int(os.getenv("telegram-channel")), t1+"\n"+t2+"\n"+t3+"\n"+message[3]+"\n"+message[4])
+                send_telegram(int(os.getenv("telegram-channel")), text_for_telegram)
             except:
-                print("[ERROR] while sending telegram:",t1+"\n"+t2+"\n"+t3+"\n"+message[3]+"\n"+message[4],"\nDue to",traceback.format_exc())
+                print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
@@ -722,95 +740,33 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
+                        if not os.getenv("running_as_kubernetes"):
+                            return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
+                        else:
+                            return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
                         cursor.execute(query_2, (int(os.getenv("admin-log-length")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
+                        if not os.getenv("running_as_kubernetes"):
+                            return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
+                        else:
+                            return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
             return render_template("error_showing.html", r = traceback.format_exc()), 500
-    
+
     @app.route("/get_local_top", methods=["GET"])
     def get_local_top():
         if 'username' in session:
-            if os.environ["running_as_kubernetes"] == "True":
-                nodes_output = subprocess.run(
-                    ["kubectl", "get", "nodes", "-o", "json"],
-                    capture_output=True,
-                    text=True
-                )
-                nodes_data = json.loads(nodes_output.stdout)
-
-                # Get pods JSON (across all namespaces)
-                pods_output = subprocess.run(
-                    ["kubectl", "get", "pods", "-A", "-o", "json"],
-                    capture_output=True,
-                    text=True
-                )
-                pods_data = json.loads(pods_output.stdout)
-
-                # Count running pods per node
-                pod_counts = {}
-                for pod in pods_data["items"]:
-                    node_name = pod.get("spec", {}).get("nodeName")
-                    pod_phase = pod.get("status", {}).get("phase")
-                    if node_name and pod_phase == "Running":
-                        pod_counts[node_name] = pod_counts.get(node_name, 0) + 1
-
-                # Construct final node info with pod counts
-                node_info = []
-                for item in nodes_data["items"]:
-                    name = item["metadata"]["name"]
-                    capacity = item["status"]["capacity"]
-
-                    node_data = {
-                        "name": name,
-                        "capacity": {
-                            "cpu": capacity.get("cpu"),
-                            "memory": capacity.get("memory")
-                        },
-                        "running_pods": f"{str(pod_counts.get(name, 0))}/{capacity.get('pods')}",
-                        "status": ", ".join(["Ready" if a["message"] == "kubelet is posting ready status" else a["message"] for a in item["status"]["conditions"] if a["status"]=="True"])
-                    }
-
-                    node_info.append(node_data)
-                return render_template("k8s-top.html", json_data=json.dumps(node_info)), 200
-            else:
-                json_data=get_top()
-                json_data["source"] = os.getenv("platform-url")
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    try:
-                        cursor = conn.cursor(buffered=True)
-                        query = '''SELECT ip FROM checker.ip_table where hostname = %s'''
-                        cursor.execute(query,(os.getenv("platform-url"),))
-                        conn.commit()
-                        result = cursor.fetchone()
-                        print(result)
-                        if len(result) > 0:
-                            json_data["source"].append(" - " + result[0])
-                    except Exception as E:
-                        pass
-                        # no conversion for ip, not a big deal
-                try:
-                    form_dict = request.form.to_dict()
-                    amount_of_lines = form_dict.pop('top_lines')
-                    json_data['processes']=json_data['processes'][:int(amount_of_lines)]
-                except Exception as E:
-                    json_data['processes']=json_data['processes'][:40]
-                if os.getenv("is-master"):
-                    jsontobereturned = {"result":json_data, "error":[]}
-                    return render_template("top-viewer.html", data=jsontobereturned), 200
-                else:
-                    return json_data
+            return get_top()
         return render_template("error_showing.html", r = "You are not authenticated"), 403
     
 
     @app.route("/get_top", methods=["GET"])
-    def get_top_single():
+    def get_top_single():  #TODO doesn't do multi yet
         if 'username' in session:
             return get_local_top()
         return render_template("error_showing.html", r = "You are not authenticated"), 403
@@ -856,6 +812,31 @@ def create_app():
                     cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],))
                     conn.commit()
                     return "ok", 201
+            except Exception:
+                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+    
+    @app.route("/edit_container", methods=["POST"])
+    def edit_container(): #add position if only if docker
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    cursor = conn.cursor(buffered=True)
+                    # to run malicious code, malicious code must be present in the db or the machine in the first place
+                    if not os.getenv("running_as_kubernetes"):
+                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s where (`component` = %s)'''
+                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['id'],))
+                    else:
+                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
+                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    conn.commit()
+                    if cursor.rowcount > 0:
+                        return "ok", 201
+                    else:
+                        return "Somehow request did not result in database changes", 400
             except Exception:
                 print("Something went wrong during the addition of a new container because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
@@ -939,7 +920,12 @@ def create_app():
         
     @app.route("/read_containers", methods=['POST'])
     def check():
-        if 'username' in session:
+        if os.getenv("is-multi"):
+            if check_password_hash(request.form.to_dict()['cluster-secret'],os.getenv("cluster-secret")):
+                return get_container_data()
+            else:
+                return "Unauthorized", 401
+        elif 'username' in session:
             return get_container_data()
         return redirect(url_for('login'))
             
@@ -1183,22 +1169,6 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         except Exception:
             print("Something went wrong during db logging because of:",traceback.format_exc(), "- in:",table)
             
-    @app.route("/load_db",methods=['POST'])
-    def load_db():
-        if 'username' in session:
-            trying_to_load_db_resulted_in = subprocess.run(f'mysql -u {os.getenv("db-user")} --password={os.getenv("db-passwd")} -D checker < just_complex.sql', shell=True, capture_output=True, text=True, encoding="utf_8")
-            out = trying_to_load_db_resulted_in.stdout
-            err = trying_to_load_db_resulted_in.stderr
-            if "mysql: [Warning] Using a password on the command line interface can be insecure" in err:
-                err = ""
-            else:
-                err = '<p style="color:#FF0000";>'+err+'</p>'
-            if len(err)==0 and len(out)==0:
-                out = '<input type="button" name="db-success" id="db-success" value="Success! Click to reload" class="form-control" onclick="location.reload()"/>'
-            return err+out
-        return redirect(url_for('login'))
-    
-    
     @app.route("/get_complex_tests", methods=["GET"])
     def get_complex_tests():
         if 'username' in session:
@@ -1220,24 +1190,70 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
     
     @app.route("/container/<podname>")
-    def get_container_logs(podname):
+    def get_container_logs(podname): #TODO no multi yet
         if 'username' in session:
-            process = subprocess.Popen(
-                'kubectl logs '+podname+" --tail "+str(int(os.getenv("default-log-length"))),
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                text=True
-            )
-            out=[]
-            for line in iter(process.stdout.readline, ''):
-                out.append(line[:-1])
-            process.stdout.close()
-            r = '<br>'.join(out)
-            return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+            if not os.getenv("running_as_kubernetes"):
+                process = subprocess.Popen(
+                    'docker logs '+podname+" --tail "+str(config["default-log-length"]),
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                out=[]
+                for line in iter(process.stdout.readline, ''):
+                    out.append(line[:-1])
+                process.stdout.close()
+                r = '<br>'.join(out)
+                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+            else:
+                process = subprocess.Popen(
+                    'kubectl logs '+podname+" --tail "+str(int(os.getenv("default-log-length"))),
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                out=[]
+                for line in iter(process.stdout.readline, ''):
+                    out.append(line[:-1])
+                process.stdout.close()
+                r = '<br>'.join(out)
+                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+        
         return redirect(url_for('login'))
         
-
+    @app.route("/advanced_read_containers", methods=['POST'])
+    def check_adv():
+        if not os.getenv("is-multi"):
+            return "Disabled for non-clustered environments", 500
+        if not os.getenv('is-master'):
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+        try:
+            results = None
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                cursor.execute(query)
+                conn.commit()
+                results = cursor.fetchall()
+                total_answer=[]
+                errors=[]
+                for r in results:
+                    obtained = requests.post(r[0]+"/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                    try:
+                        total_answer = total_answer + json.loads(obtained)
+                    except:
+                        try:
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                            total_answer = total_answer + json.loads(obtained)
+                        except Exception as E:
+                            errors.append("Reading containers from "+r[0]+" failed: the backed received this exception: "+str(E))
+                tobereturned_answer = {"result":total_answer, "error":errors}
+                return tobereturned_answer
+        except Exception:
+            print("Something went wrong because of:",traceback.format_exc())
+            return render_template("error_showing.html", r = traceback.format_exc()), 500
     
     @app.route("/advanced-container/<container_name>")
     def get_container_logs_advanced(container_name):
@@ -1295,10 +1311,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             conversion["ID"] = item["metadata"]["uid"]
             conversion["Image"] = item["spec"]["containers"][0]["image"]
             conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            #conversion["LocalVolumes"] = "Whatever"
             conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
             conversion["Names"] = item["metadata"]["name"]
-            #conversion["Networks"] = "Whatever"
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -1309,17 +1323,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception as E:
                 print(E)
                 conversion["RunningFor"] = "Not running"
-            #conversion["Size"] = "Whatever"
             conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
             conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            #conversion["BlockIO"] = "Whatever"
-            #conversion["CPUPerc"] = "Whatever"
             conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            #conversion["MemPerc"] = "Whatever"
-            #conversion["MemUsage"] = "Whatever"
             conversion["Name"] = item["metadata"]["name"]
-            #conversion["NetIO"] = "Whatever"
-            #conversion["PIDs"] = "Whatever"
 
             # new things
             conversion["Node"] = item["spec"]["nodeName"]
@@ -1339,13 +1346,13 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return jsonify(conversions)
     
     @app.route("/generate_pdf", methods=['GET'])
-    def generate_pdf():
+    def generate_pdf(): # no multi
         if 'username' in session:
             data_stored = []
             print(type(get_container_data(True)),str(get_container_data(True)))
             for container_data in get_container_data(True):
                 process = subprocess.Popen(
-                    'kubectl logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length")),
+                    f'{"kubectl" if os.getenv("running_as_kubernetes") else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length")),
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
@@ -1447,7 +1454,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/download")
     def redirect_to_download():
         if 'username' in session:
-            return redirect('/sentinel/downloads/')
+            return redirect('/downloads/')
         return redirect(url_for('login'))
     
     @app.route("/downloads/")
@@ -1479,25 +1486,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             else:
                 return render_template("error_showing.html", r = "No certification was ever produced"), 500
         return redirect(url_for('login'))
-    
-    @app.route("/clear_certifications", methods=['GET'])
-    def clear_certifications():
-        return "Suppressed", 500
-        user = ""
-        try:
-            user = base64.b64decode(request.headers["Authorization"][len('Basic '):]).decode('utf-8')
-            user = user[:user.find(":")]
-        except Exception:
-            return render_template("error_showing.html", r = "Issues during the establishing of the user: "+ traceback.format_exc()), 500
-        if user != "admin":
-            return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
-        script_folder = os.path.dirname(os.path.abspath(__file__))
-        parent_folder = os.path.dirname(script_folder)
-        target_folder = find_target_folder(parent_folder)
-        if target_folder:
-            clear_rars = subprocess.run(f'cd {target_folder}; rm -f *snap4city*-certification-*.rar', shell=True, capture_output=True, text=True, encoding="utf_8")
-            return "Done"
-        
+          
     
     @app.route("/certification", methods=['GET'])
     def certification():

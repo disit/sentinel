@@ -11,6 +11,7 @@
 		<th>Category</th>
 		<th>Contacts</th>
 		<th>Delete</th>
+		<th>Edit</th>
 	  </tr>
   </thead>
   <tbody>
@@ -20,6 +21,7 @@
 	  <td>{{item[1]}}</td>
 	  <td>{{item[2]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Delete</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -63,6 +65,46 @@
 		</div>
 	</div>
 </div>
+
+<div class="modal fade" id="editComponentModal" tabindex="-1" role="dialog" aria-labelledby="editComponentModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="editComponentLabel">Edit container</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editComponentModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="editComponentForm">
+					<div class="form-group">
+						<label for="passwordInputEdit">Password</label>
+						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="containeridmodalEdit">Container ID</label>
+						<input type="text" class="form-control" id="containeridmodalEdit" required readonly>
+					</div>
+					<label for="category-selection-edit">Select category:</label>
+					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
+						{% for item in categories %}
+							<option value="{{item[0]}}">{{item[0]}}</option>
+						{% endfor %}
+					</select>
+					<div class="form-group">
+						<label for="ContactsEdit">Contacts</label>
+						<input type="text" class="form-control" id="ContactsEdit" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editComponentModal').modal('hide')">Cancel</button>
+				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveComponentChangesButton">Save changes</button>
+			</div>
+		</div>
+	</div>
+</div>
+
 
 <div class="modal fade" id="deleteComponent" tabindex="-1" role="dialog" aria-labelledby="deleteComponentLabel">
 	<div class="modal-dialog" role="document">
@@ -118,6 +160,35 @@
 					},
 					error: function(error) {
 						alert(id + " was not deleted because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#saveComponentChangesButton').on('click', function() {
+		var password = $('#passwordInputEdit').val();
+		var id = $('#containeridmodalEdit').val();
+		var category = $('#category-selection-edit').val();
+		var contacts = $('#ContactsEdit').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './edit_container',
+					data: {id: id, psw: password, category: category, contacts: contacts},
+					type: 'POST',
+					success: function(response) {
+						alert(id + " was edited!");
+						location.reload();
+					},
+					error: function(error) {
+						alert(id + " was not edited because of:" + error.responseText);
 					},
 					timeout: {{timeout}}
 				});
