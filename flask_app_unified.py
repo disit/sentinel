@@ -40,7 +40,8 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import timedelta
 import html
-
+import jwt
+ALGORITHM = 'HS256'
 def string_of_list_to_list(string):
     try:
         a = string[1:-1]
@@ -284,12 +285,12 @@ def auto_alert_status():
                 results = cursor.fetchall()
                 total_answer=[]
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except:
                             pass
@@ -565,12 +566,12 @@ def update_container_state_db():
                 results = cursor.fetchall()
                 total_answer=[]
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except:
                             pass
@@ -876,12 +877,21 @@ def create_app():
         return redirect(url_for('login'))
 
     @app.route("/get_data_from_source", methods=["GET"])
-    def get_additional_data():
+    def get_additional_data(): # this should call the db, not directly the webpage
         if 'username' in session:
             try:
-                response = requests.get(request.args.to_dict()['url_of_resource'])
-                response.raise_for_status()
-                return response.text
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT * FROM extra_resources where resource_address = %s;'''
+                    cursor.execute(query, (request.form.to_dict()['id'],))
+                    conn.commit()
+                    try:
+                        result = cursor.fetchone()
+                    except Exception:
+                        return "An unauthorized url was attempted to use", 400
+                    response = requests.get(request.args.to_dict()['url_of_resource'])
+                    response.raise_for_status()
+                    return response.text
             except Exception:
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
@@ -921,10 +931,13 @@ def create_app():
     @app.route("/read_containers", methods=['POST'])
     def check():
         if os.getenv("is-multi"):
-            if check_password_hash(request.form.to_dict()['cluster-secret'],os.getenv("cluster-secret")):
+            try:
+                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
                 return get_container_data()
-            else:
-                return "Unauthorized", 401
+            except jwt.ExpiredSignatureError:
+                return jsonify({'error': 'Token expired'}), 401
+            except jwt.InvalidTokenError:
+                return jsonify({'error': 'Invalid token'}), 401
         elif 'username' in session:
             return get_container_data()
         return redirect(url_for('login'))
@@ -1036,18 +1049,7 @@ def create_app():
             except Exception:
                 print("Something went wrong during tests running because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))
-        
-    @app.route("/reboot/<container_id>", methods=['POST', 'GET'])
-    def reboot(container_id):
-        if 'username' in session:
-            try:
-                return render_template("reboot.html", container=container_id)
-            except Exception:
-                print("Something went wrong during rebooting because of:",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))
-        
+        return redirect(url_for('login'))        
         
     @app.route("/test_all_ports", methods=['GET'])
     def test_all_ports():
@@ -1073,15 +1075,32 @@ def create_app():
         
     @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
-        if 'username' in session:
-            if not check_password_hash(users[username], request.form.to_dict()['psw']):
-                return "An incorrect password was provided", 400
+        
+        if not os.getenv("running_as_kubernetes"):
             try:
-                result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:2])).stdout
-                log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
+                log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                 return result
-            except Exception:
-                return f"Issue while rebooting pod: {traceback.format_exc()}", 500
+            except jwt.ExpiredSignatureError:
+                return jsonify({'error': 'Token expired'}), 401
+            except jwt.InvalidTokenError:
+                return jsonify({'error': 'Invalid token'}), 401
+            except Exception: #not an intracluster call
+                if 'username' in session:
+                    result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
+                    log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                    return result
+        else:
+            if 'username' in session:
+                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                try:
+                    result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:2])).stdout
+                    log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                    return result
+                except Exception:
+                    return f"Issue while rebooting pod: {traceback.format_exc()}", 500
         return redirect(url_for('login'))
             
     @app.route("/get_muted_components", methods=['GET'])
@@ -1102,6 +1121,31 @@ def create_app():
                 print("Something went wrong during getting the muted components because:",traceback.format_exc())
                 return traceback.format_exc(), 500
         return redirect(url_for('login'))
+    
+    @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
+    def reboot_container_advanced(container_id):
+        if not os.getenv("is-multi"):
+            return "Disabled for non-clustered environments", 500
+        if not config['is-master']:
+            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
+        try:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                # to run malicious code, malicious code must be present in the db or the machine in the first place
+                query = '''SELECT position FROM checker.component_to_category where component=%s;'''
+                cursor.execute(query, (container_id,))
+                conn.commit()
+                results = cursor.fetchall()
+                try:
+                    r = requests.post(results[0][0]+"/sentinel/reboot_container",  data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)})
+                    return r.text
+                except:
+                    r = requests.post(results[0][0]+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)})
+                    return r.text
+        except Exception:
+            print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
+            return render_template("error_showing.html", r = traceback.format_exc()), 500
+
             
     @app.route("/mute_component_by_hours", methods=['POST'])
     def mute_component_by_hours():
@@ -1193,6 +1237,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     def get_container_logs(podname): #TODO no multi yet
         if 'username' in session:
             if not os.getenv("running_as_kubernetes"):
+
                 process = subprocess.Popen(
                     'docker logs '+podname+" --tail "+str(config["default-log-length"]),
                     shell=True,
@@ -1240,12 +1285,12 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 total_answer=[]
                 errors=[]
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"cluster-secret": generate_password_hash(os.getenv("cluster-secret"))}).text
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except Exception as E:
                             errors.append("Reading containers from "+r[0]+" failed: the backed received this exception: "+str(E))
@@ -1262,7 +1307,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 r = get_container_logs(container_name)
                 return r.text
             except Exception:
-                print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
+                print("Something went wrong during reading because of:",traceback.format_exc())
         return redirect(url_for('login'))
     
     @app.route("/get_summary_status")
@@ -1492,7 +1537,18 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     def certification():
         if 'username' in session:
             if session['username'] != "admin":
-                return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
+                try:
+                    if jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])['sub'] == "admin": #maybe authenticate with token
+                        pass
+                    else:
+                        return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
+                except jwt.ExpiredSignatureError:
+                    return jsonify({'error': 'Token expired'}), 401
+                except jwt.InvalidTokenError:
+                    return jsonify({'error': 'Invalid token'}), 401
+                except Exception:
+                    return render_template("error_showing.html", r = "Something bad happened: " + traceback.format_exc()), 401
+                
             try:
                 subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
@@ -1510,9 +1566,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
             
     @app.route("/clustered_certification", methods=['GET'])
-    def clustered_certification(): # probably unneeded
-        return "Suppressed", 500
+    def clustered_certification():
         if 'username' in session:
+            if not os.getenv("is-multi"):
+                return "Disabled for non-clustered environments", 500
             if session['username'] != "admin":
                 return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
             try:
@@ -1529,7 +1586,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     subprocess.run(f'rm -f *snap4city*-certification-*.rar', shell=True)
                     for r in results:
                         file_name, content_disposition = "", ""
-                        obtained = requests.get(r[0]+"/sentinel/certification", headers=request.headers)
+                        obtained = requests.get(r[0]+"/sentinel/certification", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)})
                         if 'Content-Disposition' in obtained.headers:
                             content_disposition = obtained.headers['Content-Disposition']
                         if 'filename=' in content_disposition:
