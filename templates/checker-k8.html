@@ -141,6 +141,7 @@
 					for (a in response) {
 						try {
 							if (a != "nothing") {
+								test_results_divs[a]=response[a];
 								document.getElementById(a+"-result").innerHTML=response[a];
 								}
 						}
@@ -764,7 +765,7 @@
 			var i = val_2;
 			const box = document.createElement("div");
 			box.setAttribute("class", "p-5 text-center");
-			box.setAttribute("style", "border-radius: 3rem; background-color: "+cg.next().value);
+			box.setAttribute("style", "border-radius: 1.2rem; background-color: "+cg.next().value);
 			box.setAttribute("id",i);
 			if (!closed_categories.has(i)) box.style.display = "none"; else box.style.display = "block";
 				const centerer = document.createElement("div");
@@ -776,6 +777,8 @@
 					name_of_table.setAttribute("class", "btn btn-light btn-lg button-cat");
 				name_of_table.setAttribute("onclick", "collapse_category('"+i+"', this)");
 				name_of_table.setAttribute("id", i+"-status");
+				name_of_table.setAttribute("title", "Experimental tooltip");
+				name_of_table.setAttribute("data-toggle","tooltip");
 				name_of_table.innerHTML = i;
 				var menupage = document.getElementById("category_menu");
 				menupage.appendChild(name_of_table);
@@ -806,6 +809,9 @@
 			else console.log("Skipped unmanaged containers");
 			
 			});
+		$(function () {
+			$('[data-toggle="tooltip"]').tooltip()
+		})
 		data_tables=$("table[id^='table-']").DataTable(dict_of_hidden_columns);
 		get_summary_new();
 		get_complex_tests();
