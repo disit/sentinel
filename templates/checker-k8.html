@@ -701,7 +701,7 @@
 			do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[12]+'" id="mutebutton-'+elements[12]+'">Mute</button>';
 			row.appendChild(do_not_update_this_td);
 			tbody.appendChild(row);
-			testresults.innerHTML=test_results_divs[row.childNodes[12].innerHTML];
+			testresults.innerHTML=test_results_divs[row.childNodes[7].innerHTML];
 			if (testresults.innerHTML == "undefined") {
 				testresults.innerHTML = "No tests found";
 			}
