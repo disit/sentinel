@@ -777,7 +777,8 @@
 					name_of_table.setAttribute("class", "btn btn-light btn-lg button-cat");
 				name_of_table.setAttribute("onclick", "collapse_category('"+i+"', this)");
 				name_of_table.setAttribute("id", i+"-status");
-				name_of_table.setAttribute("title", "Experimental tooltip");
+				name_of_table.setAttribute("title", "");
+				name_of_table.setAttribute("data-html","true")
 				name_of_table.setAttribute("data-toggle","tooltip");
 				name_of_table.innerHTML = i;
 				var menupage = document.getElementById("category_menu");
@@ -809,9 +810,17 @@
 			else console.log("Skipped unmanaged containers");
 			
 			});
-		$(function () {
-			$('[data-toggle="tooltip"]').tooltip()
-		})
+		const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+
+		// Loop through and dispose any existing instance
+		tooltipTriggerList.forEach(el => {
+		const existingInstance = bootstrap.Tooltip.getInstance(el);
+		if (existingInstance) {
+			existingInstance.dispose();
+		}
+		// Create a new instance
+		new bootstrap.Tooltip(el);
+		});
 		data_tables=$("table[id^='table-']").DataTable(dict_of_hidden_columns);
 		get_summary_new();
 		get_complex_tests();
@@ -929,6 +938,7 @@
 			for (var i = 0; i < columnData.length; i++)
 				{
 				if (typeof columnData[i] === 'string' && columnData[i].includes("Failure")) {
+					document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").setAttribute("title", document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").getAttribute("title") + "Issue with " + dataTable.column(7).data().toArray()[i] + "<br>");
 					hasFailure = true;
 					break;
 				}

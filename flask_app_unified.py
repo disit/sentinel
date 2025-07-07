@@ -52,7 +52,7 @@ def string_of_list_to_list(string):
     except:
         raise Exception("Couldn't do it")
 
-USERS_FILE = '/data/users.txt'
+USERS_FILE = 'users.txt'
 
 users = {}
 with open(USERS_FILE, 'r') as f:

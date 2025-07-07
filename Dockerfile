@@ -18,4 +18,4 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-CMD ["waitress-serve", "--port", "9080", "--call", "flask_app_k8s:create_app"]
+CMD ["waitress-serve", "--port", "9080", "--call", "flask_app_unified:create_app"]
