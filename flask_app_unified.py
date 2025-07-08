@@ -601,6 +601,7 @@ def update_container_state_db():
             conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
             conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
             conversion["Names"] = item["metadata"]["name"]
+            conversion["Name"] = item["metadata"]["name"]
             conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
 
             fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -693,7 +694,7 @@ def send_advanced_alerts(message):
                 send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
         except:
             print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
-            
+        text_for_telegram = ""
         if len(message[0])>0:
             text_for_telegram = "These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])) +"\n"
         if len(message[1])>0:
