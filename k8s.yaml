@@ -13,19 +13,6 @@ rules:
     resources: ["persistentvolumes", "configmaps"]
     verbs: ["create", "delete", "list", "get", "patch", "watch"]
 
----  # make n of these for n namespaces, use the names of each namespace once and a different name for the clusterrolebinding (metadata[name])
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: sentinel-role-binding
-subjects:
-  - kind: ServiceAccount
-    name: sentinel-san
-    namespace: sumoapps
-roleRef:
-  kind: ClusterRole
-  name: sentinel-pv
-  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -121,6 +108,8 @@ spec:
           value: "This is a super secret" #eg
         - name: DB_PASS
           value: passpasspass # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
+        - name: namespaces
+          value: '["sumoapps", "dashk8stest"]'
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"

@@ -296,7 +296,10 @@ def auto_alert_status():
                             pass
             containers_merged = containers_merged + total_answer
     else:
-        raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+        
+        raw_json = {}
+        for a in string_of_list_to_list(os.getenv("namespaces")):
+            raw_json = raw_json | json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
         conversions=[]
         for item in raw_json["items"]:
             conversion = {}
@@ -583,7 +586,9 @@ def update_container_state_db():
             conn.commit()
         
     else:
-        raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+        raw_json = {}
+        for a in string_of_list_to_list(os.getenv("namespaces")):
+            raw_json = raw_json | json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
         conversions=[]
         for item in raw_json["items"]:
             conversion = {}
@@ -1340,7 +1345,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return containers_merged
             return jsonify(containers_merged)
         else:
-            raw_json = json.loads(subprocess.run('kubectl get pods -o json',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+            
+            raw_json = {}
+            for a in string_of_list_to_list(os.getenv("namespaces")):
+                raw_json = raw_json | json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
             conversions=[]
         for item in raw_json["items"]:
             conversion = {}
