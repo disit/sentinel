@@ -297,55 +297,61 @@ def auto_alert_status():
             containers_merged = containers_merged + total_answer
     else:
         
-        raw_json = {}
+        raw_jsons = []
         for a in string_of_list_to_list(os.getenv("namespaces")):
-            raw_json = raw_json | json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+            raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
         conversions=[]
-        for item in raw_json["items"]:
-            conversion = {}
-            try:
-                command = item.get("command", [])
-                args = item.get("args", [])
-                full_command = command + args
-                if full_command:
-                    conversion["Command"] = full_command
-            except Exception as E: # no command set, read from image
-                conversion["Command"] = "Command not found"
-            conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
-            conversion["ID"] = item["metadata"]["uid"]
-            conversion["Image"] = item["spec"]["containers"][0]["image"]
-            conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
-            conversion["Names"] = item["metadata"]["name"]
-            conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+        for raw_json in raw_jsons:
+            for item in raw_json["items"]:
+                conversion = {}
+                try:
+                    command = item.get("command", [])
+                    args = item.get("args", [])
+                    full_command = command + args
+                    if full_command:
+                        conversion["Command"] = full_command
+                except Exception as E: # no command set, read from image
+                    conversion["Command"] = "Command not found"
+                conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
+                conversion["ID"] = item["metadata"]["uid"]
+                conversion["Image"] = item["spec"]["containers"][0]["image"]
+                try:
+                    conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
+                except KeyError:
+                    conversion["Labels"] = "No labels"
+                conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                conversion["Names"] = item["metadata"]["name"]
+                try:
+                    conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+                except KeyError as E:
+                    conversion["Ports"] = "No ports"
 
-            fmt = "%Y-%m-%dT%H:%M:%SZ"
-            try:
-                dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
-                dt2 = datetime.now()
-                conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
-            except Exception as E:
-                print(E)
-                conversion["RunningFor"] = "Not running"
-            conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
-            conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            conversion["Name"] = item["metadata"]["name"]
+                fmt = "%Y-%m-%dT%H:%M:%SZ"
+                try:
+                    dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
+                    dt2 = datetime.now()
+                    conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
+                except Exception as E:
+                    conversion["RunningFor"] = "Not running"
+                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+                conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
+                conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                conversion["Name"] = item["metadata"]["name"]
 
-            # new things
-            conversion["Node"] = item["spec"]["nodeName"]
-            temp_vols=copy.deepcopy(item["spec"]["volumes"])
-            temp_str = ""
-            for vol_num in range(len(item["spec"]["volumes"])):
-                temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
-                del temp_vols[vol_num]["name"]
-                temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                # new things
+                conversion["Node"] = item["spec"]["nodeName"]
+                temp_vols=copy.deepcopy(item["spec"]["volumes"])
+                temp_str = ""
+                for vol_num in range(len(item["spec"]["volumes"])):
+                    temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                    del temp_vols[vol_num]["name"]
+                    temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                    
+                conversion["Volumes"] = temp_str
+                conversion["Namespace"] = item["metadata"]["namespace"]
                 
-            conversion["Volumes"] = temp_str
-            conversion["Namespace"] = item["metadata"]["namespace"]
-            
-            
-            conversions.append(conversion)
+                
+                conversions.append(conversion)
         containers_merged = conversions
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -586,52 +592,58 @@ def update_container_state_db():
             conn.commit()
         
     else:
-        raw_json = {}
+        raw_jsons = []
         for a in string_of_list_to_list(os.getenv("namespaces")):
-            raw_json = raw_json | json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+            raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
         conversions=[]
-        for item in raw_json["items"]:
-            conversion = {}
-            try:
-                command = item.get("command", [])
-                args = item.get("args", [])
-                full_command = command + args
-                if full_command:
-                    conversion["Command"] = full_command
-            except Exception as E: # no command set, read from image
-                conversion["Command"] = "Command not found"
-            conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
-            conversion["ID"] = item["metadata"]["uid"]
-            conversion["Image"] = item["spec"]["containers"][0]["image"]
-            conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
-            conversion["Names"] = item["metadata"]["name"]
-            conversion["Name"] = item["metadata"]["name"]
-            conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+        for raw_json in raw_jsons:
+            for item in raw_json["items"]:
+                conversion = {}
+                try:
+                    command = item.get("command", [])
+                    args = item.get("args", [])
+                    full_command = command + args
+                    if full_command:
+                        conversion["Command"] = full_command
+                except Exception as E: # no command set, read from image
+                    conversion["Command"] = "Command not found"
+                conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
+                conversion["ID"] = item["metadata"]["uid"]
+                conversion["Image"] = item["spec"]["containers"][0]["image"]
+                try:
+                    conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
+                except KeyError:
+                    conversion["Labels"] = "No labels"
+                conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                conversion["Names"] = item["metadata"]["name"]
+                conversion["Name"] = item["metadata"]["name"]
+                try:
+                    conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+                except KeyError as E:
+                    conversion["Ports"] = "No ports"
 
-            fmt = "%Y-%m-%dT%H:%M:%SZ"
-            dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
-            dt2 = datetime.now()
-            try:
-                conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
-            except Exception as E:
-                print(E)
-                conversion["RunningFor"] = "Not running"
-            conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
-            conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            conversion["Node"] = item["spec"]["nodeName"]
-            temp_vols=copy.deepcopy(item["spec"]["volumes"])
-            temp_str = ""
-            for vol_num in range(len(item["spec"]["volumes"])):
-                temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
-                del temp_vols[vol_num]["name"]
-                temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                fmt = "%Y-%m-%dT%H:%M:%SZ"
+                try:
+                    dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
+                    dt2 = datetime.now()
+                    conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
+                except Exception as E:
+                    conversion["RunningFor"] = "Not running"
+                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+                conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
+                conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                conversion["Node"] = item["spec"]["nodeName"]
+                temp_vols=copy.deepcopy(item["spec"]["volumes"])
+                temp_str = ""
+                for vol_num in range(len(item["spec"]["volumes"])):
+                    temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                    del temp_vols[vol_num]["name"]
+                    temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                    
+                conversion["Volumes"] = temp_str
+                conversion["Namespace"] = item["metadata"]["namespace"]
                 
-            conversion["Volumes"] = temp_str
-            conversion["Namespace"] = item["metadata"]["namespace"]
-            
-            conversions.append(conversion)
+                conversions.append(conversion)
             
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -1259,7 +1271,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
             else:
                 process = subprocess.Popen(
-                    'kubectl logs '+podname+" --tail "+str(int(os.getenv("default-log-length"))),
+               f"kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}') {podname} --tail {os.getenv('default-log-length')}",
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
@@ -1346,55 +1358,61 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             return jsonify(containers_merged)
         else:
             
-            raw_json = {}
+            raw_jsons = []
             for a in string_of_list_to_list(os.getenv("namespaces")):
-                raw_json = raw_json | json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout)
+                raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
             conversions=[]
-        for item in raw_json["items"]:
-            conversion = {}
-            try:
-                command = item.get("command", [])
-                args = item.get("args", [])
-                full_command = command + args
-                if full_command:
-                    conversion["Command"] = full_command
-            except Exception as E: # no command set, read from image
-                #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
-                conversion["Command"] = "Command not found"
-            conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
-            conversion["ID"] = item["metadata"]["uid"]
-            conversion["Image"] = item["spec"]["containers"][0]["image"]
-            conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
-            conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
-            conversion["Names"] = item["metadata"]["name"]
-            conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+        for raw_json in raw_jsons:
+            for item in raw_json["items"]:
+                conversion = {}
+                try:
+                    command = item.get("command", [])
+                    args = item.get("args", [])
+                    full_command = command + args
+                    if full_command:
+                        conversion["Command"] = full_command
+                except Exception as E: # no command set, read from image
+                    #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                    conversion["Command"] = "Command not found"
+                conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
+                conversion["ID"] = item["metadata"]["uid"]
+                conversion["Image"] = item["spec"]["containers"][0]["image"]
+                try:
+                    conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
+                except KeyError:
+                    conversion["Labels"] = "No labels"
+                conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                conversion["Names"] = item["metadata"]["name"]
+                try:
+                    conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
+                except KeyError as E:
+                    conversion["Ports"] = "No ports"
 
-            fmt = "%Y-%m-%dT%H:%M:%SZ"
-            dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
-            dt2 = datetime.now()
-            try:
-                conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
-            except Exception as E:
-                print(E)
-                conversion["RunningFor"] = "Not running"
-            conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
-            conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-            conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
-            conversion["Name"] = item["metadata"]["name"]
+                fmt = "%Y-%m-%dT%H:%M:%SZ"
+                try:
+                    dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
+                    dt2 = datetime.now()
+                    conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
+                except Exception as E:
+                    conversion["RunningFor"] = "Not running"
+                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+                conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
+                conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                conversion["Name"] = item["metadata"]["name"]
 
-            # new things
-            conversion["Node"] = item["spec"]["nodeName"]
-            temp_vols=copy.deepcopy(item["spec"]["volumes"])
-            temp_str = ""
-            for vol_num in range(len(item["spec"]["volumes"])):
-                temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
-                del temp_vols[vol_num]["name"]
-                temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                # new things
+                conversion["Node"] = item["spec"]["nodeName"]
+                temp_vols=copy.deepcopy(item["spec"]["volumes"])
+                temp_str = ""
+                for vol_num in range(len(item["spec"]["volumes"])):
+                    temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                    del temp_vols[vol_num]["name"]
+                    temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                    
+                conversion["Volumes"] = temp_str
+                conversion["Namespace"] = item["metadata"]["namespace"]
                 
-            conversion["Volumes"] = temp_str
-            conversion["Namespace"] = item["metadata"]["namespace"]
-            
-            conversions.append(conversion)
+                conversions.append(conversion)
         if do_not_jsonify:
             return conversions
         return jsonify(conversions)
@@ -1406,7 +1424,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             print(type(get_container_data(True)),str(get_container_data(True)))
             for container_data in get_container_data(True):
                 process = subprocess.Popen(
-                    f'{"kubectl" if os.getenv("running_as_kubernetes") else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length")),
+                    f'{"kubectl" if os.getenv("running_as_kubernetes") else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length") + {"--namespace "+container_data['Namespace'] if os.getenv("running_as_kubernetes") else ""}),
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
