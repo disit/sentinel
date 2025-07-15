@@ -1252,7 +1252,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
     
     @app.route("/container/<podname>")
-    def get_container_logs(podname): #TODO no multi yet
+    def get_container_logs(podname):
         if 'username' in session:
             if not os.getenv("running_as_kubernetes"):
 
@@ -1270,6 +1270,15 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 r = '<br>'.join(out)
                 return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
             else:
+                prefetch = subprocess.Popen(
+               f"kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}'",
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                if prefetch.stdout.strip() not in string_of_list_to_list(os.getenv("namespaces")):
+                    return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
                 process = subprocess.Popen(
                f"kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}') {podname} --tail {os.getenv('default-log-length')}",
                     shell=True,
