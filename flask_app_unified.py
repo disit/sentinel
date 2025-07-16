@@ -1114,7 +1114,8 @@ def create_app():
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 try:
-                    result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:2])).stdout
+                    result = queued_running(f"kubectl rollout restart deployment {request.form.to_dict()['id'].split("-")[:-2]} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{request.form.to_dict()['id'].split("-")[:-2]}\" {{print $1}}')")
+                    #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
                     log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                     return result
                 except Exception:
