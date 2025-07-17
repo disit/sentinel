@@ -1114,7 +1114,8 @@ def create_app():
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 try:
-                    result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:2])).stdout
+                    result = queued_running(f"kubectl rollout restart deployment {request.form.to_dict()['id'].split("-")[:-2]} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{request.form.to_dict()['id'].split("-")[:-2]}\" {{print $1}}')")
+                    #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
                     log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                     return result
                 except Exception:
@@ -1252,7 +1253,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
     
     @app.route("/container/<podname>")
-    def get_container_logs(podname): #TODO no multi yet
+    def get_container_logs(podname):
         if 'username' in session:
             if not os.getenv("running_as_kubernetes"):
 
@@ -1270,6 +1271,15 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 r = '<br>'.join(out)
                 return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
             else:
+                prefetch = subprocess.Popen(
+               f"kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}'",
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                if prefetch.stdout.strip() not in string_of_list_to_list(os.getenv("namespaces")):
+                    return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
                 process = subprocess.Popen(
                f"kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}') {podname} --tail {os.getenv('default-log-length')}",
                     shell=True,
