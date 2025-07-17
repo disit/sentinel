@@ -1278,8 +1278,19 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     text=True
                 )
                 out=[]
+                if os.getenv('log_previous_container_if_kubernetes'):
+                    process_previous = subprocess.Popen(
+               f"kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}') {podname} --tail {os.getenv('default-log-length')} --previous",
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                    )
+                    for line in iter(process_previous.stdout.readline, ''):
+                        out.append(line[:-1])
                 for line in iter(process.stdout.readline, ''):
                     out.append(line[:-1])
+                
                 process.stdout.close()
                 r = '<br>'.join(out)
                 return render_template('log_show.html', container_id = podname, r = r, container_name=podname)

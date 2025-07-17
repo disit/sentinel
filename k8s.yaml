@@ -109,7 +109,9 @@ spec:
         - name: DB_PASS
           value: passpasspass # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
         - name: namespaces
-          value: '["sumoapps", "dashk8stest"]'
+          value: '["n1", "n2"]'
+        - name: log_previous_container_if_kubernetes # unset if not used
+          value: "true"
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"
