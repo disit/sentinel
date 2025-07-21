@@ -1026,14 +1026,14 @@ def create_app():
                     total_result = ""
                     command_ran_explained = ""
                     for r in list(results):
-                        command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="cp437").stdout
-                        command_ran_explained = subprocess.run(r[1], shell=True, capture_output=True, text=True, encoding="cp437").stdout + '\n'
-                        total_result += "Running " + r[0] + " with result " + command_ran
+                        command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="cp437")
+                        command_ran_explained = subprocess.run(r[1], shell=True, capture_output=True, text=True, encoding="cp437") + '\n'
+                        total_result += "Running " + r[0] + " with result " + command_ran.stdout + "\nWith errors: " + command_ran.stderr
                         query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
-                        cursor.execute(query_1,(command_ran, request.form.to_dict()['container'],r[0],))
+                        cursor.execute(query_1,("{command_ran.stdout}\n{command_ran.stderr}", request.form.to_dict()['container'],r[0],))
                         conn.commit()
-                        log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran, request, which_test="is alive " + str(r[2]))
-                    return jsonify(total_result, command_ran_explained)
+                        log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, request, which_test="is alive " + str(r[2]))
+                    return jsonify(total_result, command_ran_explained.stdout)
             except Exception:
                 print("Something went wrong during tests running because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500

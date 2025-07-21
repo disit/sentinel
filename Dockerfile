@@ -4,7 +4,7 @@ EXPOSE 8080
 
 RUN apt-get update
 
-RUN apt-get install nano curl default-mysql-client postgresql-client -y
+RUN apt-get install nano curl default-mysql-client postgresql-client netcat-openbsd -y
 
 RUN cd /tmp ; wget https://www.rarlab.com/rar/rarlinux-x64-700b2.tar.gz ; tar -zxvf rarlinux-x64-700b2.tar.gz ; cd rar ; cp -v rar unrar /usr/local/bin/
 
