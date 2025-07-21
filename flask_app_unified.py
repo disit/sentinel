@@ -1015,7 +1015,12 @@ def create_app():
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''select command, command_explained, id from tests_table where container_name =%s;'''
-                    cursor.execute(query, (request.form.to_dict()['container'],))
+                    
+                    if not os.getenv("running_as_kubernetes"):
+                        container = request.form.to_dict()['container']
+                    else:
+                        container = '-'.join(request.form.to_dict()['container'].split('-')[:-2])
+                    cursor.execute(query, (container,))
                     conn.commit()
                     results = cursor.fetchall()
                     total_result = ""
@@ -1114,7 +1119,7 @@ def create_app():
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 try:
-                    result = queued_running(f"kubectl rollout restart deployment {request.form.to_dict()['id'].split("-")[:-2]} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{request.form.to_dict()['id'].split("-")[:-2]}\" {{print $1}}')")
+                    result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                     #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
                     log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                     return result
