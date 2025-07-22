@@ -29,7 +29,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from apscheduler.schedulers.background import BackgroundScheduler
-import base64
 import random
 import string
 import traceback
@@ -37,7 +36,7 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import re
 from flask import Flask, render_template, request, redirect, url_for, session
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 from datetime import timedelta
 import html
 import jwt
@@ -690,16 +689,13 @@ def send_advanced_alerts(message):
             container_source="docker"
         else:
             container_source="kubernetes"
-        text_for_email, em1, em2, em3 = "", "", "", ""
+        text_for_email = ""
         if len(message[0])>0:
-            em1 = format_error_to_send("is not in the correct status ",", ".join([a["Name"] for a in message[0]]),", ".join([a["Status"] for a in message[0]]),"as its status currently is: ")
-            text_for_email = "These containers are not in the correct status: " + ", ".join([a["Name"] for a in message[0]])+"\n"
+            text_for_email = format_error_to_send("is not in the correct status ",", ".join([a["Name"] for a in message[0]]),", ".join([a["Status"] for a in message[0]]),"as its status currently is: ")+"\n"
         if len(message[1])>0:
-            em2 = format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")
-            text_for_email+= 'These containers are not answering correctly to their "is alive" test: '+ ", ".join([a["container"] for a in message[1]])+"\n"
+            text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")+"\n"
         if len(message[2])>0:
-            em3 = format_error_to_send(f"wasn't found running in {container_source} ",", ".join(message[2]))
-            text_for_email+= f"These containers weren't found in {container_source}: "+ ", ".join(message[2])+"\n"
+            text_for_email+= format_error_to_send(f"wasn't found running in {container_source} ",", ".join(message[2]))+"\n"
         if len(message[3])>0:
             text_for_email+= message[3]
         if len(message[4])>0:
@@ -708,7 +704,7 @@ def send_advanced_alerts(message):
             text_for_email+= str(message[5])
         try:
             if len(text_for_email) > 5:
-                send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", em1+"\n"+em2+"\n"+em3+"\n"+message[3]+"\n"+message[4])
+                send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", text_for_email)
         except:
             print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
         text_for_telegram = ""
