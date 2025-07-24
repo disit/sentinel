@@ -60,55 +60,49 @@ spec:
       serviceAccountName: sentinel-san
       containers:
       - env:
-        - name: PYTHONUNBUFFERED
+        - name: PYTHONUNBUFFERED # used to print to stderr and stdout asap
           value: "1"
-        - name: admin-log-length
+        - name: admin-log-length # used in the ui to load the last 200 log entries
           value: "200"
-        - name: default-log-length
+        - name: default-log-length # used to limit to the last 1000 lines of the logs of a container/pod
           value: "1000"
-        - name: requests-timeout
+        - name: requests-timeout # in milliseconds, the time it will wait before timing out a request made by the server to a resource
           value: "15000"
-        - name: is-master
-          value: "true"
-        - name: telegram-api-token
+        - name: telegram-api-token # if using telegram notifications, use the api token
           value: replaceme
-        - name: telegram-channel
+        - name: telegram-channel # if using telegram notifications, the channel id where to print messaegs
           value: "123456789"
-        - name: db-user
+        - name: db-user # name of the user to log in for the sentinel database, defined in this file
           value: root
-        - name: db-passwd
+        - name: db-passwd # password of above
           value: cPehkP5bbNJMt6Ao
-        - name: db-host
+        - name: db-host # host of the above
           value: sentineldb
-        - name: db-port
+        - name: db-port # port of the above
           value: "3306"
-        - name: smtp-server
+        - name: smtp-server # host of the mail service if email are set up
           value: change.me.com
-        - name: smtp-port
+        - name: smtp-port # port for smtp (usually 587)
           value: "587"
-        - name: sender-email
+        - name: sender-email # email address of the sender of the emails
           value: change@at.me
-        - name: sender-email-password
+        - name: sender-email-password # password of the sender of the emails
           value: replacethispassword
-        - name: email-recipients
+        - name: email-recipients # python string representation of the list of recipients of the emails
           value: '["first_address@to.besent", "second_address@to.besent", "more_addresses@to.besent"]'
-        - name: platform-url
+        - name: platform-url # appears on top left of the main sentinel UI
           value: http://someurl.com
-        - name: platform-explanation
+        - name: platform-explanation # appears in mail/telegram notifications as additional text; is supposed to explain what the sentinel is checking and where/how can it be reached
           value: Some information
-        - name: load-threshold
-          value: "30"    # no sense in k8s
-        - name: memory-threshold
-          value: "1"     # no sense in k8s
-        - name: running_as_kubernetes
-          value: "True"  # must be kept as is
-        - name: conf_path
-          value: "/mnt/data/sentinel/fakeconf/fakeconf" #eg
-        - name: cluster-secret
+        - name: running_as_kubernetes # must be kept as is to mandate kubernetes execution
+          value: "True"  
+        - name: conf_path # where to retrieve the snap4city distribution for generating distributions; it assumes that the path is also reachable, so mind how you mount it
+          value: "/mnt/data/sentinel/fakeconf/fakeconf" 
+        - name: cluster-secret # in case of a sentinel cluster, this secret will ensure the reciprocal authentication (unused)
           value: "This is a super secret" #eg
-        - name: DB_PASS
-          value: passpasspass # uses root password of dashboard database, also shared by other databases (not the best but it's all internal and unexposed)
-        - name: namespaces
+        - name: DB_PASS # uses root password of snap4city dashboard database, also shared by other databases. This is used only during certifications and assumes 'dashboarddb' is reachable from the sentinel container
+          value: passpasspass 
+        - name: namespaces # list of namespaces to manage
           value: '["n1", "n2"]'
         - name: log_previous_container_if_kubernetes # unset if not used
           value: "true"
@@ -296,7 +290,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
   hostPath:
-    path: "/mnt/data/sentinel/out.sql"
+    path: "/mnt/data/sentinel/dump k8s.sql"
 ---
 apiVersion: v1
 kind: PersistentVolume
