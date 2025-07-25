@@ -19,6 +19,10 @@
 -- Temporary view structure for view `all_logs`
 --
 
+CREATE Database checker;
+
+USE checker;
+
 DROP TABLE IF EXISTS `all_logs`;
 /*!50001 DROP VIEW IF EXISTS `all_logs`*/;
 SET @saved_cs_client     = @@character_set_client;
@@ -466,5 +470,30 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+DELIMITER $$
+CREATE DEFINER=`root`@`localhost` FUNCTION `GetHighContrastColor`(hexColor CHAR(7)) RETURNS char(7) CHARSET utf8mb4 COLLATE utf8mb4_general_ci
+    DETERMINISTIC
+BEGIN
+  DECLARE colorR INT;
+  DECLARE colorG INT;
+  DECLARE colorB INT;
+  DECLARE colorLuminance DECIMAL(10, 2);
+  DECLARE contrastColor CHAR(7);
+  DECLARE contrastThreshold INT;
+  SET colorR = CAST(CONV(SUBSTRING(hexColor, 2, 2), 16, 10) AS UNSIGNED);
+  SET colorG = CAST(CONV(SUBSTRING(hexColor, 4, 2), 16, 10) AS UNSIGNED);
+  SET colorB = CAST(CONV(SUBSTRING(hexColor, 6, 2), 16, 10) AS UNSIGNED);
+  SET contrastThreshold = 128;
+  SET colorLuminance = 0.2126 * colorR + 0.7152 * colorG + 0.0722 * colorB;
+  IF colorLuminance > contrastThreshold THEN
+    SET contrastColor = '#000000';
+  ELSE
+    SET contrastColor = '#ffffff';
+  END IF;
+
+  RETURN contrastColor;
+END$$
+DELIMITER ;
 
 -- Dump completed on 2025-07-01 10:36:19

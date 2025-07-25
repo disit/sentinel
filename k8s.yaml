@@ -177,7 +177,7 @@ spec:
           - name: MYSQL_ALLOW_EMPTY_PASSWORD
             value: "no"
           - name: MYSQL_DATABASE
-            value: Dashboard
+            value: checker
           - name: MYSQL_PASSWORD
             value: 7fBluEbtiEWZgiJs
           - name: MYSQL_ROOT_PASSWORD
