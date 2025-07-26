@@ -106,6 +106,8 @@ spec:
           value: '["n1", "n2"]'
         - name: log_previous_container_if_kubernetes # unset if not used
           value: "true"
+        - name: UNSAFE_MODE # allows for non-container elements to be managed, unsafe as it allows arbitrary code execution on pod/host, set to "true" to activate
+          value: "true"
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"

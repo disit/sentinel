@@ -19,8 +19,6 @@
 -- Temporary view structure for view `all_logs`
 --
 
-CREATE Database checker;
-
 USE checker;
 
 DROP TABLE IF EXISTS `all_logs`;

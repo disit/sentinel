@@ -1,0 +1,247 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="cronjobs">
+  <thead>
+	  <tr>
+		<th>Extra Resource</th>
+		<th>Information</th>
+		<th>Description</th>
+		<th>Category</th>
+		<th>Delete</th>
+		<th>Edit</th>
+	  </tr>
+  </thead>
+  <tbody>
+{%for item in cronjobs%}
+    <tr>
+	  <td>{{item[0]}}</td>
+	  <td>{{item[1]}}</td>
+	  <td>{{item[2]}}</td>
+	  <td>{{item[3]}}</td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteExtraResource" data-component="{{item[0]}}" id="deleteExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Delete</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#editExtraResource" data-component="{{item[0]}}" id="editExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Edit</button></td>
+	</tr>
+{% endfor %}
+  </tbody>
+</table>
+<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addExtraResourceModal" id="addExtraResource">Add</button>
+<div class="modal fade" id="addExtraResourceModal" tabindex="-1" role="dialog" aria-labelledby="addExtraResourceModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addExtraResourceLabel">Add a new extra resource</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addExtraResourceModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="addExtraResourceForm">
+					<div class="form-group">
+						<label for="passwordInputAdd">Password</label>
+						<input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+					</div>
+					<label for="category-selection">Select category:</label>
+					<select id="category-selection" name="category-selection" class="form-select">
+						{%for item in categories %}
+							<option value="{{item[0]}}">{{item[0]}}</option>
+						{% endfor %}
+					</select>
+					
+					<div class="form-group">
+						<label for="InformationExtraResourceAdd">Information</label>
+						<input type="text" class="form-control" id="InformationExtraResourceAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="DescriptionAdd">Description</label>
+						<input type="text" class="form-control" id="DescriptionAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandAdd">Address</label>
+						<input type="text" class="form-control" id="AddressAdd" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addExtraResourceModal').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addExtraResourceButton">Add cronjob</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="editExtraResourceModal" tabindex="-1" role="dialog" aria-labelledby="editExtraResourceModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="editComponentLabel">Edit extra resource</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editExtraResourceModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="editComponentForm">
+					<div class="form-group">
+						<label for="passwordInputEdit">Password</label>
+						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+					</div>
+					<label for="category-selection-edit">Select category:</label>
+					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
+						{% for item in categories %}
+							<option value="{{item[0]}}">{{item[0]}}</option>
+						{% endfor %}
+					</select>
+					<div class="form-group">
+						<label for="InformationExtraResourceEdit">Information</label>
+						<input type="text" class="form-control" id="InformationExtraResourceEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="DescriptionEdit">Description</label>
+						<input type="text" class="form-control" id="DescriptionEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandEdit">Address</label>
+						<input type="text" class="form-control" id="AddressEdit" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editExtraResourceModal').modal('hide')">Cancel</button>
+				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveExtraResourceChangesButton">Save changes</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<div class="modal fade" id="deleteExtraResource" tabindex="-1" role="dialog" aria-labelledby="deleteExtraResourceLabel">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting cronjob</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="deleteComponentForm">
+					<div class="form-group">
+						<label for="passwordInputDelete">Password</label>
+						<input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="ExtraResourceDeleteId">Extra Resource ID</label>
+						<input type="text" class="form-control" id="ExtraResourceDeleteId" readonly>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteExtraResourceButton" onClick="$('#deleteExtraResource').modal('hide')">Delete Extra resource</button>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+
+	$('.open-modal-m').on('click', function() {
+		var id = $(this).data('component');
+		$('#ExtraResourceDeleteId').val(id);
+		$('#deleteExtraResource').modal('show');
+	});
+	$("#cronjobs").DataTable();
+	$('.open-modal').on('click', function() {
+		$('#addExtraResourceModal').modal('show');
+	});
+	$('#deleteExtraResourceButton').on('click', function() {
+		var password = $('#passwordInputDelete').val();
+		var id = $('#ExtraResourceDeleteId').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './delete_extra_resource',
+					data: {id: id, psw: password},
+					type: 'POST',
+					success: function(response) {
+						alert(id + " was deleted!");
+						location.reload();
+					},
+					error: function(error) {
+						alert(id + " was not deleted because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#addExtraResourceButton').on('click', function() {
+		var password = $('#passwordInputAdd').val();
+		var category = $('#category-selection').val();
+		var address = $('#CommandAdd').val();
+		var information = $('#NameExtraResourceAdd').val();
+		var description = $('#DescriptionAdd').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './add_extra_resource',
+					data: {psw: password, category: category, address: address, information: information, description: description},
+					type: 'POST',
+					success: function(response) {
+						alert(id + " was added!");
+						location.reload();
+					},
+					error: function(error) {
+						alert(id + " was not added because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#saveExtraResourceChangesButton').on('click', function() {
+	var password = $('#passwordInputEdit').val();
+	var category = $('#category-selection-edit').val();
+	var address = $('#CommandEdit').val();
+	var information = $('#NameExtraResourceEdit').val();
+	var description = $('#DescriptionEdit').val();
+	if (password) {
+		try {
+			$.ajax({
+				url: './edit_extra_resource',
+				data: {psw: password, command: command, address: address, information: information, description: description},
+				type: 'POST',
+				success: function(response) {
+					alert(id + " was edited!");
+					location.reload();
+				},
+				error: function(error) {
+					alert(id + " was not edited because of:" + error.responseText);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			console.log(exception_var);
+		}
+	}
+	else {
+		alert('Please enter a password');
+	}
+	});
+</script>
+{% endblock %}

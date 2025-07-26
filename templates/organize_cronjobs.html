@@ -1,0 +1,236 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="cronjobs">
+  <thead>
+	  <tr>
+		<th>Cronjob</th>
+		<th>Name</th>
+		<th>Command</th>
+		<th>Category</th>
+		<th>Delete</th>
+		<th>Edit</th>
+	  </tr>
+  </thead>
+  <tbody>
+{%for item in cronjobs%}
+    <tr>
+	  <td>{{item[0]}}</td>
+	  <td>{{item[1]}}</td>
+	  <td>{{item[2]}}</td>
+	  <td>{{item[3]}}</td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" id="editCronJob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+	</tr>
+{% endfor %}
+  </tbody>
+</table>
+<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addCronJobModal" id="addCronjob">Add</button>
+<div class="modal fade" id="addCronJobModal" tabindex="-1" role="dialog" aria-labelledby="addCronJobModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addCronJobLabel">Add a new cronjob</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addCronJobModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="addCronJobForm">
+					<div class="form-group">
+						<label for="passwordInputAdd">Password</label>
+						<input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+					</div>
+					<label for="category-selection">Select category:</label>
+					<select id="category-selection" name="category-selection" class="form-select">
+						{%for item in categories %}
+							<option value="{{item[0]}}">{{item[0]}}</option>
+						{% endfor %}
+					</select>
+					<div class="form-group">
+						<label for="NameCronJobAdd">Name</label>
+						<input type="text" class="form-control" id="NameCronJobAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandAdd">Command</label>
+						<input type="text" class="form-control" id="CommandAdd" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addCronJobModal').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addCronJobButton">Add cronjob</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="editCronJobModal" tabindex="-1" role="dialog" aria-labelledby="editCronJobModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="editComponentLabel">Edit cronjob</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editCronJobModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="editComponentForm">
+					<div class="form-group">
+						<label for="passwordInputEdit">Password</label>
+						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+					</div>
+					<label for="category-selection-edit">Select category:</label>
+					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
+						{% for item in categories %}
+							<option value="{{item[0]}}">{{item[0]}}</option>
+						{% endfor %}
+					</select>
+					<div class="form-group">
+						<label for="NameCronJobEdit">Name</label>
+						<input type="text" class="form-control" id="NameCronJobEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandEdit">Command</label>
+						<input type="text" class="form-control" id="CommandEdit" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJobModal').modal('hide')">Cancel</button>
+				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton">Save changes</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<div class="modal fade" id="deleteCronJob" tabindex="-1" role="dialog" aria-labelledby="deleteCronJobLabel">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting cronjob</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="deleteComponentForm">
+					<div class="form-group">
+						<label for="passwordInputDelete">Password</label>
+						<input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="CronJobDeleteId">Cronjob ID</label>
+						<input type="text" class="form-control" id="CronJobDeleteId" readonly>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteCronJobButton" onClick="$('#deleteCronJob').modal('hide')">Delete cronjob</button>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+
+	$('.open-modal-m').on('click', function() {
+		var id = $(this).data('component');
+		$('#CronjobDeleteId').val(id);
+		$('#deleteCronJob').modal('show');
+	});
+	$("#cronjobs").DataTable();
+	$('.open-modal').on('click', function() {
+		$('#addCronJobModal').modal('show');
+	});
+	$('#deleteCronJobButton').on('click', function() {
+		var password = $('#passwordInputDelete').val();
+		var id = $('#CronJobDeleteId').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './delete_cronjob',
+					data: {id: id, psw: password},
+					type: 'POST',
+					success: function(response) {
+						alert(id + " was deleted!");
+						location.reload();
+					},
+					error: function(error) {
+						alert(id + " was not deleted because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#addCronJobButton').on('click', function() {
+		var password = $('#passwordInputAdd').val();
+		var category = $('#category-selection').val();
+		var command = $('#CommandAdd').val();
+		var name = $('#NameCronJobAdd').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './add_cronjob',
+					data: {psw: password, category: category, command: command, name: name},
+					type: 'POST',
+					success: function(response) {
+						alert(id + " was added!");
+						location.reload();
+					},
+					error: function(error) {
+						alert(id + " was not added because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#saveCronJobChangesButton').on('click', function() {
+	var password = $('#passwordInputEdit').val();
+	var category = $('#category-selection-edit').val();
+	var command = $('#CommandEdit').val();
+	var name = $('#NameCronJobEdit').val();
+	if (password) {
+		try {
+			$.ajax({
+				url: './edit_cronjob',
+				data: {psw: password, command: command, name: name},
+				type: 'POST',
+				success: function(response) {
+					alert(id + " was edited!");
+					location.reload();
+				},
+				error: function(error) {
+					alert(id + " was not edited because of:" + error.responseText);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			console.log(exception_var);
+		}
+	}
+	else {
+		alert('Please enter a password');
+	}
+	});
+</script>
+{% endblock %}
