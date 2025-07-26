@@ -1008,8 +1008,8 @@ def create_app():
                 
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`) VALUES (%s, %s, %d);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],))
+                    query = '''INSERT INTO `checker`.`extra_resources` ( `resource_address`, `resource_information`, `resource_description`) VALUES (%s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['address'],request.form.to_dict()['information'],request.form.to_dict()['description'],))
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -1029,8 +1029,8 @@ def create_app():
                 
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %d WHERE (`idcronjobs` = %d);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    query = '''UPDATE `checker`.`extra_resources` SET `resource_address` = %s, `resource_information` = %s, `resource_description` = %s WHERE (`id_category` = %d) and (`resource_address` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['address'],request.form.to_dict()['information'],request.form.to_dict()['description'],request.form.to_dict()['id'],request.form.to_dict()['address'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -1054,7 +1054,7 @@ def create_app():
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
-                query = '''DELETE FROM `checker`.`cronjobs` WHERE (`idcronjobs` = %d);'''
+                query = '''DELETE FROM `checker`.`extra_resources` WHERE (`id_category` = %d);'''
                 cursor.execute(query, (request.form.to_dict()['id'],))
                 conn.commit()
                 return "ok", 201
