@@ -23,13 +23,13 @@
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" id="editCronJob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" id="editCronJob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
 </table>
 <button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addCronJobModal" id="addCronjob">Add</button>
-<div class="modal fade" id="addCronJobModal" tabindex="-1" role="dialog" aria-labelledby="addCronJobModal" aria-hidden="true">
+<div class="modal fade" id="addCronJobModal" tabindex="-1" role="dialog" aria-labelledby="addCronJobLabel" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
@@ -47,7 +47,7 @@
 					<label for="category-selection">Select category:</label>
 					<select id="category-selection" name="category-selection" class="form-select">
 						{%for item in categories %}
-							<option value="{{item[0]}}">{{item[0]}}</option>
+							<option value="{{item[0]}}">{{item[1]}}</option>
 						{% endfor %}
 					</select>
 					<div class="form-group">
@@ -68,7 +68,7 @@
 	</div>
 </div>
 
-<div class="modal fade" id="editCronJobModal" tabindex="-1" role="dialog" aria-labelledby="editCronJobModal" aria-hidden="true">
+<div class="modal fade" id="editCronJob" tabindex="-1" role="dialog" aria-labelledby="editCronJobModal" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
@@ -79,6 +79,11 @@
 			</div>
 			<div class="modal-body">
 				<form id="editComponentForm">
+					
+					<div class="form-group">
+						<label for="CronJobEditId">Cronjob ID</label>
+						<input type="text" class="form-control" id="CronJobEditId" readonly>
+					</div>
 					<div class="form-group">
 						<label for="passwordInputEdit">Password</label>
 						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
@@ -86,7 +91,7 @@
 					<label for="category-selection-edit">Select category:</label>
 					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
 						{% for item in categories %}
-							<option value="{{item[0]}}">{{item[0]}}</option>
+							<option value="{{item[0]}}">{{item[1]}}</option>
 						{% endfor %}
 					</select>
 					<div class="form-group">
@@ -140,10 +145,15 @@
 
 	$('.open-modal-m').on('click', function() {
 		var id = $(this).data('component');
-		$('#CronjobDeleteId').val(id);
+		$('#CronJobDeleteId').val(id);
 		$('#deleteCronJob').modal('show');
 	});
 	$("#cronjobs").DataTable();
+	$('.open-modal-e').on('click', function() {
+		var id = $(this).data('component');
+		$('#CronJobEditId').val(id);
+		$('#editCronJob').modal('show');
+	});
 	$('.open-modal').on('click', function() {
 		$('#addCronJobModal').modal('show');
 	});
@@ -157,11 +167,11 @@
 					data: {id: id, psw: password},
 					type: 'POST',
 					success: function(response) {
-						alert(id + " was deleted!");
+						alert("Cronjob was deleted!");
 						location.reload();
 					},
 					error: function(error) {
-						alert(id + " was not deleted because of:" + error);
+						alert("Cronjob was not deleted because of:" + error);
 					},
 					timeout: {{timeout}}
 				});
@@ -186,11 +196,11 @@
 					data: {psw: password, category: category, command: command, name: name},
 					type: 'POST',
 					success: function(response) {
-						alert(id + " was added!");
+						alert("Cronjob was added!");
 						location.reload();
 					},
 					error: function(error) {
-						alert(id + " was not added because of:" + error);
+						alert("Cronjob was not added because of:" + error);
 					},
 					timeout: {{timeout}}
 				});
@@ -215,11 +225,11 @@
 				data: {psw: password, command: command, name: name},
 				type: 'POST',
 				success: function(response) {
-					alert(id + " was edited!");
+					alert("Cronjob was edited!");
 					location.reload();
 				},
 				error: function(error) {
-					alert(id + " was not edited because of:" + error.responseText);
+					alert("Cronjob was not edited because of:" + error.responseText);
 				},
 				timeout: {{timeout}}
 			});

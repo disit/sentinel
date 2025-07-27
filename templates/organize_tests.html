@@ -1,0 +1,243 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="tests">
+  <thead>
+	  <tr>
+		<th>Test</th>
+		<th>Container</th>
+		<th>Command</th>
+		<th>Explained command</th>
+		<th>Delete</th>
+		<th>Edit</th>
+	  </tr>
+  </thead>
+  <tbody>
+{%for item in tests%}
+    <tr>
+	  <td>{{item[0]}}</td>
+	  <td>{{item[1]}}</td>
+	  <td>{{item[2]}}</td>
+	  <td>{{item[3]}}</td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteTest" data-component="{{item[0]}}" id="deleteTest{{item[0]}}" onClick="$('#addTestModal').modal('hide')">Delete</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editTest" data-component="{{item[0]}}" id="editTest{{item[0]}}" onClick="$('#addTestModal').modal('hide')">Edit</button></td>
+	</tr>
+{% endfor %}
+  </tbody>
+</table>
+<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addTestModal" id="addTest">Add</button>
+<div class="modal fade" id="addTestModal" tabindex="-1" role="dialog" aria-labelledby="addTestModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addTestLabel">Add a new test</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addTestModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="addTestForm">
+					<div class="form-group">
+						<label for="passwordInputAdd">Password</label>
+						<input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+					</div>					
+					<div class="form-group">
+						<label for="ContainerTestAdd">Container Name (for kubernetes use the deployment name)</label>
+						<input type="text" class="form-control" id="ContainerTestAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandAdd">Command</label>
+						<input type="text" class="form-control" id="CommandAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandExplainedAdd">Command explained</label>
+						<input type="text" class="form-control" id="CommandExplainedAdd" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addTestModal').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addTestButton">Add test</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="editTest" tabindex="-1" role="dialog" aria-labelledby="editTestModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="editComponentLabel">Edit test</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editTestModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="editComponentForm">
+					<div class="form-group">
+						<label for="passwordInputEdit">Password</label>
+						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+					</div>
+					
+					<div class="form-group">
+						<label for="TestEditId">Test ID</label>
+						<input type="text" class="form-control" id="TestEditId" readonly>
+					</div>
+					<div class="form-group">
+						<label for="ContainerTestEdit">Container Name (for kubernetes use the deployment name)</label>
+						<input type="text" class="form-control" id="ContainerTestEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandEdit">Command</label>
+						<input type="text" class="form-control" id="CommandEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandExplainedEdit">Command explained</label>
+						<input type="text" class="form-control" id="CommandExplainedEdit" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editTestModal').modal('hide')">Cancel</button>
+				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveTestChangesButton">Save changes</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<div class="modal fade" id="deleteTest" tabindex="-1" role="dialog" aria-labelledby="deleteTestLabel">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting test</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="deleteComponentForm">
+					<div class="form-group">
+						<label for="passwordInputDelete">Password</label>
+						<input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="TestDeleteId">Test ID</label>
+						<input type="text" class="form-control" id="TestDeleteId" readonly>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteTestButton" onClick="$('#deleteTest').modal('hide')">Delete Test</button>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+
+	$('.open-modal-m').on('click', function() {
+		var id = $(this).data('component');
+		$('#TestDeleteId').val(id);
+		$('#deleteTest').modal('show');
+	});
+	$('.open-modal-e').on('click', function() {
+		var id = $(this).data('component');
+		$('#TestEditId').val(id);
+		$('#editTest').modal('show');
+	});
+	$("#tests").DataTable();
+	$('.open-modal').on('click', function() {
+		$('#addTestModal').modal('show');
+	});
+	$('#deleteTestButton').on('click', function() {
+		var password = $('#passwordInputDelete').val();
+		var id = $('#TestDeleteId').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './delete_test',
+					data: {id: id, psw: password},
+					type: 'POST',
+					success: function(response) {
+						alert("Test was deleted!");
+						location.reload();
+					},
+					error: function(error) {
+						alert("Test was not deleted because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#addTestButton').on('click', function() {
+		var password = $('#passwordInputAdd').val();
+		var container_name = $('#ContainerTestAdd').val();
+		var command = $('#CommandAdd').val();
+		var command_explained = $('#CommandExplainedAdd').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './add_test',
+					data: {psw: password, command: command, container_name: container_name, command_explained: command_explained},
+					type: 'POST',
+					success: function(response) {
+						alert("Test was added!");
+						location.reload();
+					},
+					error: function(error) {
+						alert("Test was not added because of:" + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#saveTestChangesButton').on('click', function() {
+	var password = $('#passwordInputEdit').val();
+	var container_name = $('#ContainerTestEdit').val();
+	var command = $('#CommandEdit').val();
+	var command_explained = $('#CommandExplainedEdit').val();
+	var id = $('#TestEditId').val();
+	if (password) {
+		try {
+			$.ajax({
+				url: './edit_test',
+				data: {psw: password, command: command, container_name: container_name, command_explained: command_explained, id: id},
+				type: 'POST',
+				success: function(response) {
+					alert("Test was edited!");
+					location.reload();
+				},
+				error: function(error) {
+					alert("Test was not edited because of:" + error.responseText);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			console.log(exception_var);
+		}
+	}
+	else {
+		alert('Please enter a password');
+	}
+	});
+</script>
+{% endblock %}

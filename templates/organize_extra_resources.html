@@ -4,7 +4,7 @@
 {{ super() }}
 {% endblock %}
 {% block content %}
-<table id="cronjobs">
+<table id="extra_resources">
   <thead>
 	  <tr>
 		<th>Extra Resource</th>
@@ -16,14 +16,14 @@
 	  </tr>
   </thead>
   <tbody>
-{%for item in cronjobs%}
+{%for item in extra_resources%}
     <tr>
 	  <td>{{item[0]}}</td>
 	  <td>{{item[1]}}</td>
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteExtraResource" data-component="{{item[0]}}" id="deleteExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#editExtraResource" data-component="{{item[0]}}" id="editExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editExtraResource" data-component="{{item[0]}}" id="editExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -47,7 +47,7 @@
 					<label for="category-selection">Select category:</label>
 					<select id="category-selection" name="category-selection" class="form-select">
 						{%for item in categories %}
-							<option value="{{item[0]}}">{{item[0]}}</option>
+							<option value="{{item[0]}}">{{item[1]}}</option>
 						{% endfor %}
 					</select>
 					
@@ -60,20 +60,20 @@
 						<input type="text" class="form-control" id="DescriptionAdd" required>
 					</div>
 					<div class="form-group">
-						<label for="CommandAdd">Address</label>
+						<label for="AddressAdd">Address</label>
 						<input type="text" class="form-control" id="AddressAdd" required>
 					</div>
 				</form>
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addExtraResourceModal').modal('hide')">Close</button>
-				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addExtraResourceButton">Add cronjob</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addExtraResourceButton">Add extra resource</button>
 			</div>
 		</div>
 	</div>
 </div>
 
-<div class="modal fade" id="editExtraResourceModal" tabindex="-1" role="dialog" aria-labelledby="editExtraResourceModal" aria-hidden="true">
+<div class="modal fade" id="editExtraResource" tabindex="-1" role="dialog" aria-labelledby="editExtraResourceLabel" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
@@ -88,10 +88,15 @@
 						<label for="passwordInputEdit">Password</label>
 						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
 					</div>
+					
+					<div class="form-group">
+						<label for="ExtraResourceEditId">Extra Resource ID</label>
+						<input type="text" class="form-control" id="ExtraResourceEditId" readonly>
+					</div>
 					<label for="category-selection-edit">Select category:</label>
 					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
 						{% for item in categories %}
-							<option value="{{item[0]}}">{{item[0]}}</option>
+							<option value="{{item[0]}}">{{item[1]}}</option>
 						{% endfor %}
 					</select>
 					<div class="form-group">
@@ -121,7 +126,7 @@
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
-				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting cronjob</h5>
+				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting extra resource</h5>
 				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
 					<span aria-hidden="true">X</span>
 				</button>
@@ -140,7 +145,7 @@
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
-				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteExtraResourceButton" onClick="$('#deleteExtraResource').modal('hide')">Delete Extra resource</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteExtraResourceButton" onClick="$('#deleteExtraResource').modal('hide')">Delete extra resource</button>
 			</div>
 		</div>
 	</div>
@@ -152,7 +157,12 @@
 		$('#ExtraResourceDeleteId').val(id);
 		$('#deleteExtraResource').modal('show');
 	});
-	$("#cronjobs").DataTable();
+	$('.open-modal-e').on('click', function() {
+		var id = $(this).data('component');
+		$('#ExtraResourceEditId').val(id);
+		$('#editExtraResource').modal('show');
+	});
+	$("#extra_resources").DataTable();
 	$('.open-modal').on('click', function() {
 		$('#addExtraResourceModal').modal('show');
 	});
@@ -166,11 +176,11 @@
 					data: {id: id, psw: password},
 					type: 'POST',
 					success: function(response) {
-						alert(id + " was deleted!");
+						alert("The new resource was deleted!");
 						location.reload();
 					},
 					error: function(error) {
-						alert(id + " was not deleted because of:" + error);
+						alert("The new resource was not deleted because of: " + error);
 					},
 					timeout: {{timeout}}
 				});
@@ -186,8 +196,8 @@
 	$('#addExtraResourceButton').on('click', function() {
 		var password = $('#passwordInputAdd').val();
 		var category = $('#category-selection').val();
-		var address = $('#CommandAdd').val();
-		var information = $('#NameExtraResourceAdd').val();
+		var address = $('#AddressAdd').val();
+		var information = $('#InformationExtraResourceAdd').val();
 		var description = $('#DescriptionAdd').val();
 		if (password) {
 			try {
@@ -196,11 +206,11 @@
 					data: {psw: password, category: category, address: address, information: information, description: description},
 					type: 'POST',
 					success: function(response) {
-						alert(id + " was added!");
+						alert("The new resource was added!");
 						location.reload();
 					},
 					error: function(error) {
-						alert(id + " was not added because of:" + error);
+						alert("The new resource was not added because of: " + error);
 					},
 					timeout: {{timeout}}
 				});
@@ -216,21 +226,22 @@
 	$('#saveExtraResourceChangesButton').on('click', function() {
 	var password = $('#passwordInputEdit').val();
 	var category = $('#category-selection-edit').val();
-	var address = $('#CommandEdit').val();
-	var information = $('#NameExtraResourceEdit').val();
+	var address = $('#AddressEdit').val();
+	var information = $('#InformationExtraResourceEdit').val();
 	var description = $('#DescriptionEdit').val();
+	var id = $('#ExtraResourceEditId').val();
 	if (password) {
 		try {
 			$.ajax({
 				url: './edit_extra_resource',
-				data: {psw: password, command: command, address: address, information: information, description: description},
+				data: {psw: password, category: category, address: address, information: information, description: description, id: id},
 				type: 'POST',
 				success: function(response) {
-					alert(id + " was edited!");
+					alert("The new resource was edited!");
 					location.reload();
 				},
 				error: function(error) {
-					alert(id + " was not edited because of:" + error.responseText);
+					alert("The new resource was not edited because of: " + error.responseText);
 				},
 				timeout: {{timeout}}
 			});

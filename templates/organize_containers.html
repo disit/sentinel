@@ -23,7 +23,7 @@
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -72,7 +72,7 @@
 	</div>
 </div>
 
-<div class="modal fade" id="editComponentModal" tabindex="-1" role="dialog" aria-labelledby="editComponentModal" aria-hidden="true">
+<div class="modal fade" id="editComponent" tabindex="-1" role="dialog" aria-labelledby="editComponentModal" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
@@ -150,6 +150,11 @@
 		var id = $(this).data('component');
 		$('#componentDeleteId').val(id);
 		$('#deleteComponent').modal('show');
+	});
+	$('.open-modal-e').on('click', function() {
+		var id = $(this).data('component');
+		$('#containeridmodalEdit').val(id);
+		$('#editComponent').modal('show');
 	});
 	$("#containers").DataTable();
 	$('.open-modal').on('click', function() {
