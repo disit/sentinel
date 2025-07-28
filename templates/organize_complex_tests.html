@@ -1,0 +1,280 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="complex_tests">
+  <thead>
+	  <tr>
+		<th>Complex Test</th>
+		<th>Name</th>
+		<th>Command</th>
+		<th>Extra Parameters</th>
+		<th>Button Color</th>
+		<th>Explanation</th>
+		<th>Category</th>
+		<th>Delete</th>
+		<th>Edit</th>
+	  </tr>
+  </thead>
+  <tbody>
+{%for item in complex_tests%}
+    <tr>
+	  <td>{{item[0]}}</td>
+	  <td>{{item[1]}}</td>
+	  <td>{{item[2]}}</td>
+	  <td>{{item[3]}}</td>
+	  <td style="background-color: {{item[4]}};"></td>
+	  <td>{{item[5]}}</td>
+	  <td>{{item[6]}}</td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComplexTest" data-component="{{item[0]}}" id="deleteComplexTest{{item[0]}}" onClick="$('#addComplexTestModal').modal('hide')">Delete</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComplexTest" data-component="{{item[0]}}" id="editComplexTest{{item[0]}}" onClick="$('#addComplexTestModal').modal('hide')">Edit</button></td>
+	</tr>
+{% endfor %}
+  </tbody>
+</table>
+<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addComplexTestModal" id="addTest">Add</button>
+<div class="modal fade" id="addComplexTestModal" tabindex="-1" role="dialog" aria-labelledby="addComplexTestLabel" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addTestLabel">Add a new complex test</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addComplexTestModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="addTestForm">
+					<div class="form-group">
+						<label for="passwordInputAdd">Password</label>
+						<input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="NameAdd">Name</label>
+						<input type="text" class="form-control" id="NameAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandAdd">Command</label>
+						<input type="text" class="form-control" id="CommandAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="ExtraParametersAdd">Extra parameters</label>
+						<input type="text" class="form-control" id="ExtraParametersAdd" required>
+					</div>
+
+					<label for="ButtonColorAdd" class="form-label">Color for button (text color will adapt)</label>
+					<input type="color" class="form-control form-control-color" id="ButtonColorAdd" value="#ff0000" title="Color for button (text color will adapt)">
+					
+					<div class="form-group">
+						<label for="ExplanationAdd">Explanation</label>
+						<input type="text" class="form-control" id="ExplanationAdd" required>
+					</div>
+					<label for="category-selection-add">Select category:</label>
+					<select id="category-selection-add" name="category-selection-add" class="form-select">
+						{% for item in categories %}
+							<option value="{{item[0]}}">{{item[1]}}</option>
+						{% endfor %}
+					</select>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addComplexTestModal').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addTestButton">Add complex test</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="editComplexTest" tabindex="-1" role="dialog" aria-labelledby="editComplexTestModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="editComponentLabel">Edit test</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editComplexTestModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="editComponentForm">
+					<div class="form-group">
+						<label for="passwordInputEdit">Password</label>
+						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="ComplexTestEditId">Complex Test ID</label>
+						<input type="text" class="form-control" id="ComplexTestEditId" readonly>
+					</div>
+					<div class="form-group">
+						<label for="NameEdit">Name</label>
+						<input type="text" class="form-control" id="NameEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="CommandEdit">Command</label>
+						<input type="text" class="form-control" id="CommandEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="ExtraParametersEdit">Extra parameters</label>
+						<input type="text" class="form-control" id="ExtraParametersEdit" required>
+					</div>
+					<label for="ButtonColorEdit" class="form-label">Color for button (text color will adapt)</label>
+					<input type="color" class="form-control form-control-color" id="ButtonColorEdit" value="#ff0000" title="Color for button (text color will adapt)">
+					<div class="form-group">
+						<label for="ExplanationEdit">Explanation</label>
+						<input type="text" class="form-control" id="ExplanationEdit" required>
+					</div>
+					<label for="category-selection-edit">Select category:</label>
+					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
+						{% for item in categories %}
+							<option value="{{item[0]}}">{{item[1]}}</option>
+						{% endfor %}
+					</select>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editComplexTestModal').modal('hide')">Cancel</button>
+				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveTestChangesButton">Save changes</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<div class="modal fade" id="deleteComplexTest" tabindex="-1" role="dialog" aria-labelledby="deleteComplexTestLabel">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting complex test</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="deleteComponentForm">
+					<div class="form-group">
+						<label for="passwordInputDelete">Password</label>
+						<input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="ComplexTestDeleteId">Test ID</label>
+						<input type="text" class="form-control" id="ComplexTestDeleteId" readonly>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteComplexTestButton" onClick="$('#deleteComplexTest').modal('hide')">Delete Complex Test</button>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+
+	$('.open-modal-m').on('click', function() {
+		var id = $(this).data('component');
+		$('#ComplexTestDeleteId').val(id);
+		$('#deleteComplexTest').modal('show');
+	});
+	$('.open-modal-e').on('click', function() {
+		var id = $(this).data('component');
+		$('#ComplexTestEditId').val(id);
+		$('#editComplexTest').modal('show');
+	});
+	$("#complex_tests").DataTable();
+	$('.open-modal').on('click', function() {
+		$('#addComplexTestModal').modal('show');
+	});
+	$('#deleteComplexTestButton').on('click', function() {
+		var password = $('#passwordInputDelete').val();
+		var id = $('#ComplexTestDeleteId').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './delete_complex_test',
+					data: {id: id, psw: password},
+					type: 'POST',
+					success: function(response) {
+						alert("Complex test was deleted!");
+						location.reload();
+					},
+					error: function(error) {
+						alert("Complex test was not deleted because of: " + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#addTestButton').on('click', function() {
+		var password = $('#passwordInputAdd').val();
+		var name = $('#NameAdd').val();
+		var command = $('#CommandAdd').val();
+		var extra_parameters = $('#ExtraParametersAdd').val();
+		var button_color = $('#ButtonColorAdd').val();
+		var explanation = $('#ExplanationAdd').val();
+		var category = $('#category-selection-add').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './add_complex_test',
+					data: {psw: password, name: name, command: command, extra_parameters: extra_parameters, button_color: button_color, explanation: explanation, category: category},
+					type: 'POST',
+					success: function(response) {
+						alert("Complex test was added!");
+						location.reload();
+					},
+					error: function(error) {
+						alert("Complex test was not added because of: " + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#saveTestChangesButton').on('click', function() {
+	var password = $('#passwordInputEdit').val();
+	var name = $('#NameEdit').val();
+	var command = $('#CommandEdit').val();
+	var extra_parameters = $('#ExtraParametersEdit').val();
+	var button_color = $('#ButtonColorEdit').val();
+	var explanation = $('#ExplanationEdit').val();
+	var category = $('#category-selection-edit').val();
+	var id = $('#ComplexTestEditId').val();
+	if (password) {
+		try {
+			$.ajax({
+				url: './edit_complex_test',
+				data: {psw: password, name: name, command: command, extra_parameters: extra_parameters, button_color: button_color, explanation: explanation, category: category, id: id},
+				type: 'POST',
+				success: function(response) {
+					alert("Complex test was edited!");
+					location.reload();
+				},
+				error: function(error) {
+					alert("Complex test was not edited because of: " + error.responseText);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			console.log(exception_var);
+		}
+	}
+	else {
+		alert('Please enter a password');
+	}
+	});
+</script>
+{% endblock %}

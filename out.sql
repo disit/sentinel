@@ -41,20 +41,6 @@ INSERT INTO `categories` VALUES (1,'Dashboard'),
 (9,'System');
 UNLOCK TABLES;
 
-DROP TABLE IF EXISTS `category_test`;
-CREATE TABLE `category_test` (
-  `test` int(11) NOT NULL,
-  `category` int(11) NOT NULL,
-  PRIMARY KEY (`test`,`category`),
-  KEY `category_foreign_key_idx` (`category`),
-  CONSTRAINT `category_foreign_key` FOREIGN KEY (`category`) REFERENCES `categories` (`idcategories`),
-  CONSTRAINT `test_foreign_key` FOREIGN KEY (`test`) REFERENCES `complex_tests` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-LOCK TABLES `category_test` WRITE;
-INSERT INTO `category_test` VALUES (5,2),
-(8,2);
-UNLOCK TABLES;
-
 DROP TABLE IF EXISTS `complex_tests`;
 CREATE TABLE `complex_tests` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -63,14 +49,22 @@ CREATE TABLE `complex_tests` (
   `extraparameters` varchar(200) DEFAULT NULL,
   `button_color` varchar(7) DEFAULT '#ffffff',
   `explanation` tinytext DEFAULT NULL,
+  `category_id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name_of_test_UNIQUE` (`name_of_test`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4;
+  UNIQUE KEY `name_of_test_UNIQUE` (`name_of_test`),
+  KEY `fk_idx` (`category_id`),
+  CONSTRAINT `fk` FOREIGN KEY (`category_id`) REFERENCES `categories` (`idcategories`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `complex_tests`
+--
+
 LOCK TABLES `complex_tests` WRITE;
-INSERT INTO `complex_tests` VALUES (4,'Check iotapps','bash scripts/check_iotapps.sh',NULL,'#20ff14','Check all iotapps, no matter how many they are'),
-(5,'Add Device','bash scripts/add_device.sh',NULL,'#ff7f00','Calls the test for adding a new device, then adds some test data'),
-(7,'Verify Authentication','bash scripts/get_token.sh',NULL,'#20ff14','Attempts to register as the operator to ensure the correct behavior of keycloak'),
-(8,'Attempt new user registration','bash scripts/attempt-registration.sh',NULL,'#ffffff',NULL);
+/*!40000 ALTER TABLE `complex_tests` DISABLE KEYS */;
+INSERT INTO `complex_tests` VALUES (4,'Check iotapps','bash scripts/check_iotapps.sh',NULL,'#20ff14','Check all iotapps, no matter how many they are',1),(5,'Add Device','bash scripts/add_device.sh',NULL,'#ff7f00','Calls the test for adding a new device, then adds some test data',2),(7,'Verify Authentication','bash scripts/get_token.sh',NULL,'#20ff14','Attempts to register as the operator to ensure the correct behavior of keycloak',1),(8,'Attempt new user registration','bash scripts/attempt-registration.sh',NULL,'#ffffff',NULL,2);
+/*!40000 ALTER TABLE `complex_tests` ENABLE KEYS */;
 UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `component_to_category`;

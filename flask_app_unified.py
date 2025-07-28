@@ -753,7 +753,7 @@ def create_app():
                 if 'username' in session:
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join category_test on id = category_test.test left join categories on categories.idcategories = category_test.category;'''
+                    query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join categories on categories.idcategories = complex_tests.category_id;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
@@ -918,12 +918,12 @@ def create_app():
                     conn.commit()
                     return "ok", 201
             except Exception:
-                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
+                print("Something went wrong during the addition of a new cronjob because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
     
     @app.route("/edit_cronjob", methods=["POST"])
-    def edit_cronjob(): #add position if only if docker
+    def edit_cronjob(): 
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -940,7 +940,7 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
+                print("Something went wrong during the editing of a new cronjob because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
         
@@ -1006,12 +1006,12 @@ def create_app():
                     conn.commit()
                     return "ok", 201
             except Exception:
-                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
+                print("Something went wrong during the addition of a new extra resource because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
     
     @app.route("/edit_extra_resource", methods=["POST"])
-    def edit_extra_resource(): #add position if only if docker
+    def edit_extra_resource(): 
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1029,7 +1029,7 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
+                print("Something went wrong during the editing of a new extra resource because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
         
@@ -1067,14 +1067,10 @@ def create_app():
                 
                     cursor = conn.cursor(buffered=True)
                     query = '''SELECT * FROM checker.tests_table;'''
-                    query2 = '''SELECT * from categories;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
-                    cursor.execute(query2)
-                    conn.commit()
-                    results_2 = cursor.fetchall()
-                    return render_template("organize_tests.html",tests=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    return render_template("organize_tests.html",tests=results, timeout=int(os.getenv("requests-timeout")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -1097,12 +1093,12 @@ def create_app():
                     conn.commit()
                     return "ok", 201
             except Exception:
-                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
+                print("Something went wrong during the addition of a new test because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
     
     @app.route("/edit_test", methods=["POST"])
-    def edit_test(): #add position if only if docker
+    def edit_test(): 
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1120,7 +1116,7 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
+                print("Something went wrong during the editing of a new test because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
         
@@ -1143,6 +1139,97 @@ def create_app():
         return redirect(url_for('login'))
     
     ## end add test
+    
+    ## start add complex test
+    
+    @app.route("/organize_complex_tests", methods=["GET"])
+    def organize_complex_tests():
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT * FROM checker.complex_tests;'''
+                    query2 = '''SELECT * from categories;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    cursor.execute(query2)
+                    conn.commit()
+                    results_2 = cursor.fetchall()
+                    return render_template("organize_complex_tests.html",complex_tests=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    
+            except Exception:
+                print("Something went wrong because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+        
+    @app.route("/add_complex_test", methods=["POST"])
+    def add_complex_test():
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                    cursor = conn.cursor(buffered=True)
+                    query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name_of_test'],request.form.to_dict()['command'],request.form.to_dict()['extraparameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category_id'],))
+                    conn.commit()
+                    return "ok", 201
+            except Exception:
+                print("Something went wrong during the addition of a new complex test because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+    
+    @app.route("/edit_complex_test", methods=["POST"])
+    def edit_complex_test(): 
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                    cursor = conn.cursor(buffered=True)
+                    query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name_of_test'],request.form.to_dict()['command'],request.form.to_dict()['extraparameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category_id'],request.form.to_dict()['id'],)) 
+                    conn.commit()
+                    if cursor.rowcount > 0:
+                        return "ok", 201
+                    else:
+                        return "Somehow request did not result in database changes", 400
+            except Exception:
+                print("Something went wrong during the editing of a new complex_test because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+        
+    @app.route("/delete_complex_test", methods=["POST"])
+    def delete_complex_test():
+        if 'username' in session:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if os.getenv('UNSAFE_MODE') != "true":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                cursor = conn.cursor(buffered=True)
+                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                query = '''DELETE FROM `checker`.`complex_tests` WHERE (`id` = %s);'''
+                cursor.execute(query, (request.form.to_dict()['id'],))
+                conn.commit()
+                return "ok", 201
+        return redirect(url_for('login'))
+    
+    ## end add complex test
     
     
     
@@ -1190,7 +1277,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join category_test on id = category_test.test left join categories on categories.idcategories = category_test.category;'''
+                    query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join categories on categories.idcategories = complex_tests.category_id;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()

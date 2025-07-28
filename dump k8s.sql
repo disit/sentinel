@@ -80,36 +80,6 @@ INSERT INTO `categories` VALUES (1,'Dashboard'),(2,'Authorization and Authentica
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
---
--- Table structure for table `category_test`
---
-
-DROP TABLE IF EXISTS `category_test`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `category_test` (
-  `test` int(11) NOT NULL,
-  `category` int(11) NOT NULL,
-  PRIMARY KEY (`test`,`category`),
-  KEY `category_foreign_key_idx` (`category`),
-  CONSTRAINT `category_foreign_key` FOREIGN KEY (`category`) REFERENCES `categories` (`idcategories`),
-  CONSTRAINT `test_foreign_key` FOREIGN KEY (`test`) REFERENCES `complex_tests` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `category_test`
---
-
-LOCK TABLES `category_test` WRITE;
-/*!40000 ALTER TABLE `category_test` DISABLE KEYS */;
-INSERT INTO `category_test` VALUES (5,2),(8,2);
-/*!40000 ALTER TABLE `category_test` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `complex_tests`
---
 
 DROP TABLE IF EXISTS `complex_tests`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -121,8 +91,11 @@ CREATE TABLE `complex_tests` (
   `extraparameters` varchar(200) DEFAULT NULL,
   `button_color` varchar(7) DEFAULT '#ffffff',
   `explanation` tinytext DEFAULT NULL,
+  `category_id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name_of_test_UNIQUE` (`name_of_test`)
+  UNIQUE KEY `name_of_test_UNIQUE` (`name_of_test`),
+  KEY `fk_idx` (`category_id`),
+  CONSTRAINT `fk` FOREIGN KEY (`category_id`) REFERENCES `categories` (`idcategories`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -132,7 +105,7 @@ CREATE TABLE `complex_tests` (
 
 LOCK TABLES `complex_tests` WRITE;
 /*!40000 ALTER TABLE `complex_tests` DISABLE KEYS */;
-INSERT INTO `complex_tests` VALUES (4,'Check iotapps','bash scripts/check_iotapps.sh',NULL,'#20ff14','Check all iotapps, no matter how many they are'),(5,'Add Device','bash scripts/add_device.sh',NULL,'#ff7f00','Calls the test for adding a new device, then adds some test data'),(7,'Verify Authentication','bash scripts/get_token.sh',NULL,'#20ff14','Attempts to register as the operator to ensure the correct behavior of keycloak'),(8,'Attempt new user registration','bash scripts/attempt-registration.sh',NULL,'#ffffff',NULL);
+INSERT INTO `complex_tests` VALUES (4,'Check iotapps','bash scripts/check_iotapps.sh',NULL,'#20ff14','Check all iotapps, no matter how many they are',1),(5,'Add Device','bash scripts/add_device.sh',NULL,'#ff7f00','Calls the test for adding a new device, then adds some test data',2),(7,'Verify Authentication','bash scripts/get_token.sh',NULL,'#20ff14','Attempts to register as the operator to ensure the correct behavior of keycloak',1),(8,'Attempt new user registration','bash scripts/attempt-registration.sh',NULL,'#ffffff',NULL,2);
 /*!40000 ALTER TABLE `complex_tests` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -197,7 +170,7 @@ CREATE TABLE `cronjob_history` (
   `errors` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`idcronjob_history`),
   KEY `cronjobid` (`id_cronjob`),
-  CONSTRAINT `cronjobid` FOREIGN KEY (`id_cronjob`) REFERENCES `cronjobs` (`idcronjobs`) ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT `cronjobid` FOREIGN KEY (`id_cronjob`) REFERENCES `cronjobs` (`idcronjobs`) ON DELETE CASCADE ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
