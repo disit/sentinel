@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: sentinel-san
-  namespace: sentinel-deployment
+  namespace: sentinel-namespace
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -29,7 +29,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: sentinel-san
-    namespace: sentinel-deployment
+    namespace: sentinel-namespace
 roleRef:
   kind: ClusterRole
   name: sentinel-pv
@@ -38,7 +38,7 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: sentinel-deployment
+  namespace: sentinel-namespace
   name: sentinel-role-name
 rules:
   - apiGroups: [""]
@@ -49,11 +49,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: sentinel-san-binding
-  namespace: sentinel-deployment
+  namespace: sentinel-namespace
 subjects:
   - kind: ServiceAccount
     name: sentinel-san
-    namespace: sentinel-deployment
+    namespace: sentinel-namespace
 roleRef:
   kind: Role
   name: sentinel-role-name
@@ -63,17 +63,17 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: sentinel-deployment
-  name: sentinel-deployment
+    app: sentinel-namespace
+  name: sentinel-namespace
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sentinel-deployment
+      app: sentinel-namespace
   template:
     metadata:
       labels:
-        app: sentinel-deployment
+        app: sentinel-namespace
     spec:
       serviceAccountName: sentinel-san
       containers:
@@ -172,7 +172,7 @@ spec:
       nodePort: 32080
       targetPort: 9080
   selector:
-    app: sentinel-deployment
+    app: sentinel-namespace
 ---
 apiVersion: apps/v1
 kind: Deployment
