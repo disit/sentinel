@@ -731,7 +731,7 @@ def send_advanced_alerts(message):
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
-    
+update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
 scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
 scheduler.add_job(update_container_state_db, trigger='interval', minutes=5)
@@ -1477,8 +1477,8 @@ def create_app():
                 try:
                     result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                     #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
-                    log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
-                    return result
+                    log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, request)
+                    return result.stdout
                 except Exception:
                     return f"Issue while rebooting pod: {traceback.format_exc()}", 500
         return redirect(url_for('login'))
@@ -1633,16 +1633,21 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
             else:
                 prefetch = subprocess.Popen(
-               f"kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}'",
+               f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
                     text=True
                 )
-                if str(prefetch.stdout).strip() not in string_of_list_to_list(os.getenv("namespaces")):
+                namespace = ""
+                try:
+                    namespace = prefetch.stdout.readlines()[0].strip()
+                except IndexError:
+                    pass
+                if namespace not in string_of_list_to_list(os.getenv("namespaces")):
                     return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
                 process = subprocess.Popen(
-               f"kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}') {podname} --tail {os.getenv('default-log-length')}",
+               f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
@@ -1651,7 +1656,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 out=[]
                 if os.getenv('log_previous_container_if_kubernetes'):
                     process_previous = subprocess.Popen(
-               f"kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2==\"{podname}\"{{print $1; exit}}') {podname} --tail {os.getenv('default-log-length')} --previous",
+               f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order

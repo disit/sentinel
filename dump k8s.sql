@@ -128,13 +128,42 @@ CREATE TABLE `component_to_category` (
 --
 -- Dumping data for table `component_to_category`
 --
-
 LOCK TABLES `component_to_category` WRITE;
-/*!40000 ALTER TABLE `component_to_category` DISABLE KEYS */;
-INSERT INTO `component_to_category` VALUES ('sumo-microsim-creator-*','Dashboard','Nothing set','$#base-url#$'),('sumoapp-manager-deployment-*','Dashboard','Contact information not set','$#base-url#$');
-/*!40000 ALTER TABLE `component_to_category` ENABLE KEYS */;
+INSERT INTO `component_to_category` VALUES ('certbot-*','Authorization and Authentication','Contact information not set'),
+('dashboard-backend-*','Dashboard','Contact information not set'),
+('dashboard-builder-*','Dashboard','Contact information not set'),
+('dashboard-cron-*','Dashboard','Contact information not set'),
+('dashboarddb-*','Data Storage','Contact information not set'),
+('geoserver-*','HLT','Contact information not set'),
+('geoserver-db-*','Knowledge Base','Contact information not set'),
+('heatmap-api-*','HLT','Contact information not set'),
+('heatmap2geosrv-*','HLT','Contact information not set'),
+('iot-discovery-*','Dashboard','Contact information not set'),
+('iot-fiware-api-*','Dashboard','Contact information not set'),
+('iot-fiware-harvester-*','Dashboard','Contact information not set'),
+('iotapp-*','Process Logic','Contact information not set'),
+('kafka-*','Real Time Dash','Contact information not set'),
+('keycloak-*','Authorization and Authentication','Contact information not set'),
+('ldap-server-*','Authorization and Authentication','Contact information not set'),
+('myldap-*','Authorization and Authentication','Contact information not set'),
+('nifi-*','Data Storage','Contact information not set'),
+('od-build-api-*','HLT','Contact information not set'),
+('od-get-api-*','HLT','Contact information not set'),
+('od-insert-api-*','HLT','Contact information not set'),
+('od-postgis-*','Knowledge Base','Contact information not set'),
+('opensearch-dashboards-*','Data Storage','Contact information not set'),
+('orion-*','Broker','Contact information not set'),
+('orionbrokerfilter-*','Broker','Contact information not set'),
+('personaldata-*','Dashboard','Contact information not set'),
+('proxy-*','System','Contact information not set'),
+('servicemap-*','Knowledge Base','Contact information not set'),
+('solr-kb-*','Knowledge Base','Contact information not set'),
+('synoptics-*','Real Time Dash','Contact information not set'),
+('varnish-*','Data Storage','Contact information not set'),
+('virtuoso-kb-*','Knowledge Base','Contact information not set'),
+('wsserver-*','Real Time Dash','Contact information not set'),
+('zookeeper-*','Real Time Dash','Contact information not set');
 UNLOCK TABLES;
-
 --
 -- Table structure for table `container_data`
 --
