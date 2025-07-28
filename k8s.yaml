@@ -129,7 +129,7 @@ spec:
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"
-        image: fabriziomereu/sentinel:v0.4.10
+        image: fabriziomereu/sentinel:v0.4.17
         #command: ["sleep", "3600"]
         name: k8sentinel
         volumeMounts:
