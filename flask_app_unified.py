@@ -1180,7 +1180,7 @@ def create_app():
                 
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name_of_test'],request.form.to_dict()['command'],request.form.to_dict()['extraparameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category_id'],))
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],))
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -1200,7 +1200,7 @@ def create_app():
                 
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name_of_test'],request.form.to_dict()['command'],request.form.to_dict()['extraparameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category_id'],request.form.to_dict()['id'],)) 
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
