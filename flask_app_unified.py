@@ -318,7 +318,10 @@ def auto_alert_status():
                     conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
                 except KeyError:
                     conversion["Labels"] = "No labels"
-                conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                try:
+                    conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                except KeyError:
+                    conversion["Mounts"] = "No volumes"
                 conversion["Names"] = item["metadata"]["name"]
                 try:
                     conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
@@ -1768,7 +1771,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
                 except KeyError:
                     conversion["Labels"] = "No labels"
-                conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                try:
+                    conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                except KeyError:
+                    conversion["Mounts"] = "No volumes"
                 conversion["Names"] = item["metadata"]["name"]
                 try:
                     conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
