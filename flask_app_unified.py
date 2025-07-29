@@ -118,17 +118,26 @@ db_conn_info = {
 }
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
+
     using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     if because:
         becauses=because.split(",")
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
-        query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
+        if not os.getenv("running_as_kubernetes"):
+            query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
+        else:
+            query2 = 'SELECT category, component FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
+        
         cursor.execute(query2)
         now_it_is = cursor.fetchall()
     newstr=""
     for a in now_it_is:
-        curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
+        if not os.getenv("running_as_kubernetes"):
+            curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
+        else:
+            curstr="In category " + a[0] + ", the kubernetes container named " + a[1] + " " + instance_of_problem
+        
         if because:
             newstr += curstr + explain_reason + becauses.pop(0)+"\n"
         else:
@@ -857,7 +866,7 @@ def create_app():
                         query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s where (`component` = %s)'''
                         cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['id'],))
                     else:
-                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
+                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = `kubernetes-cluster` where (`component` = %s)'''
                         cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
@@ -1148,6 +1157,97 @@ def create_app():
         return redirect(url_for('login'))
     
     ## end add test
+    
+    ## start add complex test
+    
+    @app.route("/organize_complex_tests", methods=["GET"])
+    def organize_complex_tests():
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                    cursor = conn.cursor(buffered=True)
+                    query = '''SELECT * FROM checker.complex_tests;'''
+                    query2 = '''SELECT * from categories;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    cursor.execute(query2)
+                    conn.commit()
+                    results_2 = cursor.fetchall()
+                    return render_template("organize_complex_tests.html",complex_tests=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    
+            except Exception:
+                print("Something went wrong because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+        
+    @app.route("/add_complex_test", methods=["POST"])
+    def add_complex_test():
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                    cursor = conn.cursor(buffered=True)
+                    query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],))
+                    conn.commit()
+                    return "ok", 201
+            except Exception:
+                print("Something went wrong during the addition of a new complex test because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+    
+    @app.route("/edit_complex_test", methods=["POST"])
+    def edit_complex_test(): 
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                    cursor = conn.cursor(buffered=True)
+                    query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    conn.commit()
+                    if cursor.rowcount > 0:
+                        return "ok", 201
+                    else:
+                        return "Somehow request did not result in database changes", 400
+            except Exception:
+                print("Something went wrong during the editing of a new complex_test because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+        
+    @app.route("/delete_complex_test", methods=["POST"])
+    def delete_complex_test():
+        if 'username' in session:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if os.getenv('UNSAFE_MODE') != "true":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
+                cursor = conn.cursor(buffered=True)
+                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                query = '''DELETE FROM `checker`.`complex_tests` WHERE (`id` = %s);'''
+                cursor.execute(query, (request.form.to_dict()['id'],))
+                conn.commit()
+                return "ok", 201
+        return redirect(url_for('login'))
+    
+    ## end add complex test
     
     ## start add complex test
     
