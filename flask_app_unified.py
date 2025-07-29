@@ -1316,110 +1316,28 @@ def create_app():
     @app.route("/delete_category", methods=["POST"])
     def delete_category():
         if 'username' in session:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('UNSAFE_MODE') != "true":
-                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                cursor = conn.cursor(buffered=True)
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
-                    return "An incorrect password was provided", 400
-                query = '''DELETE FROM `checker`.`categories` WHERE (`idcategories` = %s);'''
-                cursor.execute(query, (request.form.to_dict()['id'],))
-                conn.commit()
-                return "ok", 201
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                    cursor = conn.cursor(buffered=True)
+                    if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                        return "An incorrect password was provided", 400
+                    query = '''DELETE FROM `checker`.`categories` WHERE (`idcategories` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['id'],))
+                    conn.commit()
+                    return "ok", 201
+            except Exception:
+                print("Something went wrong during the editing of a new category because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        
         return redirect(url_for('login'))
     
     ## end add cronjob
     
-    @app.route("/organize_complex_tests", methods=["GET"])
-    def organize_complex_tests():
-        if 'username' in session:
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
-                    cursor = conn.cursor(buffered=True)
-                    query = '''SELECT * FROM checker.complex_tests;'''
-                    query2 = '''SELECT * from categories;'''
-                    cursor.execute(query)
-                    conn.commit()
-                    results = cursor.fetchall()
-                    cursor.execute(query2)
-                    conn.commit()
-                    results_2 = cursor.fetchall()
-                    return render_template("organize_complex_tests.html",complex_tests=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
-                    
-            except Exception:
-                print("Something went wrong because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))
-        
-    @app.route("/add_complex_test", methods=["POST"])
-    def add_complex_test():
-        if 'username' in session:
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
-                    cursor = conn.cursor(buffered=True)
-                    query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],))
-                    conn.commit()
-                    return "ok", 201
-            except Exception:
-                print("Something went wrong during the addition of a new complex test because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))
-    
-    @app.route("/edit_complex_test", methods=["POST"])
-    def edit_complex_test(): 
-        if 'username' in session:
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
-                    cursor = conn.cursor(buffered=True)
-                    query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
-                    conn.commit()
-                    if cursor.rowcount > 0:
-                        return "ok", 201
-                    else:
-                        return "Somehow request did not result in database changes", 400
-            except Exception:
-                print("Something went wrong during the editing of a new complex_test because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))
-        
-    @app.route("/delete_complex_test", methods=["POST"])
-    def delete_complex_test():
-        if 'username' in session:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('UNSAFE_MODE') != "true":
-                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
-                cursor = conn.cursor(buffered=True)
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
-                    return "An incorrect password was provided", 400
-                query = '''DELETE FROM `checker`.`complex_tests` WHERE (`id` = %s);'''
-                cursor.execute(query, (request.form.to_dict()['id'],))
-                conn.commit()
-                return "ok", 201
-        return redirect(url_for('login'))
-    
-    ## end add complex test
+   
     
     
     
