@@ -164,6 +164,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     msg.attach(MIMEText(str(composite_message), 'html'))
     server.send_message(msg)
     server.quit()
+    print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients")))
     return
     
 
