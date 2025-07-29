@@ -342,14 +342,17 @@ def auto_alert_status():
 
                 # new things
                 conversion["Node"] = item["spec"]["nodeName"]
-                temp_vols=copy.deepcopy(item["spec"]["volumes"])
-                temp_str = ""
-                for vol_num in range(len(item["spec"]["volumes"])):
-                    temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
-                    del temp_vols[vol_num]["name"]
-                    temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
-                    
-                conversion["Volumes"] = temp_str
+                try:
+                    temp_vols=copy.deepcopy(item["spec"]["volumes"])
+                    temp_str = ""
+                    for vol_num in range(len(item["spec"]["volumes"])):
+                        temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                        del temp_vols[vol_num]["name"]
+                        temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                        
+                    conversion["Volumes"] = temp_str
+                except KeyError:
+                    conversion["Volumes"] = "No volumes"
                 conversion["Namespace"] = item["metadata"]["namespace"]
                 
                 
@@ -635,14 +638,17 @@ def update_container_state_db():
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
                 conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
                 conversion["Node"] = item["spec"]["nodeName"]
-                temp_vols=copy.deepcopy(item["spec"]["volumes"])
-                temp_str = ""
-                for vol_num in range(len(item["spec"]["volumes"])):
-                    temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
-                    del temp_vols[vol_num]["name"]
-                    temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
-                    
-                conversion["Volumes"] = temp_str
+                try:
+                    temp_vols=copy.deepcopy(item["spec"]["volumes"])
+                    temp_str = ""
+                    for vol_num in range(len(item["spec"]["volumes"])):
+                        temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                        del temp_vols[vol_num]["name"]
+                        temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                    conversion["Volumes"] = temp_str
+                except KeyError:
+                    conversion["Volumes"] = "No volumes"
+                
                 conversion["Namespace"] = item["metadata"]["namespace"]
                 
                 conversions.append(conversion)
@@ -1795,14 +1801,17 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
                 # new things
                 conversion["Node"] = item["spec"]["nodeName"]
-                temp_vols=copy.deepcopy(item["spec"]["volumes"])
-                temp_str = ""
-                for vol_num in range(len(item["spec"]["volumes"])):
-                    temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
-                    del temp_vols[vol_num]["name"]
-                    temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
-                    
-                conversion["Volumes"] = temp_str
+                try:
+                    temp_vols=copy.deepcopy(item["spec"]["volumes"])
+                    temp_str = ""
+                    for vol_num in range(len(item["spec"]["volumes"])):
+                        temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
+                        del temp_vols[vol_num]["name"]
+                        temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
+                        
+                    conversion["Volumes"] = temp_str
+                except KeyError:
+                    conversion["Volumes"] = "No volumes"
                 conversion["Namespace"] = item["metadata"]["namespace"]
                 
                 conversions.append(conversion)
