@@ -1,0 +1,217 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="categories">
+  <thead>
+	  <tr>
+		<th>Category</th>
+		<th>Delete</th>
+		<th>Edit</th>
+	  </tr>
+  </thead>
+  <tbody>
+{%for item in categories%}
+    <tr>
+	  <td>{{item[1]}}</td>
+	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCategory" data-component="{{item[0]}}" id="deleteCategory{{item[0]}}" onClick="$('#addCategoryModal').modal('hide')">Delete</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCategory" data-component="{{item[0]}}" id="editCategory{{item[0]}}" onClick="$('#addCategoryModal').modal('hide')">Edit</button></td>
+	</tr>
+{% endfor %}
+  </tbody>
+</table>
+<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addCategoryModal" id="addCategory">Add</button>
+<div class="modal fade" id="addCategoryModal" tabindex="-1" role="dialog" aria-labelledby="addCategoryModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addCategoryLabel">Add a new category</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addCategoryModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="addCategoryForm">
+					<div class="form-group">
+						<label for="passwordInputAdd">Password</label>
+						<input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+					</div>					
+					<div class="form-group">
+						<label for="CategoryAdd">Category name</label>
+						<input type="text" class="form-control" id="CategoryAdd" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addCategoryModal').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addCategoryButton">Add category</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="editCategory" tabindex="-1" role="dialog" aria-labelledby="editCategoryModal" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="editComponentLabel">Edit category</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editCategoryModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="editComponentForm">
+					<div class="form-group">
+						<label for="passwordInputEdit">Password</label>
+						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+					</div>
+					
+					<div class="form-group">
+						<label for="CategoryEditId">Category ID</label>
+						<input type="text" class="form-control" id="CategoryEditId" readonly>
+					</div>
+										
+					<div class="form-group">
+						<label for="CategoryEdit">Category name</label>
+						<input type="text" class="form-control" id="CategoryEdit" required>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCategoryModal').modal('hide')">Cancel</button>
+				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveCategoryChangesButton">Save changes</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<div class="modal fade" id="deleteCategory" tabindex="-1" role="dialog" aria-labelledby="deleteCategoryLabel">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting category</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="deleteComponentForm">
+					<div class="form-group">
+						<label for="passwordInputDelete">Password</label>
+						<input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="CategoryDeleteId">Category ID</label>
+						<input type="text" class="form-control" id="CategoryDeleteId" readonly>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteCategoryButton" onClick="$('#deleteCategory').modal('hide')">Delete category</button>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+
+	$('.open-modal-m').on('click', function() {
+		var id = $(this).data('component');
+		$('#CategoryDeleteId').val(id);
+		$('#deleteCategory').modal('show');
+	});
+	$('.open-modal-e').on('click', function() {
+		var id = $(this).data('component');
+		$('#CategoryEditId').val(id);
+		$('#editCategory').modal('show');
+	});
+	$("#Categorys").DataTable();
+	$('.open-modal').on('click', function() {
+		$('#addCategoryModal').modal('show');
+	});
+	$('#deleteCategoryButton').on('click', function() {
+		var password = $('#passwordInputDelete').val();
+		var id = $('#CategoryDeleteId').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './delete_category',
+					data: {id: id, psw: password},
+					type: 'POST',
+					success: function(response) {
+						alert("Category was deleted!");
+						location.reload();
+					},
+					error: function(error) {
+						alert("Category was not deleted because of: " + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#addCategoryButton').on('click', function() {
+		var password = $('#passwordInputAdd').val();
+		var category = $('#CategoryAdd').val();
+		if (password) {
+			try {
+				$.ajax({
+					url: './add_category',
+					data: {psw: password, category: category},
+					type: 'POST',
+					success: function(response) {
+						alert("Category was added!");
+						location.reload();
+					},
+					error: function(error) {
+						alert("Category was not added because of: " + error);
+					},
+					timeout: {{timeout}}
+				});
+			}
+			catch (exception_var) {
+				console.log(exception_var);
+			}
+		}
+		else {
+			alert('Please enter a password');
+		}
+	});
+	$('#saveCategoryChangesButton').on('click', function() {
+	var password = $('#passwordInputEdit').val();
+	var id = $('#CategoryEditId').val();
+	if (password) {
+		try {
+			$.ajax({
+				url: './edit_category',
+				data: {psw: password, id: id},
+				type: 'POST',
+				success: function(response) {
+					alert("Category was edited!");
+					location.reload();
+				},
+				error: function(error) {
+					alert("Category was not edited because of: " + error.responseText);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			console.log(exception_var);
+		}
+	}
+	else {
+		alert('Please enter a password');
+	}
+	});
+</script>
+{% endblock %}
