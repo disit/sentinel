@@ -1249,7 +1249,88 @@ def create_app():
     
     ## end add complex test
     
-    ## start add complex test
+    ## start add category
+    
+    @app.route("/organize_categories", methods=["GET"])
+    def organize_categories():
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                    cursor = conn.cursor(buffered=True)
+                    query2 = '''SELECT * from categories;'''
+                    cursor.execute(query2)
+                    conn.commit()
+                    results_2 = cursor.fetchall()
+                    return render_template("organize_categories.html",categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    
+            except Exception:
+                print("Something went wrong because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+        
+    @app.route("/add_category", methods=["POST"])
+    def add_category():
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                    cursor = conn.cursor(buffered=True)
+                    query = '''INSERT INTO `checker`.`categories` (`category`) VALUES (%s);'''
+                    cursor.execute(query, (request.form.to_dict()['category'],))
+                    conn.commit()
+                    return "ok", 201
+            except Exception:
+                print("Something went wrong during the addition of a new category because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+    
+    @app.route("/edit_category", methods=["POST"])
+    def edit_category(): 
+        if 'username' in session:
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    if session['username']!="admin":
+                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                    if os.getenv('UNSAFE_MODE') != "true":
+                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                    cursor = conn.cursor(buffered=True)
+                    query = '''UPDATE `checker`.`categories` SET `category` = %s (`idcategories` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    conn.commit()
+                    if cursor.rowcount > 0:
+                        return "ok", 201
+                    else:
+                        return "Somehow request did not result in database changes", 400
+            except Exception:
+                print("Something went wrong during the editing of a new category because of",traceback.format_exc())
+                return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+        
+    @app.route("/delete_category", methods=["POST"])
+    def delete_category():
+        if 'username' in session:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if os.getenv('UNSAFE_MODE') != "true":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                cursor = conn.cursor(buffered=True)
+                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                query = '''DELETE FROM `checker`.`categories` WHERE (`idcategories` = %s);'''
+                cursor.execute(query, (request.form.to_dict()['id'],))
+                conn.commit()
+                return "ok", 201
+        return redirect(url_for('login'))
+    
+    ## end add cronjob
     
     @app.route("/organize_complex_tests", methods=["GET"])
     def organize_complex_tests():
