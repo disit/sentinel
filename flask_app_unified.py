@@ -753,7 +753,7 @@ def send_advanced_alerts(message):
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
 scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=5)
+scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database_update_frequency")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
