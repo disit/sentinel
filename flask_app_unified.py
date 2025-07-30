@@ -345,7 +345,7 @@ def auto_alert_status():
                     conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
                 except Exception as E:
                     conversion["RunningFor"] = "Not running"
-                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restarts"])
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
                 conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
                 conversion["Name"] = item["metadata"]["name"]
@@ -383,7 +383,13 @@ def auto_alert_status():
     components_original = [a[0] for a in results]
     containers_which_should_be_running_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and (c["State"] != "running")]
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
-    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
+    if not os.getenv("running_as_kubernetes"):
+        containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
+    else:
+        try:
+            containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "restarts" in c["State"] and int(c["State"].strip().split("restarts:")[-1]) > 10]
+        except:
+            containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
@@ -644,7 +650,7 @@ def update_container_state_db():
                     conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
                 except Exception as E:
                     conversion["RunningFor"] = "Not running"
-                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restarts"])
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
                 conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
                 conversion["Node"] = item["spec"]["nodeName"]
@@ -1894,7 +1900,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minutes(s) and {(dt2-dt1).seconds % 60} second(s)"
                 except Exception as E:
                     conversion["RunningFor"] = "Not running"
-                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0]
+                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restarts"])
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
                 conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
                 conversion["Name"] = item["metadata"]["name"]
