@@ -642,6 +642,8 @@
 			row.setAttribute("name", rowValues["Name"]);			
 			var elements = Object.values(rowValues);
 			var index_of_below_array = 0;
+			const check = duration => ((t => t > 600 ? true : false)((s => (s.match(/\d+/g).map(Number)).reduce((a, v, i) => a + v * [86400, 3600, 60, 1][i], 0))((duration.replace(/and/g, ',')))));
+
 			elements.forEach(cellData => {
 				const td = document.createElement("td");
 				if (index_of_below_array === 6) {
@@ -650,7 +652,7 @@
 				}
 				else if (index_of_below_array === 12) {
 					var content_of_id_cell; 
-					if ((cellData === "running" != (elements[6] === "certbot/certbot")) && !elements[12].includes('unhealthy'))
+					if ((/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 && check(elements[11])) || !elements[12].includes('unhealthy'))
 						content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 						else content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 					td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
@@ -746,8 +748,10 @@
 			let category = 'Unknown';
 			for (const key in lookupTable) {
 				if (name.startsWith(key.replace('*', ''))) {
-					category = lookupTable[key][0];
-					break;
+					if (item.Namespace == lookupTable[key][0]) {
+						category = lookupTable[key][0];
+						break;
+					}
 				}
 			}
 			if (!categorizedData[category]) {
