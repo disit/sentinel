@@ -76,10 +76,6 @@ Then look for sentinel-service as the service, and at the column Ports you'll se
 
 In the main web interface, go to Show Administrative Actions and select Manage Containers. In the newly opened page you'll see the currently managed containers; from there you can add and delete new containers. `*` in the name of the container will wildcard for each other characters following it (e.g. `iotapp-*` will match all iotapps, `dashboarddb-*` will catch kubernetes dashboarddb pods regardless of the randomly generated substring appended to the deployment name).
 
-### Adding a new category
+### Adding, editing or deleting a test (a isalive test), a complex test (anything specific to a category), a cronjob (anything specific to a category, which also repeats once each 5 minutes) or a new category
 
-This can only be done by accessing the database manually
-
-### Adding a test (a isalive test), a complex test (anything specific to a category) or a cronjob (anything specific to a category, which also repeats once each 5 minutes)
-
-This can only be done by accessing the database manually, to prevent remote injection
+These actions can only be done by accessing the database manually or by enabling unsafe mode in the enviroment of Snap4Sentinel. For the administrator, the actions are available in Show Administrative Actions. As per date 01/08/2025, all but category related actions have been tested and found functioning. In-web examples and explanations are yet to be added.

@@ -10,6 +10,7 @@
 		<th>Container</th>
 		<th>Category</th>
 		<th>Contacts</th>
+		<th>Namespace</th>
 		<th>Delete</th>
 		<th>Edit</th>
 	  </tr>
@@ -20,6 +21,7 @@
 	  <td>{{item[0]}}</td>
 	  <td>{{item[1]}}</td>
 	  <td>{{item[2]}}</td>
+	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Delete</button></td>
 	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
 	</tr>
@@ -55,6 +57,10 @@
 					<div class="form-group">
 						<label for="ContactsAdd">Contacts</label>
 						<input type="text" class="form-control" id="ContactsAdd" required>
+					</div>
+					<div class="form-group">
+						<label for="NamespaceAdd">Namespace</label>
+						<input type="text" class="form-control" id="NamespaceAdd" required>
 					</div>
 				</form>
 			</div>
@@ -94,6 +100,10 @@
 					<div class="form-group">
 						<label for="ContactsEdit">Contacts</label>
 						<input type="text" class="form-control" id="ContactsEdit" required>
+					</div>
+					<div class="form-group">
+						<label for="NamespaceEdit">Namespace</label>
+						<input type="text" class="form-control" id="NamespaceEdit" required>
 					</div>
 				</form>
 			</div>
@@ -182,11 +192,12 @@
 		var id = $('#containeridmodalEdit').val();
 		var category = $('#category-selection-edit').val();
 		var contacts = $('#ContactsEdit').val();
+		var namespace = $('#NamespaceEdit').val();
 		if (password) {
 			try {
 				$.ajax({
 					url: './edit_container',
-					data: {id: id, psw: password, category: category, contacts: contacts},
+					data: {id: id, psw: password, category: category, contacts: contacts, namespace: namespace},
 					type: 'POST',
 					success: function(response) {
 						alert(id + " was edited!");
@@ -211,11 +222,12 @@
 		var id = $('#containeridmodalAdd').val();
 		var category = $('#category-selection').val();
 		var contacts = $('#ContactsAdd').val();
+		var namespace = $('#NamespaceAdd').val();
 		if (password) {
 			try {
 				$.ajax({
 					url: './add_container',
-					data: {id: id, psw: password, category: category, contacts: contacts},
+					data: {id: id, psw: password, category: category, contacts: contacts, namespace: namespace},
 					type: 'POST',
 					success: function(response) {
 						alert(id + " was added!");
