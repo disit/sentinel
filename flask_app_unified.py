@@ -140,7 +140,10 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         
         if because:
-            newstr += curstr + explain_reason + becauses.pop(0)+"<br>"
+            try:
+                newstr += curstr + explain_reason + becauses.pop(0)+"<br>"
+            except IndexError: #somehow ran out of reasons, use the last one
+                newstr += curstr + explain_reason + because.split(",")[-1]+"<br>"
         else:
             newstr += curstr+"<br>"
     return newstr

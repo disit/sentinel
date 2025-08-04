@@ -126,7 +126,7 @@ spec:
           value: "true"
         - name: UNSAFE_MODE # allows for non-container elements to be managed, unsafe as it allows arbitrary code execution on pod/host, set to "true" to activate
           value: "true"
-        - name: update_database_frequency
+        - name: database_update_frequency
           value: "5" # minutes
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
