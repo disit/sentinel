@@ -373,6 +373,8 @@
 					logging("<b>" + element.name + "</b> had its port checked and the result was: <b>"+response[0]+'</b><br>Complete response: ' + response[1] + '<hr>', location+'-logs');
 					test_results[container] = response;
 					stored_pings_results[container] = response;
+					document.getElementById(container+'-result').innerHTML= response;
+		
 				},
 				error: function(error) {
 					add_alert("Failed to contact the backend for the tests results with reason: "+error.statusText);
@@ -706,7 +708,7 @@
 			do_not_update_this.setAttribute("type", "button");
 			do_not_update_this.setAttribute("value", "Stop refreshing");
 			do_not_update_this_td.appendChild(do_not_update_this);
-			do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[12]+'" id="mutebutton-'+elements[12]+'">Mute</button>';
+			do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[6]+'" id="mutebutton-'+elements[6]+'">Mute</button>';
 			row.appendChild(do_not_update_this_td);
 			tbody.appendChild(row);
 			testresults.innerHTML=test_results_divs[row.childNodes[7].innerHTML];
