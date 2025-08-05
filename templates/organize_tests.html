@@ -23,7 +23,7 @@
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteTest" data-component="{{item[0]}}" id="deleteTest{{item[0]}}" onClick="$('#addTestModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editTest" data-component="{{item[0]}}" id="editTest{{item[0]}}" onClick="$('#addTestModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editTest" data-component="{{item[0]}}" data-container="{{item[1] | e}}" data-command="{{item[2] | e}}" data-commandexplained="{{item[3] | e}}" id="editTest{{item[0]}}" onClick="$('#addTestModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -146,7 +146,13 @@
 	});
 	$('.open-modal-e').on('click', function() {
 		var id = $(this).data('component');
+		var container = $(this).data('container');
+		var command = $(this).data('command');
+		var command_explained = $(this).data('commandexplained');
 		$('#TestEditId').val(id);
+		$('#ContainerTestEdit').val(container);
+		$('#CommandEdit').val(command);
+		$('#CommandExplainedEdit').val(command_explained);
 		$('#editTest').modal('show');
 	});
 	$("#tests").DataTable();

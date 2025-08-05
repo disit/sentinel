@@ -23,7 +23,7 @@
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteExtraResource" data-component="{{item[0]}}" id="deleteExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editExtraResource" data-component="{{item[0]}}" id="editExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editExtraResource" data-component="{{item[0]}}" data-information="{{item[1] | e}}" data-description="{{item[2] | e}}" data-category="{{item[3] | e}}" id="editExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -159,7 +159,22 @@
 	});
 	$('.open-modal-e').on('click', function() {
 		var id = $(this).data('component');
+		var information = $(this).data('information');
+		var description = $(this).data('description');
+		var category = $(this).data('category');
 		$('#ExtraResourceEditId').val(id);
+		$('#InformationExtraResourceEdit').val(information);
+		$('#DescriptionEdit').val(description);
+
+		let select = document.getElementById('category-selection-edit');
+
+		for (let i = 0; i < select.options.length; i++) {
+			if (select.options[i].text === category) {
+				select.selectedIndex = i;
+				break;
+			}
+		}
+
 		$('#editExtraResource').modal('show');
 	});
 	$("#extra_resources").DataTable();

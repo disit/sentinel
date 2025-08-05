@@ -40,6 +40,8 @@ from werkzeug.security import check_password_hash
 from datetime import timedelta
 import html
 import jwt
+import asyncio
+
 ALGORITHM = 'HS256'
 def string_of_list_to_list(string):
     try:
@@ -143,7 +145,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             try:
                 newstr += curstr + explain_reason + becauses.pop(0)+"<br>"
             except IndexError: #somehow ran out of reasons, use the last one
-                newstr += curstr + explain_reason + because.split(",")[-1]+"<br>"
+                newstr += curstr + explain_reason + "couldn't find reason"+"<br>"
         else:
             newstr += curstr+"<br>"
     return newstr
@@ -255,7 +257,7 @@ def isalive():
     send_telegram(int(os.getenv("telegram-channel")), os.getenv("platform-url")+" is alive")
     return
 
-def auto_run_tests():
+async def auto_run_tests():
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -264,17 +266,33 @@ def auto_run_tests():
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
-            total_result = ""
-            badstuff = []
-            for r in list(results):
-                command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="cp437", timeout=10).stdout
-                total_result += command_ran
-                if "Failure" in command_ran:
-                    badstuff.append({"container":r[1], "result":command_ran, "command":r[2]})
-            return badstuff
+            tasks = [run_shell_command(r[0], r[1]) for r in results]
+            completed = await asyncio.gather(*tasks)
+
+            return dict(completed)
     except Exception:
         print("Something went wrong during tests running because of:",traceback.format_exc())
-        return badstuff
+
+async def run_shell_command(name, command):
+    try:
+        process = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+
+        output = stdout.decode("cp437") if stdout else ""
+        error = stderr.decode("cp437") if stderr else ""
+
+        if process.returncode != 0:
+            return name, f"Command {command} exited with code {process.returncode}:\n{error}"
+        
+        return name, output
+
+    except Exception:
+        return name, f"Command {command} had an error:\n{traceback.format_exc()}"
+
 
 def auto_alert_status():
     if not os.getenv("running_as_kubernetes"):
@@ -387,10 +405,8 @@ def auto_alert_status():
     #components_original = [[a[0],a[2]] for a in results]
     components_original = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results]
     containers_which_should_be_running_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and not ("running" in c["State"])]
-    print(containers_which_should_be_running_and_are_not)
     
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
-    print(containers_which_should_be_exited_and_are_not)
     if not os.getenv("running_as_kubernetes"): #todo troubleshoot here
         containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
     else:
@@ -405,12 +421,21 @@ def auto_alert_status():
                                 containers_which_are_running_but_are_not_healthy.append(c_m)
                     except Exception:
                         containers_which_are_running_but_are_not_healthy.append(c_m)
-    print(containers_which_are_running_but_are_not_healthy)
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
-    containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
+    if not os.getenv("running_as_kubernetes"): #todo troubleshoot here
+        containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
+        containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
+    else:
+    
+        containers_which_are_not_expected = dict(components_original)
+        for c in containers_merged:
+            #print("dealing with",c["Names"],"as",'-'.join(c["Names"].split('-')[:-2]))
+            for value in list(containers_which_are_not_expected.keys()):
+                if '-'.join(c["Names"].split('-')[:-2]).startswith(value):
+                    del containers_which_are_not_expected[value]
+    
     if not os.getenv("running_as_kubernetes"):
         top = get_top()
         load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
@@ -776,7 +801,7 @@ def send_advanced_alerts(message):
         
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=5)
+scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error_notification_frequency",5)))
 scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database_update_frequency")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
@@ -1513,16 +1538,17 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     total_result = ""
-                    command_ran_explained = ""
                     for r in list(results):
-                        command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="cp437")
-                        command_ran_explained = subprocess.run(r[1], shell=True, capture_output=True, text=True, encoding="cp437").stdout + '\n'
-                        total_result += "Running " + r[0] + " with result " + command_ran.stdout + "\nWith errors: " + command_ran.stderr
-                        query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
-                        cursor.execute(query_1,(f"{command_ran.stdout}\n{command_ran.stderr}", request.form.to_dict()['container'],r[0],))
-                        conn.commit()
-                        log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, request, which_test="is alive " + str(r[2]))
-                    return jsonify(total_result, command_ran_explained)
+                        try:
+                            command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="cp437")
+                            total_result += "Running " + r[0] + " with result " + command_ran.stdout + "\nWith errors: " + command_ran.stderr
+                            query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
+                            cursor.execute(query_1,(f"{command_ran.stdout}\n{command_ran.stderr}", request.form.to_dict()['container'],r[0],))
+                            conn.commit()
+                            log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, request, which_test="is alive " + str(r[2]))
+                        except Exception:
+                            return jsonify(f"Test of {request.form.to_dict()['container']} had a runtime error with the cause: {traceback.format_exc()}"), 500
+                    return jsonify(total_result)
             except Exception:
                 print("Something went wrong during tests running because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
@@ -1564,9 +1590,8 @@ def create_app():
         return redirect(url_for('login'))        
         
     @app.route("/test_all_ports", methods=['GET'])
-    def test_all_ports():
+    async def test_all_ports():
         if 'username' in session:
-            result = {}
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
@@ -1574,10 +1599,11 @@ def create_app():
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
-                for r in list(results):
-                    command_ran = subprocess.run(r[1], shell=True, capture_output=True, text=True, encoding="cp437").stdout
-                    result[r[0]]=command_ran
-            return result
+                
+                tasks = [run_shell_command(r[0], r[1]) for r in results]
+                completed = await asyncio.gather(*tasks)
+
+                return dict(completed)
         return redirect(url_for('login'))
             
     @app.route("/deauthenticate", methods=['POST','GET'])

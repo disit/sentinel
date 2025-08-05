@@ -29,7 +29,7 @@
 	  <td>{{item[5]}}</td>
 	  <td>{{item[6]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComplexTest" data-component="{{item[0]}}" id="deleteComplexTest{{item[0]}}" onClick="$('#addComplexTestModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComplexTest" data-component="{{item[0]}}" id="editComplexTest{{item[0]}}" onClick="$('#addComplexTestModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComplexTest" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command={{item[2] | e}} data-extraparameters={{item[3] | e}} data-color={{item[4] | e}} data-explanation={{item[5] | e}} data-category={{item[6] | e}} id="editComplexTest{{item[0]}}" onClick="$('#addComplexTestModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -177,7 +177,26 @@
 	});
 	$('.open-modal-e').on('click', function() {
 		var id = $(this).data('component');
+		var name = $(this).data('name');
+		var command = $(this).data('command');
+		var extra_parameters = $(this).data('extraparameters');
+		var color = $(this).data('color');
+		var explanation = $(this).data('explanation');
+		var category = $(this).data('category');
+		let select = document.getElementById('category-selection-edit');
+
+		for (let i = 0; i < select.options.length; i++) {
+			if (select.options[i].text === category) {
+				select.selectedIndex = i;
+				break;
+			}
+		}
+		$('#ExplanationEdit').val(explanation);
+		$('#ButtonColorEdit').val(color);
+		$('#ExtraParametersEdit').val(extra_parameters);
 		$('#ComplexTestEditId').val(id);
+		$('#NameEdit').val(name);
+		$('#CommandEdit').val(command);
 		$('#editComplexTest').modal('show');
 	});
 	$("#complex_tests").DataTable();

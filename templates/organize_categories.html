@@ -17,7 +17,7 @@
     <tr>
 	  <td>{{item[1]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCategory" data-component="{{item[0]}}" id="deleteCategory{{item[0]}}" onClick="$('#addCategoryModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCategory" data-component="{{item[0]}}" id="editCategory{{item[0]}}" onClick="$('#addCategoryModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCategory" data-component="{{item[0]}}" data-name="{{item[1] | e}}" id="editCategory{{item[0]}}" onClick="$('#addCategoryModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -125,6 +125,8 @@
 	});
 	$('.open-modal-e').on('click', function() {
 		var id = $(this).data('component');
+		var name = $(this).data('name');
+		$('#CategoryEdit').val(name);
 		$('#CategoryEditId').val(id);
 		$('#editCategory').modal('show');
 	});

@@ -23,7 +23,7 @@
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" id="editCronJob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command={{item[2] | e}} data-category={{item[3] | e}} id="editCronJob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -151,7 +151,23 @@
 	$("#cronjobs").DataTable();
 	$('.open-modal-e').on('click', function() {
 		var id = $(this).data('component');
+
+		var name = $(this).data('name');
+		var command = $(this).data('command');
+		var category = $(this).data('category');
 		$('#CronJobEditId').val(id);
+		$('#NameCronJobEdit').val(name);
+		$('#CommandEdit').val(command);
+
+		let select = document.getElementById('category-selection-edit');
+
+		for (let i = 0; i < select.options.length; i++) {
+			if (select.options[i].text === category) {
+				select.selectedIndex = i;
+				break;
+			}
+		}
+
 		$('#editCronJob').modal('show');
 	});
 	$('.open-modal').on('click', function() {
