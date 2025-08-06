@@ -145,7 +145,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             try:
                 newstr += curstr + explain_reason + becauses.pop(0)+"<br>"
             except IndexError: #somehow ran out of reasons, use the last one
-                newstr += curstr + explain_reason + "couldn't find reason"+"<br>"
+                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug)."+"<br>"
         else:
             newstr += curstr+"<br>"
     return newstr
@@ -755,6 +755,8 @@ def runcronjobs():
 
 def send_advanced_alerts(message):
     try:
+        for a in range(len(message)):
+            print("printing part",a,message[a])
         container_source = ""
         if not os.getenv("running_as_kubernetes"):
             container_source="docker"
