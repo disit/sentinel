@@ -280,7 +280,12 @@ async def run_shell_command(name, command):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.communicate()  # Clean up
+            return name, f"Command {command} timed out after 10 seconds."
 
         output = stdout.decode("cp437") if stdout else ""
         error = stderr.decode("cp437") if stderr else ""
@@ -294,7 +299,7 @@ async def run_shell_command(name, command):
         return name, f"Command {command} had an error:\n{traceback.format_exc()}"
 
 
-async def auto_alert_status():
+def auto_alert_status():
     if not os.getenv("running_as_kubernetes"):
         
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -400,7 +405,7 @@ async def auto_alert_status():
     except Exception:
         send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
         return
-    is_alive_with_ports = await auto_run_tests() # check namespace here if k8s
+    is_alive_with_ports = asyncio.run(auto_run_tests()) # check namespace here if k8s
     components = [a[0].replace("*","") for a in results]
     #components_original = [[a[0],a[2]] for a in results]
     components_original = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results]
