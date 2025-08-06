@@ -1,6 +1,6 @@
 waitress
 apscheduler
-flask
+flask[async]
 requests
 mysql-connector-python
 reportlab

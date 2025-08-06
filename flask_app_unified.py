@@ -294,7 +294,7 @@ async def run_shell_command(name, command):
         return name, f"Command {command} had an error:\n{traceback.format_exc()}"
 
 
-def auto_alert_status():
+async def auto_alert_status():
     if not os.getenv("running_as_kubernetes"):
         
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -400,7 +400,7 @@ def auto_alert_status():
     except Exception:
         send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
         return
-    is_alive_with_ports = auto_run_tests() # check namespace here if k8s
+    is_alive_with_ports = await auto_run_tests() # check namespace here if k8s
     components = [a[0].replace("*","") for a in results]
     #components_original = [[a[0],a[2]] for a in results]
     components_original = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results]
@@ -802,7 +802,7 @@ def send_advanced_alerts(message):
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
 scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error_notification_frequency",5)))
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database_update_frequency")))
+scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database_update_frequency", 2)))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
