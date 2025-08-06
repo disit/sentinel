@@ -433,14 +433,17 @@ def auto_alert_status():
         containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
         containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
     else:
-    
-        containers_which_are_not_expected = dict(components_original)
+        missing_containers = dict(components_original)
+        containers_which_are_not_expected = [a for a in missing_containers if not a[0].endswith("*")]
+        og_conts = copy.deepcopy(containers_which_are_not_expected)
         for c in containers_merged:
-            #print("dealing with",c["Names"],"as",'-'.join(c["Names"].split('-')[:-2]))
-            for value in list(containers_which_are_not_expected.keys()):
+            for value,_ in list(og_conts.items()):
                 if '-'.join(c["Names"].split('-')[:-2]).startswith(value):
-                    del containers_which_are_not_expected[value]
-    
+                    try:
+                        og_conts.remove(value)
+                    except ValueError:
+                        pass
+        containers_which_are_not_expected = og_conts
     if not os.getenv("running_as_kubernetes"):
         top = get_top()
         load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
@@ -475,7 +478,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                issues[2]=[a[0] for a in containers_which_are_not_expected]
+                issues[2]=[a for a,_ in containers_which_are_not_expected.items()]
             if len(load_issues)>0:
                 issues[3]=load_issues
             if len(memory_issues)>0:
@@ -766,7 +769,12 @@ def send_advanced_alerts(message):
         if len(message[0])>0:
             text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=", ".join([a["State"] for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
-            text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")+"<br><br>"
+            if not os.getenv("running_as_kubernetes"):
+                text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")+"<br><br>"
+            else:
+                #text_for_email+="Issues with some containers not answering to their isalive test, this message bandaids a bug"
+                text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")+"<br><br>"
+            
         if len(message[2])>0:
             text_for_email+= format_error_to_send(f"wasn't found running in {container_source} ",", ".join(message[2]))+"<br><br>"
         if len(message[3])>0:
