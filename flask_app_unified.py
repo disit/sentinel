@@ -262,14 +262,13 @@ async def auto_run_tests():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             # to run malicious code, malicious code must be present in the db or the machine in the first place
-            query = '''select command, container_name, command_explained from tests_table;'''
+            query = '''select command, container_name from tests_table;'''
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
-            tasks = [run_shell_command(r[0], r[1]) for r in results]
+            tasks = [run_shell_command(r[1], r[0]) for r in results]
             completed = await asyncio.gather(*tasks)
-
-            return dict(completed)
+            return completed
     except Exception:
         print("Something went wrong during tests running because of:",traceback.format_exc())
 
@@ -289,11 +288,11 @@ async def run_shell_command(name, command):
 
         output = stdout.decode("cp437") if stdout else ""
         error = stderr.decode("cp437") if stderr else ""
-
-        if process.returncode != 0:
-            return name, f"Command {command} exited with code {process.returncode}:\n{error}"
         
-        return name, output
+        if process.returncode != 0:
+            return {"container":name, "result": error, "command": command}
+        
+        return {"container":name, "result": output, "command": command}
 
     except Exception:
         return name, f"Command {command} had an error:\n{traceback.format_exc()}"
@@ -437,7 +436,7 @@ def auto_alert_status():
         containers_which_are_not_expected = [a for a in missing_containers if not a[0].endswith("*")]
         og_conts = copy.deepcopy(containers_which_are_not_expected)
         for c in containers_merged:
-            for value,_ in list(og_conts.items()):
+            for value,_ in list(missing_containers.items()):
                 if '-'.join(c["Names"].split('-')[:-2]).startswith(value):
                     try:
                         og_conts.remove(value)
@@ -478,7 +477,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                issues[2]=[a for a,_ in containers_which_are_not_expected.items()]
+                if not os.getenv("running_as_kubernetes"): #todo troubleshoot here
+                    issues[2]=[a[0] for a in containers_which_are_not_expected]
+                else:
+                    issues[2]=containers_which_are_not_expected
             if len(load_issues)>0:
                 issues[3]=load_issues
             if len(memory_issues)>0:
