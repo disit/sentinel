@@ -124,7 +124,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
     if not os.getenv("running_as_kubernetes"):
         using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     else:
-        using_these = '|'.join('^{0}'.format(w).strip() for w in containers.split(", "))
+        using_these = '|'.join('^{0}'.format(w).strip() for w in containers.split(", ") if len(w)>0)
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
         if not os.getenv("running_as_kubernetes"):
