@@ -125,8 +125,6 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     else:
         using_these = '|'.join('^{0}'.format(w).strip() for w in containers.split(", "))
-    if because:
-        becauses=because.split(",")
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
         if not os.getenv("running_as_kubernetes"):
@@ -136,19 +134,22 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         cursor.execute(query2)
         now_it_is = cursor.fetchall()
     newstr=""
+    #if because:
+    #    print(f"because: {because}")
     for a in now_it_is:
         if not os.getenv("running_as_kubernetes"):
             curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         else:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         
-        if because:
-            try:
-                newstr += curstr + explain_reason + becauses.pop(0)+"<br>"
-            except IndexError: #somehow ran out of reasons, use the last one
-                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug)."+"<br>"
-        else:
-            newstr += curstr+"<br>"
+        #if because:
+        #    try:
+        #        newstr += curstr + explain_reason + because[a[1]]+"<br>"
+        #    except IndexError: #somehow ran out of reasons, use the last one
+        #        newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug)."+"<br>"
+        #else:
+        #    newstr += curstr+"<br>"
+        newstr += curstr+"<br>"
     return newstr
 
 def send_telegram(chat_id, message):
@@ -294,7 +295,10 @@ async def run_shell_command(name, command):
             process.kill()
             #await process.communicate()  # Clean up
             end = time.time()
-            print("run_shell_command: end "+name+" exception elapsed "+str(end-start)+"s result:"+str(process.returncode))
+            process_return_code = process.returncode
+            if not process_return_code:
+                process_return_code = "Timed out"
+            print("run_shell_command: end "+name+" exception elapsed "+str(end-start)+"s result: "+str(process_return_code))
             return {"container":name, "result": f"Command {command} timed out after 10 seconds.", "command": command} 
         end = time.time()
         print("run_shell_command: end "+name+" elapsed "+str(end-start)+"s result:"+str(process.returncode))
@@ -786,11 +790,11 @@ def send_advanced_alerts(message):
         text_for_email = ""
         if len(message[0])>0:
             containers = ", ".join([a["container"] for a in message[1]])
-            becauses = ", ".join([a["command"] for a in message[1]])
+            becauses = dict([[a["container"],a["command"]] for a in message[1]])
             text_for_email = format_error_to_send("is not in the correct status ",containers=containers,because=becauses,explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
             containers = ", ".join([a["container"] for a in message[1]])
-            becauses = ", ".join([a["command"] for a in message[1]])
+            becauses = dict([[a["container"],a["command"]] for a in message[1]])
             text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",containers=containers,because=becauses,explain_reason="given the failure of: ")+"<br><br>"    
         if len(message[2])>0:
             containers = ", ".join(message[2])
