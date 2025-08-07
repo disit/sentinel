@@ -1628,7 +1628,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
-                query = '''select command, container_name from tests_table;'''
+                query = '''select container_name, command from tests_table;'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
