@@ -343,10 +343,11 @@
 				type: 'POST',
 				data: {container: container},
 				success: function(response) {
-					if (response==="") response = "No test was found for this component."; 
-					logging("<b>" + element.name + "</b> had its port checked and the result was: <b>"+response[0]+'</b><br>Complete response: ' + response[1] + '<hr>', location+'-logs');
-					test_results[container] = response;
-					stored_pings_results[container] = response;
+					if (response.result==="") response = "No test was found for this component."; 
+					logging("<b>" + element.name + "</b> had its port checked and the result was: <b>"+response.result+'</b><br>With errors: ' + response.errors + '<hr>', location+'-logs');
+					test_results[container] = response.result;
+					stored_pings_results[container] = response.result;
+					document.getElementById(container+'-result').innerHTML= response.result;
 				},
 				error: function(error) {
 					add_alert("Failed to contact the backend for the tests results with reason: "+error.statusText);

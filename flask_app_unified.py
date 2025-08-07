@@ -274,8 +274,17 @@ async def auto_run_tests():
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
+            print(f"Starting running test (backend): {datetime.now()}")
             tasks = [run_shell_command(r[1], r[0]) for r in results]
             completed = await asyncio.gather(*tasks)
+            for test_ran in completed:
+                try:
+                    query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
+                    cursor.execute(query_1,(test_ran["result"], test_ran['container'],test_ran['command'],))
+                    conn.commit()
+                except Exception:
+                    print(f"ERROR: failed to insert the result of a test for container {test_ran['container']}")
+                            
             return completed
     except Exception:
         print("Something went wrong during tests running because of:",traceback.format_exc())
@@ -787,6 +796,8 @@ def send_advanced_alerts(message):
             container_source="docker"
         else:
             container_source="kubernetes"
+        for b in range(len(message)):
+            print(f"Content #{b} of errors: {message[b]}")
         text_for_email = ""
         if len(message[0])>0:
             containers = ", ".join([a["container"] for a in message[1]])
@@ -937,7 +948,7 @@ def create_app():
                     return "ok", 201
             except Exception:
                 print("Something went wrong during the addition of a new container because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                return f"Something went wrong during the addition of a new container because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
     
     @app.route("/edit_container", methods=["POST"])
@@ -961,8 +972,8 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the addition of a new container because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                print("Something went wrong during the editing of a container because of",traceback.format_exc())
+                return f"Something went wrong during the editing of a container because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
         
     @app.route("/delete_container", methods=["POST"])
@@ -1024,7 +1035,7 @@ def create_app():
                     return "ok", 201
             except Exception:
                 print("Something went wrong during the addition of a new cronjob because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                return f"Something went wrong during the addition of a new cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
     
     @app.route("/edit_cronjob", methods=["POST"])
@@ -1045,8 +1056,8 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the editing of a new cronjob because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                print("Something went wrong during the editing of a cronjob because of",traceback.format_exc())
+                return f"Something went wrong during the editing of a cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
         
     @app.route("/delete_cronjob", methods=["POST"])
@@ -1066,9 +1077,6 @@ def create_app():
                 return "ok", 201
         return redirect(url_for('login'))
     
-    ## end add cronjob
-    
-    ## start add extra resource
     
     @app.route("/organize_extra_resources", methods=["GET"])
     def organize_extra_resources():
@@ -1156,9 +1164,6 @@ def create_app():
                 return "ok", 201
         return redirect(url_for('login'))
     
-    ## end add extra resource
-    
-    ## start add test
     
     @app.route("/organize_tests", methods=["GET"])
     def organize_tests():
@@ -1199,7 +1204,7 @@ def create_app():
                     return "ok", 201
             except Exception:
                 print("Something went wrong during the addition of a new test because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                return f"Something went wrong during the addition of a new test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
     
     @app.route("/edit_test", methods=["POST"])
@@ -1221,8 +1226,8 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the editing of a new test because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                print("Something went wrong during the editing of a test because of",traceback.format_exc())
+                return f"Something went wrong during the editing of a test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
         
     @app.route("/delete_test", methods=["POST"])
@@ -1243,9 +1248,6 @@ def create_app():
                 return "ok", 201
         return redirect(url_for('login'))
     
-    ## end add test
-    
-    ## start add complex test
     
     @app.route("/organize_complex_tests", methods=["GET"])
     def organize_complex_tests():
@@ -1290,7 +1292,7 @@ def create_app():
                     return "ok", 201
             except Exception:
                 print("Something went wrong during the addition of a new complex test because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                return f"Something went wrong during the addition of a new complex test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
     
     @app.route("/edit_complex_test", methods=["POST"])
@@ -1312,8 +1314,8 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the editing of a new complex_test because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                print("Something went wrong during the editing of a complex_test because of",traceback.format_exc())
+                return f"Something went wrong during the editing of a complex test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
         
     @app.route("/delete_complex_test", methods=["POST"])
@@ -1334,9 +1336,6 @@ def create_app():
                 return "ok", 201
         return redirect(url_for('login'))
     
-    ## end add complex test
-    
-    ## start add category
     
     @app.route("/organize_categories", methods=["GET"])
     def organize_categories():
@@ -1375,7 +1374,7 @@ def create_app():
                     return "ok", 201
             except Exception:
                 print("Something went wrong during the addition of a new category because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                return f"Something went wrong during the addition of a new category because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
     
     @app.route("/edit_category", methods=["POST"])
@@ -1396,8 +1395,8 @@ def create_app():
                     else:
                         return "Somehow request did not result in database changes", 400
             except Exception:
-                print("Something went wrong during the editing of a new category because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                print("Something went wrong during the editing of a category because of",traceback.format_exc())
+                return f"Something went wrong during the editing of a category because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
         
     @app.route("/delete_category", methods=["POST"])
@@ -1417,12 +1416,11 @@ def create_app():
                     conn.commit()
                     return "ok", 201
             except Exception:
-                print("Something went wrong during the editing of a new category because of",traceback.format_exc())
-                return render_template("error_showing.html", r = traceback.format_exc()), 500
+                print("Something went wrong during the deletion of an old category because of",traceback.format_exc())
+                return f"Something went wrong during the deletion of an old category because of {traceback.format_exc()}", 500
         
         return redirect(url_for('login'))
     
-    ## end add cronjob
     
    
     
@@ -1579,13 +1577,15 @@ def create_app():
                         try:
                             command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="cp437")
                             total_result += "Running " + r[0] + " with result " + command_ran.stdout + "\nWith errors: " + command_ran.stderr
+                            #new stuff
+                            new_output = {"container":request.form.to_dict()['container'],"command":r[0],"result":command_ran.stdout,"errors":command_ran.stderr}
                             query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
                             cursor.execute(query_1,(f"{command_ran.stdout}\n{command_ran.stderr}", request.form.to_dict()['container'],r[0],))
                             conn.commit()
                             log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, request, which_test="is alive " + str(r[2]))
                         except Exception:
                             return jsonify(f"Test of {request.form.to_dict()['container']} had a runtime error with the cause: {traceback.format_exc()}"), 500
-                    return jsonify(total_result)
+                    return jsonify(new_output)
             except Exception:
                 print("Something went wrong during tests running because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
@@ -1636,6 +1636,7 @@ def create_app():
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
+                print(f"Starting running test (frontend): {datetime.now()}")
                 tasks = [run_shell_command(r[0], r[1]) for r in results]
                 completed = await asyncio.gather(*tasks)
                 return completed
