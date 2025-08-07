@@ -800,9 +800,7 @@ def send_advanced_alerts(message):
             print(f"Content #{b} of errors: {message[b]}")
         text_for_email = ""
         if len(message[0])>0:
-            containers = ", ".join([a["container"] for a in message[0]])
-            becauses = dict([[a["container"],a["command"]] for a in message[0]])
-            text_for_email = format_error_to_send("is not in the correct status ",containers=containers,because=becauses,explain_reason="as its status currently is: ")+"<br><br>"
+            text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=", ".join([a["State"] for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
             containers = ", ".join([a["container"] for a in message[1]])
             becauses = dict([[a["container"],a["command"]] for a in message[1]])
