@@ -131,6 +131,8 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
         else:
             query2 = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(using_these)
+        print(f"\n\nQuery for format_error_to_send: {query2}\n\n")
+        
         cursor.execute(query2)
         now_it_is = cursor.fetchall()
     newstr=""
