@@ -41,6 +41,7 @@ from datetime import timedelta
 import html
 import jwt
 import asyncio
+import time
 
 ALGORITHM = 'HS256'
 def string_of_list_to_list(string):
@@ -159,9 +160,15 @@ def send_telegram(chat_id, message):
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
     composite_message = os.getenv("platform-explanation") + "<br>" + message
     smtp_server = os.getenv("smtp-server")
+    if not smtp_server:
+        print("MISSING smtp-server, email not sent.")
+        return
     smtp_port = int(os.getenv("smtp-port"))
-    server = smtplib.SMTP(smtp_server, smtp_port)
-    server.starttls()
+    if os.getenv("smtp-type", "starttls") == "ssl":
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+    else:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
     server.login(sender_email, sender_password)
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -274,6 +281,8 @@ async def auto_run_tests():
 
 async def run_shell_command(name, command):
     try:
+        print("run_shell_command: start "+name+" cmd:"+command)
+        start = time.time()
         process = await asyncio.create_subprocess_shell(
             command,
             stdout=asyncio.subprocess.PIPE,
@@ -283,8 +292,12 @@ async def run_shell_command(name, command):
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10)
         except asyncio.TimeoutError:
             process.kill()
-            await process.communicate()  # Clean up
-            return name, f"Command {command} timed out after 10 seconds."
+            #await process.communicate()  # Clean up
+            end = time.time()
+            print("run_shell_command: end "+name+" exception elapsed "+str(end-start)+"s result:"+str(process.returncode))
+            return {"container":name, "result": f"Command {command} timed out after 10 seconds.", "command": command} 
+        end = time.time()
+        print("run_shell_command: end "+name+" elapsed "+str(end-start)+"s result:"+str(process.returncode))
 
         output = stdout.decode("cp437") if stdout else ""
         error = stderr.decode("cp437") if stderr else ""
@@ -295,7 +308,7 @@ async def run_shell_command(name, command):
         return {"container":name, "result": output, "command": command}
 
     except Exception:
-        return name, f"Command {command} had an error:\n{traceback.format_exc()}"
+        return {"container":name, "result": f"Command {command} had an error:\n{traceback.format_exc()}", "command": command}
 
 
 def auto_alert_status():
@@ -686,7 +699,10 @@ def update_container_state_db():
                     conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
                 except KeyError:
                     conversion["Labels"] = "No labels"
-                conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                try: 
+                    conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
+                except KeyError:
+                    conversion["Mounts"] = "No mounts"
                 conversion["Names"] = item["metadata"]["name"]
                 conversion["Name"] = item["metadata"]["name"]
                 try:
@@ -1615,7 +1631,7 @@ def create_app():
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
-                tasks = [run_shell_command(r[1], r[0]) for r in results]
+                tasks = [run_shell_command(r[0], r[1]) for r in results]
                 completed = await asyncio.gather(*tasks)
                 return completed
         return redirect(url_for('login'))
