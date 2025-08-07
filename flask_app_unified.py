@@ -144,14 +144,13 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         else:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         
-        #if because:
-        #    try:
-        #        newstr += curstr + explain_reason + because[a[1]]+"<br>"
-        #    except IndexError: #somehow ran out of reasons, use the last one
-        #        newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug)."+"<br>"
-        #else:
-        #    newstr += curstr+"<br>"
-        newstr += curstr+"<br>"
+        if because:
+            try:
+                newstr += curstr + explain_reason + because[a[1]]+"<br>"
+            except IndexError:
+                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug)."+"<br>"
+        else:
+            newstr += curstr+"<br>"
     return newstr
 
 def send_telegram(chat_id, message):
