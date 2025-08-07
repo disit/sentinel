@@ -820,7 +820,7 @@ def send_advanced_alerts(message):
                 prepare_text += f"<br>Cronjob named {failed_cron[3]} assigned to category {failed_cron[5]} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + failed_cron[1] + ' but'} error: {failed_cron[2]} at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
             text_for_email += prepare_text + "<br><br>"
         try:
-            if len(text_for_email) > 5:
+            if len(text_for_email) > 15:
                 print("Will send email with text:")
                 print(text_for_email)
                 send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", text_for_email)
