@@ -771,12 +771,11 @@ def send_advanced_alerts(message):
         if len(message[0])>0:
             text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=", ".join([a["State"] for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
-            if not os.getenv("running_as_kubernetes"):
-                text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")+"<br><br>"
-            else:
-                #text_for_email+="Issues with some containers not answering to their isalive test, this message bandaids a bug"
-                text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",", ".join([a["container"] for a in message[1]]),", ".join([a["command"] for a in message[1]]),"given the failure of: ")+"<br><br>"
-            
+            for b in range(len(message[1])):
+                print(f"failed isalive debug #{b}:{message[1][b]}")
+            containers = ", ".join([a["container"] for a in message[1]])
+            becauses = ", ".join([a["command"] for a in message[1]])
+            text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",containers,becauses,"given the failure of: ")+"<br><br>"    
         if len(message[2])>0:
             text_for_email+= format_error_to_send(f"wasn't found running in {container_source} ",", ".join(message[2]))+"<br><br>"
         if len(message[3])>0:
@@ -1616,11 +1615,9 @@ def create_app():
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
-                
-                tasks = [run_shell_command(r[0], r[1]) for r in results]
+                tasks = [run_shell_command(r[1], r[0]) for r in results]
                 completed = await asyncio.gather(*tasks)
-
-                return dict(completed)
+                return completed
         return redirect(url_for('login'))
             
     @app.route("/deauthenticate", methods=['POST','GET'])
