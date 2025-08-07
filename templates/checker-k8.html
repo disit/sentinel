@@ -15,7 +15,7 @@
 		{% endfor %}
 	];
 	var less_columns = true;
-	
+	var container_names = [];
 	var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 13, visible: false},{target: 14, visible: false}]};
 	var container_rows = {};
 	var iframes = {};
@@ -199,6 +199,8 @@
 				url: './read_containers_db',
 				type: 'GET',
 				success: function(response) {
+					container_names = [];
+					for (var container of response.result) {container_names.push(container.Name);}
 					makeTable(response.result);
 					if(response.error.length > 0)
 						for (var a of response.error) {add_alert(a)};
@@ -327,7 +329,8 @@
 				success: function(response) {
 					for (const element of response) {
 						try {
-							document.getElementById(element[3]+'-result').innerHTML=element[2];
+							const match = container_names.find(item => item.startsWith(element[3] + "-"));
+							document.getElementById(match+'-result').innerHTML=element[2];
 						}
 						catch (exception_var) {
 							logging("Error in obtaining complex tests: "+ exception_var + ' - ' + element);
