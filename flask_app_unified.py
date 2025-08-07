@@ -800,8 +800,8 @@ def send_advanced_alerts(message):
             print(f"Content #{b} of errors: {message[b]}")
         text_for_email = ""
         if len(message[0])>0:
-            containers = ", ".join([a["container"] for a in message[1]])
-            becauses = dict([[a["container"],a["command"]] for a in message[1]])
+            containers = ", ".join([a["container"] for a in message[0]])
+            becauses = dict([[a["container"],a["command"]] for a in message[0]])
             text_for_email = format_error_to_send("is not in the correct status ",containers=containers,because=becauses,explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
             containers = ", ".join([a["container"] for a in message[1]])
@@ -821,6 +821,8 @@ def send_advanced_alerts(message):
             text_for_email += prepare_text + "<br><br>"
         try:
             if len(text_for_email) > 5:
+                print("Will send email with text:")
+                print(text_for_email)
                 send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", text_for_email)
             else:
                 print("No mail was sent because no problem was detected")
@@ -1585,6 +1587,8 @@ def create_app():
                             log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, request, which_test="is alive " + str(r[2]))
                         except Exception:
                             return jsonify(f"Test of {request.form.to_dict()['container']} had a runtime error with the cause: {traceback.format_exc()}"), 500
+                    if len(results) == 0:
+                        return {"container":request.form.to_dict()['container'],"command":"Test was not found","result":"Test was not ran","errors":""}
                     return jsonify(new_output)
             except Exception:
                 print("Something went wrong during tests running because of:",traceback.format_exc())

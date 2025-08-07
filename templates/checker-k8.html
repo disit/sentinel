@@ -556,6 +556,7 @@
 	}
 	
 	function add_alert(body) {
+		console.log(body);
 		var floatdiv = document.getElementById("floating-div");
 		floatdiv.innerHTML+='<div class="alert my-alert alert-danger alert-dismissible" role="alert"><div>'+body+'</div><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
 		if (document.getElementById("alerts").innerHTML == "No alerts to be shown") 
