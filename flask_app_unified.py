@@ -405,6 +405,8 @@ def auto_alert_status():
         send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
         return
     is_alive_with_ports = asyncio.run(auto_run_tests()) # check namespace here if k8s
+    is_alive_with_ports = [a for a in is_alive_with_ports if "Failure" in a["result"]] # only keep those who failed
+    
     components = [a[0].replace("*","") for a in results]
     #components_original = [[a[0],a[2]] for a in results]
     components_original = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results]
@@ -760,8 +762,6 @@ def runcronjobs():
 
 def send_advanced_alerts(message):
     try:
-        for a in range(len(message)):
-            print("printing part",a,message[a])
         container_source = ""
         if not os.getenv("running_as_kubernetes"):
             container_source="docker"
@@ -769,15 +769,16 @@ def send_advanced_alerts(message):
             container_source="kubernetes"
         text_for_email = ""
         if len(message[0])>0:
-            text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=", ".join([a["State"] for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
-        if len(message[1])>0:
-            for b in range(len(message[1])):
-                print(f"failed isalive debug #{b}:{message[1][b]}")
             containers = ", ".join([a["container"] for a in message[1]])
             becauses = ", ".join([a["command"] for a in message[1]])
-            text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",containers,becauses,"given the failure of: ")+"<br><br>"    
+            text_for_email = format_error_to_send("is not in the correct status ",containers=containers,because=becauses,explain_reason="as its status currently is: ")+"<br><br>"
+        if len(message[1])>0:
+            containers = ", ".join([a["container"] for a in message[1]])
+            becauses = ", ".join([a["command"] for a in message[1]])
+            text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",containers=containers,because=becauses,explain_reason="given the failure of: ")+"<br><br>"    
         if len(message[2])>0:
-            text_for_email+= format_error_to_send(f"wasn't found running in {container_source} ",", ".join(message[2]))+"<br><br>"
+            containers = ", ".join(message[2])
+            text_for_email+= format_error_to_send(f"wasn't found running in {container_source} ",containers=containers)+"<br><br>"
         if len(message[3])>0:
             text_for_email+= message[3] + '<br><br>'
         if len(message[4])>0:
@@ -794,7 +795,7 @@ def send_advanced_alerts(message):
                 print("No mail was sent because no problem was detected")
         except:
             print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
-        text_for_telegram = ""
+        text_for_telegram = "" #probably needs fixing
         if len(message[0])>0:
             text_for_telegram = "These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])) +"\n"
         if len(message[1])>0:
@@ -1611,7 +1612,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
-                query = '''select container_name, command from tests_table;'''
+                query = '''select command, container_name from tests_table;'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
