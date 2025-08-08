@@ -121,7 +121,7 @@ CREATE TABLE `component_to_category` (
   `category` varchar(50) NOT NULL,
   `references` varchar(200) NOT NULL DEFAULT 'Contact information not set',
   `position` varchar(45) NOT NULL DEFAULT '$#k8-namespace#$',
-  PRIMARY KEY (`component`)
+  PRIMARY KEY (`component`,`position`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -129,7 +129,7 @@ CREATE TABLE `component_to_category` (
 -- Dumping data for table `component_to_category`
 --
 LOCK TABLES `component_to_category` WRITE;
-INSERT INTO `component_to_category` VALUES ('certbot-*','Authorization and Authentication','Contact information not set'),
+INSERT INTO `component_to_category` VALUES 
 ('dashboard-backend-*','Dashboard','Contact information not set'),
 ('dashboard-builder-*','Dashboard','Contact information not set'),
 ('dashboard-cron-*','Dashboard','Contact information not set'),
@@ -162,7 +162,6 @@ INSERT INTO `component_to_category` VALUES ('certbot-*','Authorization and Authe
 ('varnish-*','Data Storage','Contact information not set'),
 ('virtuoso-kb-*','Knowledge Base','Contact information not set'),
 ('wsserver-*','Real Time Dash','Contact information not set'),
-('zookeeper-*','Real Time Dash','Contact information not set');
 UNLOCK TABLES;
 --
 -- Table structure for table `container_data`
