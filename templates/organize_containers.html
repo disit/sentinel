@@ -23,7 +23,7 @@
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" data-category="{{item[1] | e}}" data-contacts={{item[2] | e}} data-position={{item[3] | e}} id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" data-category="{{item[1] | e}}" data-contacts="{{item[2] | e}}" data-position="{{item[3] | e}}" id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>

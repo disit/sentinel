@@ -138,8 +138,8 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         cursor.execute(query2)
         now_it_is = cursor.fetchall()
     newstr=""
-    #if because:
-    #    print(f"because: {because}")
+    if because:
+        print(f"because: {because}")
     for a in now_it_is:
         if not os.getenv("running_as_kubernetes"):
             curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
@@ -147,10 +147,28 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         
         if because:
+            reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
+            
+            if len(reason) == 1:
+                use_this_reason=because[reason[0]]
+            else:
+                if len(reason) == 0:
+                    print("fuzzy search failed, trying second one")
+                    reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
+                    if len(reason) == 1:
+                        print("second fuzzy search succeeded")
+                        use_this_reason=because[reason[0]]
+                    else:
+                        if len(reason) == 0:
+                            use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
+                        else:
+                            use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+                else:
+                    use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
             try:
-                newstr += curstr + explain_reason + because[a[1]]+"<br>"
-            except IndexError:
-                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug)."+"<br>"
+                newstr += curstr + explain_reason + use_this_reason+"<br>"
+            except Exception as E:
+                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
         else:
             newstr += curstr+"<br>"
     return newstr
@@ -803,7 +821,7 @@ def send_advanced_alerts(message):
             print(f"Content #{b} of errors: {message[b]}")
         text_for_email = ""
         if len(message[0])>0:
-            text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=", ".join([a["State"] for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
+            text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
             containers = ", ".join([a["container"] for a in message[1]])
             becauses = dict([[a["container"],a["command"]] for a in message[1]])
@@ -967,7 +985,7 @@ def create_app():
                         query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
                         cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['id'],))
                     else:
-                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = `%s` where (`component` = %s)'''
+                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
                         cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['namespace'],request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
