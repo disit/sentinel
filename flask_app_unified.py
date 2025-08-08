@@ -130,6 +130,8 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         if not os.getenv("running_as_kubernetes"):
             query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
         else:
+            if len(using_these)<1:
+                return ""
             query2 = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(using_these)
         print(f"\n\nQuery for format_error_to_send: {query2}\n\n")
         
