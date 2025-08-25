@@ -43,6 +43,8 @@ import jwt
 import asyncio
 import time
 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 ALGORITHM = 'HS256'
 def string_of_list_to_list(string):
     try:
@@ -106,28 +108,28 @@ for key, value in config.items():
     if not os.getenv(key):
         os.environ[key] = value
 
-bot_2 = Snap4SentinelTelegramBot(os.getenv("telegram-api-token"), int(os.getenv("telegram-channel")))
+bot_2 = Snap4SentinelTelegramBot(os.getenv("telegram-api-token","0"), int(os.getenv("telegram-channel","0")))
 greendot = """&#128994"""
 reddot = """&#128308"""
 
 # edit this block according to your mysql server's configuration
 db_conn_info = {
-    "user": os.getenv("db-user"),
-    "passwd": os.getenv("db-passwd"),
-    "host": os.getenv("db-host"),
-    "port": int(os.getenv("db-port")),
+    "user": os.getenv("db-user","user"),
+    "passwd": os.getenv("db-passwd","password"),
+    "host": os.getenv("db-host","localhost"),
+    "port": int(os.getenv("db-port","3306")),
     "database": "checker",
     "auth_plugin": 'mysql_native_password'
 }
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    if not os.getenv("running_as_kubernetes"):
+    if not os.getenv("running_as_kubernetes",None):
         using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     else:
         using_these = '|'.join('^{0}'.format(w).strip() for w in containers.split(", ") if len(w)>0)
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
-        if not os.getenv("running_as_kubernetes"):
+        if not os.getenv("running_as_kubernetes",None):
             query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
         else:
             if len(using_these)<1:
@@ -141,7 +143,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
     if because:
         print(f"because: {because}")
     for a in now_it_is:
-        if not os.getenv("running_as_kubernetes"):
+        if not os.getenv("running_as_kubernetes",None):
             curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         else:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
@@ -180,12 +182,12 @@ def send_telegram(chat_id, message):
     return
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
-    composite_message = os.getenv("platform-explanation") + "<br>" + message
-    smtp_server = os.getenv("smtp-server")
+    composite_message = os.getenv("platform-explanation","No explanation set") + "<br>" + message
+    smtp_server = os.getenv("smtp-server","no.server.set")
     if not smtp_server:
         print("MISSING smtp-server, email not sent.")
         return
-    smtp_port = int(os.getenv("smtp-port"))
+    smtp_port = int(os.getenv("smtp-port","587"))
     if os.getenv("smtp-type", "starttls") == "ssl":
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
     else:
@@ -199,7 +201,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     msg.attach(MIMEText(str(composite_message), 'html'))
     server.send_message(msg)
     server.quit()
-    print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients")))
+    print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
     return
     
 
@@ -282,8 +284,8 @@ def filter_out_wrong_status_containers_for_telegram(containers):
     return ", ".join([a["Name"] for a in new_elements])
 
 def isalive():
-    send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is alive", os.getenv("platform-url")+" is alive")
-    send_telegram(int(os.getenv("telegram-channel")), os.getenv("platform-url")+" is alive")
+    send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is alive", os.getenv("platform-url","unseturl")+" is alive")
+    send_telegram(int(os.getenv("telegram-channel","0")), os.getenv("platform-url","unseturl")+" is alive")
     return
 
 async def auto_run_tests():
@@ -346,7 +348,7 @@ async def run_shell_command(name, command):
 
 
 def auto_alert_status():
-    if not os.getenv("running_as_kubernetes"):
+    if not os.getenv("running_as_kubernetes",None):
         
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -358,7 +360,7 @@ def auto_alert_status():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        if os.getenv("is-multi"):
+        if os.getenv("is-multi",None):
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT distinct position FROM checker.component_to_category;'''
@@ -367,12 +369,12 @@ def auto_alert_status():
                 results = cursor.fetchall()
                 total_answer=[]
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except:
                             pass
@@ -380,7 +382,7 @@ def auto_alert_status():
     else:
         
         raw_jsons = []
-        for a in string_of_list_to_list(os.getenv("namespaces")):
+        for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
             raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
         conversions=[]
         for raw_json in raw_jsons:
@@ -460,7 +462,7 @@ def auto_alert_status():
     containers_which_should_be_running_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and not ("running" in c["State"])]
     
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
-    if not os.getenv("running_as_kubernetes"): #todo troubleshoot here
+    if not os.getenv("running_as_kubernetes",None): #todo troubleshoot here
         containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
     else:
         containers_which_are_running_but_are_not_healthy=[]
@@ -477,7 +479,7 @@ def auto_alert_status():
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    if not os.getenv("running_as_kubernetes"): #todo troubleshoot here
+    if not os.getenv("running_as_kubernetes",None): #todo troubleshoot here
         containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
         containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
     else:
@@ -492,16 +494,16 @@ def auto_alert_status():
                     except ValueError:
                         pass
         containers_which_are_not_expected = og_conts
-    if not os.getenv("running_as_kubernetes"):
+    if not os.getenv("running_as_kubernetes",None):
         top = get_top()
         load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
         load_issues=""
         for average, timing in zip(load_averages, [1, 5, 15]):
-            if float(average) > int(os.getenv("load-threshold")):
-                load_issues += "Load threshold above "+str(int(os.getenv("load-threshold"))) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
+            if float(average) > int(os.getenv("load-threshold",1000)):
+                load_issues += "Load threshold above "+str(int(os.getenv("load-threshold",1000))) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
         memory_issues = ""
-        if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold")):
-            memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold"))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
+        if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold",1000)):
+            memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold",1000))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
     else:
         load_issues = ""
         memory_issues = ""
@@ -526,7 +528,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                if not os.getenv("running_as_kubernetes"): #todo troubleshoot here
+                if not os.getenv("running_as_kubernetes",None): #todo troubleshoot here
                     issues[2]=[a[0] for a in containers_which_are_not_expected]
                 else:
                     issues[2]=containers_which_are_not_expected
@@ -670,13 +672,13 @@ def get_top():
 
 def send_alerts(message):
     try:
-        send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", message)
-        send_telegram(int(os.getenv("telegram-channel")), message)
+        send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is in trouble!", message)
+        send_telegram(int(os.getenv("telegram-channel","0")), message)
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
 def update_container_state_db():
-    if not os.getenv("running_as_kubernetes"):
+    if not os.getenv("running_as_kubernetes",None):
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -687,7 +689,7 @@ def update_container_state_db():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        if os.getenv("is-multi"):
+        if os.getenv("is-multi",None):
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT distinct position FROM checker.component_to_category;'''
@@ -696,12 +698,12 @@ def update_container_state_db():
                 results = cursor.fetchall()
                 total_answer=[]
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except:
                             pass
@@ -714,7 +716,7 @@ def update_container_state_db():
         
     else:
         raw_jsons = []
-        for a in string_of_list_to_list(os.getenv("namespaces")):
+        for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
             raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
         conversions=[]
         for raw_json in raw_jsons:
@@ -813,7 +815,7 @@ def runcronjobs():
 def send_advanced_alerts(message):
     try:
         container_source = ""
-        if not os.getenv("running_as_kubernetes"):
+        if not os.getenv("running_as_kubernetes",None):
             container_source="docker"
         else:
             container_source="kubernetes"
@@ -842,7 +844,7 @@ def send_advanced_alerts(message):
             if len(text_for_email) > 15:
                 print("Will send email with text:")
                 print(text_for_email)
-                send_email(os.getenv("sender-email"), os.getenv("sender-email-password"), string_of_list_to_list(os.getenv("email-recipients")), os.getenv("platform-url")+" is in trouble!", text_for_email)
+                send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is in trouble!", text_for_email)
             else:
                 print("No mail was sent because no problem was detected")
         except:
@@ -862,7 +864,7 @@ def send_advanced_alerts(message):
             text_for_telegram+= str(message[5])
         if len(text_for_telegram)>5:  
             try:
-                send_telegram(int(os.getenv("telegram-channel")), text_for_telegram)
+                send_telegram(int(os.getenv("telegram-channel","0")), text_for_telegram)
             except:
                 print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
     except Exception:
@@ -870,8 +872,8 @@ def send_advanced_alerts(message):
         
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error_notification_frequency",5)))
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database_update_frequency", 2)))
+scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error_notification_frequency","5")))
+scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database_update_frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
@@ -880,6 +882,8 @@ auto_alert_status()
 
 def create_app():
     app = Flask(__name__)
+    app.config['APPLICATION_ROOT'] =os.getenv("APPLICATION_ROOT", "2")
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_host=1)
     app.secret_key = b'\x8a\x17\x93kT\xc0\x0b6;\x93\xfdp\x8bLl\xe6u\xa9\xf5x'
     app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
 
@@ -895,19 +899,19 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        if not os.getenv("running_as_kubernetes"):
-                            return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
+                        if not os.getenv("running_as_kubernetes",None):
+                            return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
                         else:
-                            return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout")),user=session['username'])
+                            return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
-                        cursor.execute(query_2, (int(os.getenv("admin-log-length")),))
+                        cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        if not os.getenv("running_as_kubernetes"):
-                            return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
+                        if not os.getenv("running_as_kubernetes",None):
+                            return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
                         else:
-                            return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout")),user=session['username'],platform=os.getenv("platform-url"))
+                            return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
@@ -944,10 +948,10 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    if os.getenv("running_as_kubernetes"):
-                        return render_template("organize_containers_k8s.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    if os.getenv("running_as_kubernetes",None):
+                        return render_template("organize_containers_k8s.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
                     else:
-                        return render_template("organize_containers.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                        return render_template("organize_containers.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -981,7 +985,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    if not os.getenv("running_as_kubernetes"):
+                    if not os.getenv("running_as_kubernetes",None):
                         query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
                         cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['id'],))
                     else:
@@ -1033,7 +1037,7 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    return render_template("organize_cronjobs.html",cronjobs=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    return render_template("organize_cronjobs.html",cronjobs=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -1117,7 +1121,7 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    return render_template("organize_extra_resources.html",extra_resources=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    return render_template("organize_extra_resources.html",extra_resources=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -1201,7 +1205,7 @@ def create_app():
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
-                    return render_template("organize_tests.html",tests=results, timeout=int(os.getenv("requests-timeout")))
+                    return render_template("organize_tests.html",tests=results, timeout=int(os.getenv("requests-timeout","15000")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -1289,7 +1293,7 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    return render_template("organize_complex_tests.html",complex_tests=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    return render_template("organize_complex_tests.html",complex_tests=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -1372,7 +1376,7 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    return render_template("organize_categories.html",categories=results_2,timeout=int(os.getenv("requests-timeout")))
+                    return render_template("organize_categories.html",categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -1518,7 +1522,7 @@ def create_app():
         
     @app.route("/read_containers", methods=['POST'])
     def check():
-        if os.getenv("is-multi"):
+        if os.getenv("is-multi",None):
             try:
                 jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
                 return get_container_data()
@@ -1536,7 +1540,7 @@ def create_app():
     @app.route("/read_containers_db", methods=['GET'])
     def check_container_db():
         if 'username' in session:
-            if not os.getenv("is-master"):
+            if not os.getenv("is-master",True):
                 return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
@@ -1586,7 +1590,7 @@ def create_app():
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''select command, command_explained, id from tests_table where container_name =%s;'''
                     
-                    if not os.getenv("running_as_kubernetes"):
+                    if not os.getenv("running_as_kubernetes",None):
                         container = request.form.to_dict()['container']
                     else:
                         container = '-'.join(request.form.to_dict()['container'].split('-')[:-2])
@@ -1673,7 +1677,7 @@ def create_app():
     @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
         
-        if not os.getenv("running_as_kubernetes"):
+        if not os.getenv("running_as_kubernetes",None):
             try:
                 jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
                 result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
@@ -1722,7 +1726,7 @@ def create_app():
     
     @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
     def reboot_container_advanced(container_id):
-        if not os.getenv("is-multi"):
+        if not os.getenv("is-multi",None):
             return "Disabled for non-clustered environments", 500
         if not config['is-master']:
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -1735,10 +1739,10 @@ def create_app():
                 conn.commit()
                 results = cursor.fetchall()
                 try:
-                    r = requests.post(results[0][0]+"/sentinel/reboot_container",  data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)})
+                    r = requests.post(results[0][0]+"/sentinel/reboot_container",  data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
                     return r.text
                 except:
-                    r = requests.post(results[0][0]+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)})
+                    r = requests.post(results[0][0]+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
                     return r.text
         except Exception:
             print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
@@ -1834,7 +1838,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/container/<podname>")
     def get_container_logs(podname):
         if 'username' in session:
-            if not os.getenv("running_as_kubernetes"):
+            if not os.getenv("running_as_kubernetes",None):
 
                 process = subprocess.Popen(
                     'docker logs '+podname+" --tail "+str(config["default-log-length"]),
@@ -1862,7 +1866,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     namespace = prefetch.stdout.readlines()[0].strip()
                 except IndexError:
                     pass
-                if namespace not in string_of_list_to_list(os.getenv("namespaces")):
+                if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
                     return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
                 process = subprocess.Popen(
                f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
@@ -1893,7 +1897,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         
     @app.route("/advanced_read_containers", methods=['POST'])
     def check_adv():
-        if not os.getenv("is-multi"):
+        if not os.getenv("is-multi",True):
             return "Disabled for non-clustered environments", 500
         if not os.getenv('is-master'):
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -1908,12 +1912,12 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 total_answer=[]
                 errors=[]
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)}).text
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except Exception as E:
                             errors.append("Reading containers from "+r[0]+" failed: the backed received this exception: "+str(E))
@@ -1947,7 +1951,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
     
     def get_container_data(do_not_jsonify=False):
-        if not os.getenv("running_as_kubernetes"):
+        if not os.getenv("running_as_kubernetes",None):
             containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_merged = []
@@ -1964,7 +1968,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         else:
             
             raw_jsons = []
-            for a in string_of_list_to_list(os.getenv("namespaces")):
+            for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
                 raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
             conversions=[]
         for raw_json in raw_jsons:
@@ -2035,7 +2039,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             print(type(get_container_data(True)),str(get_container_data(True)))
             for container_data in get_container_data(True):
                 process = subprocess.Popen(
-                    f'{"kubectl" if os.getenv("running_as_kubernetes") else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length") + {"--namespace "+container_data['Namespace'] if os.getenv("running_as_kubernetes") else ""}),
+                    f'{"kubectl" if os.getenv("running_as_kubernetes",None) else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length",1000) + {"--namespace "+container_data['Namespace'] if os.getenv("running_as_kubernetes",None) else ""}),
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
@@ -2085,7 +2089,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             for root, dirs, files in os.walk(os.path.join(current_dir, os.pardir)): #maybe doesn't find the files while clustered but continues gracefully
                 if 'log.txt' in files:
                     #logs_file_path = os.path.join(root, 'log.txt')
-                    log_output = subprocess.run(f'cd {root}; tail -n {os.getenv("default-log-length")} log.txt', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
+                    log_output = subprocess.run(f'cd {root}; tail -n {os.getenv("default-log-length",1000)} log.txt', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
                     content.append(Paragraph('<a href="#iot-directory-log" color="blue">iot-directory-log</a>', styles["Normal"]))
                     extra_logs.append(Paragraph(f'<b><a name="iot-directory-log"></a>iot-directory-log</b>', styles["Heading1"]))
                     extra_logs.append(Paragraph(log_output.replace("\n","<br></br>"), styles["Normal"]))
@@ -2191,9 +2195,9 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
                 script_to_run = "/app/scripts/make_dumps_of_database.sh"
-                if os.getenv("running_as_kubernetes"):
+                if os.getenv("running_as_kubernetes",None):
                     script_to_run = "/app/scripts/make_dumps_of_database_k8.sh"
-                make_certification = subprocess.run(f'mkdir -p /app/data; mkdir -p {os.getenv("conf_path")}; cp -r {os.getenv("conf_path")} /app/data/{subfolder}; cd /app/data/{subfolder} && bash {script_to_run} && rar a -k -p{password} snap4city-certification-{password}.rar */ *.*', shell=True, capture_output=True, text=True, encoding="utf_8")
+                make_certification = subprocess.run(f'mkdir -p /app/data; mkdir -p {os.getenv("conf_path","/home/debian")}; cp -r {os.getenv("conf_path","/home/debian")} /app/data/{subfolder}; cd /app/data/{subfolder} && bash {script_to_run} && rar a -k -p{password} snap4city-certification-{password}.rar */ *.*', shell=True, capture_output=True, text=True, encoding="utf_8")
                 if len(make_certification.stderr) > 0:
                     print(make_certification.stderr)
                     return send_file(f'/app/data/{subfolder}/snap4city-certification-{password}.rar')
@@ -2206,7 +2210,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/clustered_certification", methods=['GET'])
     def clustered_certification():
         if 'username' in session:
-            if not os.getenv("is-multi"):
+            if not os.getenv("is-multi",True):
                 return "Disabled for non-clustered environments", 500
             if session['username'] != "admin":
                 return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
@@ -2224,7 +2228,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     subprocess.run(f'rm -f *snap4city*-certification-*.rar', shell=True)
                     for r in results:
                         file_name, content_disposition = "", ""
-                        obtained = requests.get(r[0]+"/sentinel/certification", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret"), algorithm=ALGORITHM)})
+                        obtained = requests.get(r[0]+"/sentinel/certification", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
                         if 'Content-Disposition' in obtained.headers:
                             content_disposition = obtained.headers['Content-Disposition']
                         if 'filename=' in content_disposition:

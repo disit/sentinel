@@ -130,6 +130,8 @@ spec:
           value: "5" # minutes
         - name: error_notification_frequency
           value: "5" # minutes
+        - name: APPLICATION_ROOT # for serving behind nginx
+          value: "/sentinel"
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"
