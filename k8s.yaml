@@ -135,13 +135,13 @@ spec:
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"
-        image: fabriziomereu/sentinel:v0.4.17
+        image: fabriziomereu/sentinel:v0.5.19
         #command: ["sleep", "3600"]
         name: k8sentinel
         volumeMounts:
-        - mountPath: /data/users.txt
+        - mountPath: /app/users.txt
           name: sentinel-claim001
-        - mountPath: /mnt/data/sentinel/fakeconf
+        - mountPath: /mnt/data/sentinel-confs
           name: sentinel-claim002
         - mountPath: /app/data
           name: sentinel-claim003

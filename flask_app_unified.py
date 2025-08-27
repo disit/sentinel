@@ -1962,6 +1962,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             if key1 == "Name" and key2 == "Names":
                                 if value1 == value2:
                                     containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+            for item in containers_merged: # in docker, this an extra, useless field was added and it breaks the frontend
+                item.pop("Platform", None)
             if do_not_jsonify:
                 return containers_merged
             return jsonify(containers_merged)
