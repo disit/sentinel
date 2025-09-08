@@ -319,14 +319,15 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			type: "GET", 
 			success: function(data, textStatus, jqXHR) {
 				data.forEach(el => {
+					let cronjobmsg = "";
 					try {
-						let cronjobmsg = "";
 						if (el[2]) {
-							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1] + "with some errors: " + el[2];
+							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1] + " with some errors: " + el[2];
 						}
 						else {
-							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1] + "with no errors.";
+							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1] + " with no errors.";
 						}
+						logging(cronjobmsg,el[5]+"-logs");
 					}
 					catch (exception_var) {
 						console.log("Issue while printing cronjob log of " + el[3] + " in: " + el[5]+": " + el[1] + " - " + el[2])
@@ -623,7 +624,11 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		try {
 			test_results.forEach((element)=> {
 				try {
-					document.getElementById(element[3]+'-result').innerHTML=element[2];
+					let prefix = element[3];
+					let test_cell_result_array = Array.from(document.querySelectorAll(`[id^="${prefix}"]`)).filter(el => el.id.endsWith("-result") && !el.id.endsWith("reboot-result")); // get the id of the test cell result which matches the container, filter out the reboot results first
+					let best_match = test_cell_result_array.reduce((a, b) => a.length <= b.length ? a : b); // if there are many results, best one is probably the shortest one
+					best_match.innerHTML = element[2];
+
 				}
 				catch (exception_var) {
 					logging('An orphan test with the name '+element[3]+' gave a result of: ' +element[2]);
@@ -697,12 +702,12 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 				else if (index_of_below_array === 12) {
 					var content_of_id_cell;
 					try {
-						if ((/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
-							content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
-							else content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+						if (cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
+							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 						}
 						catch {
-							content_of_id_cell = cellData + '<svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 						}
 					td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
 				}
@@ -997,7 +1002,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			for (var i = 0; i < columnData.length; i++)
 				{
 				if (typeof columnData[i] === 'string' && columnData[i].includes("Failure")) {
-					document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").setAttribute("title", document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").getAttribute("title") + "Issue with " + dataTable.column(7).data().toArray()[i] + "<br>");
+					document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").setAttribute("title", document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").getAttribute("title") + "Issue with " + dataTable.column(7).data().toArray()[i]);
 					hasFailure = true;
 					break;
 				}
@@ -1019,7 +1024,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			var dataTable = $(table).DataTable();
 			var isNotRunning = true;
 			var columnData = dataTable.column(12).data().toArray();
-			for (var i = 0; i < columnData.length; i++)
+			for (var i = 0; i < columnData.length; i++)  // maybe check if too many restarts
 				{
 				if (typeof columnData[i] === 'string' && !columnData[i].includes("running")) {
 					isNotRunning = false;
@@ -1179,7 +1184,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 
 	
 </nav>
-<div id="output" class="main" style="width: fit-content;min-width: 1000px;">
+<div id="output" class="main" style="width: fit-content;min-width: fit-content;">
 	<br>
 
 <div id="table-container">

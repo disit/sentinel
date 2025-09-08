@@ -1605,7 +1605,7 @@ def create_app():
                             #new stuff
                             new_output = {"container":request.form.to_dict()['container'],"command":r[0],"result":command_ran.stdout,"errors":command_ran.stderr}
                             query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
-                            cursor.execute(query_1,(f"{command_ran.stdout}\n{command_ran.stderr}", request.form.to_dict()['container'],r[0],))
+                            cursor.execute(query_1,(f"{command_ran.stdout}\n{command_ran.stderr}", container,r[0],))
                             conn.commit()
                             log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, request, which_test="is alive " + str(r[2]))
                         except Exception:
