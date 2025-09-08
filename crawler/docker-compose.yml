@@ -1,0 +1,11 @@
+services:
+  dashboard-cron:
+    command: /bin/sh -c "sleep 100000"
+    image: disitlab/dashboard-builder:v9.4.5  #v8.2 #v8 #v6.3
+    logging:
+      driver: json-file
+      options:
+        max-file: '10'
+        max-size: 100m
+    restart: unless-stopped
+    user: root
