@@ -422,7 +422,10 @@ def auto_alert_status():
                     conversion["RunningFor"] = "Not running"
                 conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-                conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                try:
+                    conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                except KeyError as E:
+                    conversion["Container"] = "Container parameter"
                 conversion["Name"] = item["metadata"]["name"]
 
                 # new things
@@ -757,7 +760,10 @@ def update_container_state_db():
                     conversion["RunningFor"] = "Not running"
                 conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-                conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                try:
+                    conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                except KeyError as E:
+                    conversion["Container"] = "Container parameter"
                 conversion["Node"] = item["spec"]["nodeName"]
                 try:
                     temp_vols=copy.deepcopy(item["spec"]["volumes"])

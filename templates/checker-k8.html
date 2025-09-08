@@ -500,6 +500,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		test_results = results;
 		try {
 			test_results.forEach((element) => {
+				//may be the cause of [Object object] in test results when db is empty
 				test_results_divs[element[3]]=element[2];
 			});
 		}
