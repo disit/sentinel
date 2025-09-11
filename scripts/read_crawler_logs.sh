@@ -33,45 +33,38 @@ else
     tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-os.log
 fi
 
-echo ""
+printf "\n\n"
 
-# 1/6 there's no progress log in php
+# 2/6 issue in run-micro-os.sh, there's no progress log in php, the file does not exist, suppressing this log by commenting block of code
 # script done
 
-echo "Printing last 3 lines of feed-iot-os.log..."
-tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-os.log
-echo ""
-
-# 2/6 issue in run-micro-os.sh won't allow for printing anyway (wrong php called in run-micro-os.sh), there's no progress log in php
-# script done
-
-echo "Printing last 3 lines of feed-iot-app-os.log..."
-tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-app-os.log
-echo ""
+# echo "Printing last 3 lines of feed-iot-app-os.log..."
+# tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-app-os.log
+# printf "\n\n"
 
 # 3/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of feed-personaldata-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-personaldata-os.log
-echo ""
+printf "\n\n"
 
 # 4/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of synoptic-update-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/synoptic-update-os.log
-echo ""
+printf "\n\n"
 
 # 5/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of feed-heatmap-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-heatmap-os.log
-echo ""
+printf "\n\n"
 
 # 6/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of mykpicheck-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/mykpicheck-os.log
-echo ""
+printf "\n\n"
 
 
 # second
@@ -98,7 +91,7 @@ fi
 
 echo "Printing last 3 lines of health-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/health-os.log
-echo ""
+printf "\n\n"
 
 # third
 FILE_THIRD="/var/www/html/dashboardSmartCity/ScheduledTasks/running2.txt"
@@ -122,31 +115,31 @@ fi
 
 echo "Printing last 3 lines of feed-iot-2021.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-2021.log
-echo ""
+printf "\n\n"
 
 # 2/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of feed-iot-app.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-app.log
-echo ""
+printf "\n\n"
 
 # 3/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of feed-personaldata.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-personaldata.log
-echo ""
+printf "\n\n"
 
 # 4/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of feed-iot-act.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-act.log
-echo ""
+printf "\n\n"
 
 # 5/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of synoptic-update.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/synoptic-update.log
-echo ""
+printf "\n\n"
 
 # 6/6 Heatmap_FeedDashboardWizard.php isn't printed to anything, will pretend it goes to new-log.log, done
 
@@ -178,4 +171,4 @@ fi
 
 echo "Printing last 3 lines of health.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/health.log
-echo ""
+printf "\n\n"
