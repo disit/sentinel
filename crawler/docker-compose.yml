@@ -1,7 +1,7 @@
 services:
   dashboard-cron:
     command: /bin/sh -c "sleep 100000"
-    image: disitlab/dashboard-builder:v9.4.5  #v8.2 #v8 #v6.3
+    image: disitlab/dashboard-builder:v9.5.2
     logging:
       driver: json-file
       options:

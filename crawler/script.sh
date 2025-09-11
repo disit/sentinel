@@ -41,6 +41,13 @@ fi
 
 echo ""
 
+# 1/6 there's no progress log in php
+# script done
+
+echo "Printing last 3 lines of feed-iot-os.log..."
+tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-iot-os.log
+echo ""
+
 # 2/6 issue in run-micro-os.sh won't allow for printing anyway (wrong php called in run-micro-os.sh), there's no progress log in php
 # script done
 
@@ -54,7 +61,7 @@ echo "Printing last 3 lines of feed-personaldata-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-personaldata-os.log
 echo ""
 
-# 4/6 there's no progress log in php, there's only 1/2 ends in php file, done
+# 4/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of synoptic-update-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/synoptic-update-os.log
@@ -149,8 +156,8 @@ echo ""
 
 # 6/6 Heatmap_FeedDashboardWizard.php isn't printed to anything, will pretend it goes to new-log.log, done
 
-#echo "Printing last 3 lines of new-log.log..."
-#tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/new-log.log
+echo "Printing last 3 lines of heatmap.log..."
+tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/heatmap.log
 
 
 
