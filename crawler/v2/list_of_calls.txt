@@ -1,0 +1,27 @@
+run_single_crawl.sh takes 4 arguments; command, log path, hours before considering a log old, and optionally a time delta in hours in case timestamps are off due to timezones shenanigas
+
+first it runs the command
+if the command has a failure, it is logged as such
+otherwise (exitcode 0) it didn't fail
+in either case the time when it happened is stored in a separate log (respectively for failure and success)
+
+then it searches the produced log in log path (the parameter), note that it is expected for this to exist and be populated by the command ran, as seen in the examples at end of this file
+if it finds an endtime (it is expected it to be on the last line at the end of that line) it is matched against current time
+the tldr is if it is too old, we somehow didn't update, we are reading an old one, and the old one is too old (as for 3 parameter)
+
+then we check if the latest failure happened more recently than latest success, if it did (or success never happened) then an error is printed
+
+bash run_single_crawl.sh "php -d memory_limit=2G HealthinessCheck-OS.php > health-os.log 2>&1" health-os.log 1  # doesn't work, file not in microx
+bash run_single_crawl.sh "php -d memory_limit=2G HealthinessCheck.php > health.log 2>&1" health.log 1
+bash run_single_crawl.sh "php -d memory_limit=5G IOT_Device_FeedAndUpdate_DashboardWizard-OS.php > feed-iot-os.log 2>&1" feed-iot-os.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G Synoptic_Update_DashboardWizard-OS.php > synoptic-update-os.log 2>&1" synoptic-update-os.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G IOT_Device_FeedAndUpdate_DashboardWizard.php > feed-iot-2021.log 2>&1" feed-iot-2021.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G IOT_Actuator_FeedDashboardWizard.php > feed-iot-act.log 2>&1" feed-iot-act.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G Synoptic_Update_DashboardWizard.php > synoptic-update.log 2>&1" synoptic-update.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G Heatmap_FeedDashboardWizard.php > heatmap.log 2>&1" heatmap.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G IOT_Device_FeedAndUpdate_DashboardWizard-OS.php > feed-iot-os.log 2>&1" feed-iot-os.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G Synoptic_Update_DashboardWizard-OS.php > synoptic-update-os.log 2>&1" synoptic-update-os.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G Heatmap_FeedDashboardWizard-OS.php > feed-heatmap-os.log 2>&1" feed-heatmap-os.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G MyKPICheck-OS.php > mykpicheck-os.log 2>&1" mykpicheck-os.log 1
+bash run_single_crawl.sh "php -d memory_limit=2G Heatmap_FeedDashboardWizard-OS.php > heatmap-os.log 2>&1" heatmap-os.log 1
+
