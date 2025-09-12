@@ -54,7 +54,7 @@ echo "Printing last 3 lines of feed-personaldata-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-personaldata-os.log
 printf "\n\n"
 
-# 4/6 there's no progress log in php, there's only 1/2 ends in php file, done
+# 4/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of synoptic-update-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/synoptic-update-os.log
@@ -149,8 +149,8 @@ printf "\n\n"
 
 # 6/6 Heatmap_FeedDashboardWizard.php isn't printed to anything, will pretend it goes to new-log.log, done
 
-#echo "Printing last 3 lines of new-log.log..."
-#tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/new-log.log
+echo "Printing last 3 lines of heatmap.log..."
+tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/heatmap.log
 
 
 

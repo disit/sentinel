@@ -92,58 +92,6 @@ def parse_top(data):
     return parsed_data
 
 ###
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>Host Manager</title>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-</head>
-<body>
-<h1>Available Hosts</h1>
-<table border="1" cellpadding="5">
-<tr><th>Host</th><th>User</th><th>Actions</th></tr>
-{% for row in hosts %}
-<tr>
-<td>{{ row['host'] }}</td>
-<td>{{ row['user'] }}</td>
-<td>
-<button onclick="deleteHost('{{ row['host'] }}')">Delete</button>
-</td>
-</tr>
-{% endfor %}
-</table>
-
-
-<h2>Add New Host</h2>
-<form id="addForm">
-Host: <input type="text" name="host"><br>
-User: <input type="text" name="user"><br>
-Password: <input type="password" name="password"><br>
-<button type="submit">Add Host</button>
-</form>
-
-
-<script>
-function deleteHost(host) {
-$.post('/delete', {host: host}, function(response) {
-alert(JSON.stringify(response));
-location.reload();
-});
-}
-
-
-$('#addForm').on('submit', function(e) {
-e.preventDefault();
-$.post('/connect', $(this).serialize(), function(response) {
-alert(JSON.stringify(response));
-location.reload();
-});
-});
-</script>
-</body>
-</html>
-"""
 
 
 @app.route('/')
@@ -156,7 +104,7 @@ def index():
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
-        return render_template_string(HTML_TEMPLATE, hosts=rows)
+        return render_template("control_panel.html", hosts=rows)
     except Exception as e:
         return f"Error loading hosts: {e}"
 

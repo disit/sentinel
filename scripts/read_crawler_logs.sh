@@ -1,9 +1,3 @@
-# use this to run
-
-#  docker exec -i dashboard-cron /bin/bash -s < some_commands.sh
-
-
-
 # first
 FILE_FIRST="/var/www/html/dashboardSmartCity/ScheduledTasks/running2-os.txt"
 
@@ -54,7 +48,7 @@ echo "Printing last 3 lines of feed-personaldata-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/feed-personaldata-os.log
 printf "\n\n"
 
-# 4/6 there's no progress log in php, there's only 1/2 ends in php file, done
+# 4/6 there's no progress log in php, done
 
 echo "Printing last 3 lines of synoptic-update-os.log..."
 tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/synoptic-update-os.log
@@ -82,7 +76,7 @@ if [ ! -e "$FILE_SECOND" ]; then
 else
     echo "running-health-os.txt exists, run-health-os.sh may be currently running"
     output_second=$(pgrep -af run-health-os.sh)
-
+    
     if [ -n "$output_second" ]; then
         echo "run-health-os.sh is currently running"
     else
@@ -107,7 +101,7 @@ if [ ! -e "$FILE_THIRD" ]; then
     echo "run-iotapp.sh is not currently running"
 else
     output_first=$(pgrep -af run-iotapp.sh)
-
+    
     if [ -n "$output_first" ]; then
         echo "run-iotapp.sh is currently running"
     else
@@ -149,8 +143,8 @@ printf "\n\n"
 
 # 6/6 Heatmap_FeedDashboardWizard.php isn't printed to anything, will pretend it goes to new-log.log, done
 
-#echo "Printing last 3 lines of new-log.log..."
-#tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/new-log.log
+echo "Printing last 3 lines of heatmap.log..."
+tail -n 3 /var/www/html/dashboardSmartCity/ScheduledTasks/heatmap.log
 
 
 
@@ -162,7 +156,7 @@ if [ ! -e "$FILE_FOURTH" ]; then
     echo "run-health.sh is not currently running"
 else
     output_first=$(pgrep -af run-health.sh)
-
+    
     if [ -n "$output_first" ]; then
         echo "run-health.sh is currently running"
     else
