@@ -182,6 +182,8 @@ def send_telegram(chat_id, message):
     return
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
+    if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
+        print("Email was not sent, no email address(es) set as recipients")
     composite_message = os.getenv("platform-explanation","No explanation set") + "<br>" + message
     smtp_server = os.getenv("smtp-server","no.server.set")
     if not smtp_server:

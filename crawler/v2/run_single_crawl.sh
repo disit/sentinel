@@ -22,7 +22,7 @@ if [[ $COMMAND_EXIT -ne 0 ]]; then
   echo "Error: Command '$COMMAND' failed with exit code $COMMAND_EXIT." >&2
   echo "$NOW_DATETIME" >> "$FAILURE_FILE"
 else
-  echo "Command '$COMMAND' was executed and ended without failures."
+  echo "Command '$COMMAND' was executed and it ended without failures."
   echo "$NOW_DATETIME" >> "$SUCCESS_FILE"
 fi
 
