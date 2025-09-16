@@ -1,0 +1,12 @@
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+SHELL=/bin/bash
+# m h  dom mon dow   command
+0 * * * *  /var/www/html/dashboardSmartCity/ScheduledTasks/run-os.sh
+30 * * * * /var/www/html/dashboardSmartCity/ScheduledTasks/run-health-os.sh
+30 * * * * /var/www/html/dashboardSmartCity/ScheduledTasks/run-mykpicheck-os.sh
+* * * * * /var/www/html/dashboardSmartCity/ScheduledTasks/run-iotapp-os.sh
+* * * * * /var/www/html/dashboardSmartCity/ScheduledTasks/run-kpi-os.sh
+#*/10 * * * * /var/www/html/dashboardSmartCity/ScheduledTasks/run-10min-os.sh
+* * * * * /var/www/html/dashboardSmartCity/ScheduledTasks/run-last10m-iot.sh
+* * * * * date > /proc/1/fd/1 2>/proc/1/fd/2
+#@reboot rm /var/www/html/dashboardSmartCity/ScheduledTasks/running*.txt
