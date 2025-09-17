@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, render_template_string
+from flask import Flask, request, jsonify, render_template
 import paramiko
 import mysql.connector
 import os
@@ -108,8 +108,6 @@ def index():
     except Exception as e:
         return f"Error loading hosts: {e}"
 
-###
-
 @app.route('/connect', methods=['POST'])
 def connect_and_store():
     host = request.form.get('host')
@@ -177,7 +175,7 @@ def run_command():
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(host, username=user, key_filename=private_key_path)
 
-        stdin, stdout, stderr = ssh.exec_command("ps -aux | head -n 10")
+        stdin, stdout, stderr = ssh.exec_command("ps -aux | head -n 50")
         output = stdout.read().decode()
         error = stderr.read().decode()
 
