@@ -1,17 +1,19 @@
 <!DOCTYPE html>
-<html>
-<head>
-<title>Host Manager</title>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-</head>
+{% extends "main.html" %}
+{% block title %}SnapSentinel (Kubernetes){% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
 <body>
 <h1>Available Hosts</h1>
 <table border="1" cellpadding="5">
-<tr><th>Host</th><th>User</th><th>Actions</th></tr>
+<tr><th>Host</th><th>User</th><th>User</th><th>Description</th></tr>
 {% for row in hosts %}
 <tr>
 <td>{{ row['host'] }}</td>
 <td>{{ row['user'] }}</td>
+<td>{{ row['description'] }}</td>
 <td>
 <button onclick="deleteHost('{{ row['host'] }}')">Delete</button>
 </td>
@@ -24,6 +26,7 @@
 <form id="addForm">
 Host: <input type="text" name="host"><br>
 User: <input type="text" name="user"><br>
+Description: <input type="text" name="description"><br>
 Password: <input type="password" name="password"><br>
 <button type="submit">Add Host</button>
 </form>
@@ -46,5 +49,4 @@ location.reload();
 });
 });
 </script>
-</body>
-</html>
+{% endblock %}

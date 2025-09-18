@@ -2405,169 +2405,179 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     # hosts stuff        
     @app.route('/hosts_control_panel')
     def index():
-        try:
-            conn = mysql.connector.connect(**db_conn_info)
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT host, user FROM host")
-            rows = cursor.fetchall()
-            cursor.close()
-            conn.close()
-            return render_template("control_panel.html", hosts=rows)
-        except Exception:
-            return f"Error loading hosts: {traceback.format_exc()}"
+        if 'username' in session:
+            try:
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT host, user, description FROM host")
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                return render_template("control_panel.html", hosts=rows)
+            except Exception:
+                return f"Error loading hosts: {traceback.format_exc()}"
+        return redirect(url_for('login'))
 
     @app.route('/connect_host', methods=['POST'])
     def connect_and_store():
-        host = request.form.get('host')
-        user = request.form.get('user')
-        password = request.form.get('password')
+        if 'username' in session:
+            host = request.form.get('host')
+            user = request.form.get('user')
+            password = request.form.get('password')
+            description = request.form.get('description')
 
-        try:
-            private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
-            public_key_path = private_key_path + ".pub"
+            try:
+                private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+                public_key_path = private_key_path + ".pub"
 
-            if not os.path.exists(private_key_path):
-                key = paramiko.RSAKey.generate(2048)
-                key.write_private_key_file(private_key_path)
-                with open(public_key_path, 'w') as f:
-                    f.write(f"{key.get_name()} {key.get_base64()}")
+                if not os.path.exists(private_key_path):
+                    key = paramiko.RSAKey.generate(2048)
+                    key.write_private_key_file(private_key_path)
+                    with open(public_key_path, 'w') as f:
+                        f.write(f"{key.get_name()} {key.get_base64()}")
 
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(host, username=user, password=password)
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(host, username=user, password=password)
 
-            with ssh.open_sftp() as sftp:
-                try:
-                    sftp.mkdir(".ssh")
-                except IOError:
-                    pass
-                with sftp.open(".ssh/authorized_keys", 'a') as ak:
-                    with open(public_key_path, 'r') as f:
-                        ak.write(f.read() + "\n")
+                with ssh.open_sftp() as sftp:
+                    try:
+                        sftp.mkdir(".ssh")
+                    except IOError:
+                        pass
+                    with sftp.open(".ssh/authorized_keys", 'a') as ak:
+                        with open(public_key_path, 'r') as f:
+                            ak.write(f.read() + "\n")
 
-            ssh.close()
+                ssh.close()
 
-            conn = mysql.connector.connect(**db_conn_info)
-            cursor = conn.cursor()
-            cursor.execute("CREATE TABLE IF NOT EXISTS host (host VARCHAR(255), user VARCHAR(255))")
-            cursor.execute("INSERT INTO host (host, user) VALUES (%s, %s)", (host, user))
-            conn.commit()
-            cursor.close()
-            conn.close()
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor()
+                cursor.execute("CREATE TABLE IF NOT EXISTS host (host VARCHAR(255), user VARCHAR(255), description VARCHAR(255))")
+                cursor.execute("INSERT INTO host (host, user, description) VALUES (%s, %s, %s)", (host, user, description))
+                conn.commit()
+                cursor.close()
+                conn.close()
 
-            return jsonify({"status": "ok"})
+                return jsonify({"status": "ok"})
 
-        except Exception:
-            return jsonify({"error": traceback.format_exc()}), 500
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
     
     @app.route('/run_command_host', methods=['POST'])
     def run_command():
-        host = request.form.get('host')
+        if 'username' in session:
+            host = request.form.get('host')
 
-        try:
-            conn = mysql.connector.connect(**db_conn_info)
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT user FROM host WHERE host=%s", (host,))
-            row = cursor.fetchone()
-            cursor.close()
-            conn.close()
+            try:
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT user FROM host WHERE host=%s", (host,))
+                row = cursor.fetchone()
+                cursor.close()
+                conn.close()
 
-            if not row:
-                return jsonify({"error": "Host not found in DB"}), 400
+                if not row:
+                    return jsonify({"error": "Host not found in DB"}), 400
 
-            user = row['user']
-            private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+                user = row['user']
+                private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
 
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(host, username=user, key_filename=private_key_path)
-            # later on make this something which can change, but only if it is safe!
-            _, stdout, stderr = ssh.exec_command("pwd")
-            output = stdout.read().decode()
-            error = stderr.read().decode()
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(host, username=user, key_filename=private_key_path)
+                # later on make this something which can change, but only if it is safe!
+                _, stdout, stderr = ssh.exec_command("pwd")
+                output = stdout.read().decode()
+                error = stderr.read().decode()
 
-            ssh.close()
+                ssh.close()
 
-            if error:
-                return jsonify({"error": error}), 500
-            return jsonify({"output": output})
+                if error:
+                    return jsonify({"error": error}), 500
+                return jsonify({"output": output})
 
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        return redirect(url_for('login'))
 
     
     @app.route('/delete_saved_host', methods=['POST'])
     def delete_host():
-        host = request.form.get('host')
+        if 'username' in session:
+            host = request.form.get('host')
 
-        try:
-            # Fetch user from DB
-            conn = mysql.connector.connect(**db_conn_info)
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT user FROM host WHERE host=%s", (host,))
-            row = cursor.fetchone()
+            try:
+                # Fetch user from DB
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT user FROM host WHERE host=%s", (host,))
+                row = cursor.fetchone()
 
-            if not row:
+                if not row:
+                    cursor.close()
+                    conn.close()
+                    return jsonify({"error": "Host not found in DB"}), 400
+
+                user = row['user']
+                cursor.execute("DELETE FROM host WHERE host=%s", (host,))
+                conn.commit()
                 cursor.close()
                 conn.close()
-                return jsonify({"error": "Host not found in DB"}), 400
 
-            user = row['user']
-            cursor.execute("DELETE FROM host WHERE host=%s", (host,))
-            conn.commit()
-            cursor.close()
-            conn.close()
+                # Only delete keys if the host was present in DB
+                private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+                public_key_path = private_key_path + ".pub"
+                for path in [private_key_path, public_key_path]:
+                    if os.path.exists(path):
+                        os.remove(path)
 
-            # Only delete keys if the host was present in DB
-            private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
-            public_key_path = private_key_path + ".pub"
-            for path in [private_key_path, public_key_path]:
-                if os.path.exists(path):
-                    os.remove(path)
+                return jsonify({"status": "deleted"})
 
-            return jsonify({"status": "deleted"})
-
-        except Exception:
-            return jsonify({"error": traceback.format_exc()}), 500
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
 
     @app.route('/get_host_tops', methods=['GET'])
     def get_tops():
+        if 'username' in session:
+            try:
+                # Fetch user from DB
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT user, host FROM host;")
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                outs = []
+                errors = []
+                for row in rows:
+                    try:
+                        user = row['user']
+                        host = row['host']
+                        private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
 
-        try:
-            # Fetch user from DB
-            conn = mysql.connector.connect(**db_conn_info)
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT user, host FROM host;")
-            rows = cursor.fetchall()
-            cursor.close()
-            conn.close()
-            outs = []
-            errors = []
-            for row in rows:
-                try:
-                    user = row['user']
-                    host = row['host']
-                    private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+                        # Connect with key
+                        ssh = paramiko.SSHClient()
+                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                        ssh.connect(host, username=user, key_filename=private_key_path)
 
-                    # Connect with key
-                    ssh = paramiko.SSHClient()
-                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    ssh.connect(host, username=user, key_filename=private_key_path)
+                        _, stdout, _ = ssh.exec_command("top -b -n 1")
+                        output = stdout.read().decode()
 
-                    _, stdout, _ = ssh.exec_command("top -b -n 1")
-                    output = stdout.read().decode()
+                        ssh.close()
+                        generated_json=parse_top(output)
+                        generated_json["source"] = host
+                        outs.append(generated_json)
+                    except:
+                        errors.append(traceback.format_exc())
+                data_to_send={"result":outs,"error":errors}
+                return render_template("top-viewer.html",data=data_to_send)
 
-                    ssh.close()
-                    generated_json=parse_top(output)
-                    generated_json["source"] = host
-                    outs.append(generated_json)
-                except:
-                    errors.append(traceback.format_exc())
-            data_to_send={"result":outs,"error":errors}
-            return render_template("top-viewer.html",data=data_to_send)
-
-        except Exception:
-            return jsonify({"error": traceback.format_exc()}), 500
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
 
     return app
     
