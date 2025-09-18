@@ -622,17 +622,28 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             cron_results = cursor.fetchall()
     except Exception:
         pass
+    hosts_results = []
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY host ORDER BY `sampled_at` DESC) AS row_num FROM host_data) SELECT * FROM RankedEntries left join host on host.host=RankedEntries.host where row_num = 1;'''
+            cursor.execute(query)
+            conn.commit()
+            hosts_results = cursor.fetchall()
+    except Exception:
+        pass
+    # TODO read data from hosts, whatever happens send it to db, if there is troublesome data send an alert
+    
+    
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0:
         try:
-            # todo
-            # UPDATE `checker`.`summary_status` SET `status` = "&#128308" where `category` in ("System","Broker") # join, set of a list
             issues = ["","","","","",""]
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                if not os.getenv("running_as_kubernetes",None): #todo troubleshoot here
+                if not os.getenv("running_as_kubernetes",None):
                     issues[2]=[a[0] for a in containers_which_are_not_expected]
                 else:
                     issues[2]=containers_which_are_not_expected
