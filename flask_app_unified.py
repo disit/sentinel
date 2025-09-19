@@ -622,22 +622,58 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             cron_results = cursor.fetchall()
     except Exception:
         pass
-    hosts_results = []
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY host ORDER BY `sampled_at` DESC) AS row_num FROM host_data) SELECT * FROM RankedEntries left join host on host.host=RankedEntries.host where row_num = 1;'''
-            cursor.execute(query)
-            conn.commit()
-            hosts_results = cursor.fetchall()
-    except Exception:
-        pass
-    # TODO read data from hosts, whatever happens send it to db, if there is troublesome data send an alert
-    
-    
-    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0:
+
+    conn = mysql.connector.connect(**db_conn_info)
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT user, host, threshold FROM host;")
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    outs = []
+    top_errors = []
+    for row in rows:
         try:
-            issues = ["","","","","",""]
+            user = row['user']
+            host = row['host']
+            private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+
+            # Connect with key
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(host, username=user, key_filename=private_key_path)
+
+            _, stdout, _ = ssh.exec_command("top -b -n 1")
+            output = stdout.read().decode()
+
+            ssh.close()
+            generated_json=parse_top(output)
+            generated_json["source"] = host
+            generated_json["threshold"] = row["threshold"]
+            outs.append(generated_json)
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor_2 = conn.cursor(buffered=True)
+                    query_2 = '''INSERT INTO `checker`.`host_data` (`host`, `data`) VALUES (%s, %s);'''
+                    cursor_2.execute(query_2,(host,json.dumps(generated_json),))
+                    conn.commit()
+            except:
+                top_errors.append(traceback.format_exc())
+        except:
+            top_errors.append(traceback.format_exc())
+    problematic_tops = []
+    for top in outs:
+        regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
+
+        matches = re.finditer(regex, top["system_info"]["load_average"], re.MULTILINE)
+
+        for _, match in enumerate(matches, start=1):
+            for groupNum in range(0, len(match.groups())):
+                if (float(match.group(groupNum + 1).replace(",","."))>top["threshold"]):
+                    problematic_tops.append(top)
+    
+    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops)>0 or len(top_errors)>0:
+        try:
+            issues = ["","","","","","","",""]
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
@@ -653,6 +689,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 issues[4]=memory_issues
             if len(cron_results)>0:
                 issues[5]=cron_results
+            if len(problematic_tops)>0:
+                issues[6]=problematic_tops
+            if len(top_errors)>0:
+                issues[7]=top_errors
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -2420,7 +2460,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
-                cursor.execute("SELECT host, user, description FROM host")
+                cursor.execute("SELECT host, user, description, threshold FROM host")
                 rows = cursor.fetchall()
                 cursor.close()
                 conn.close()
@@ -2436,6 +2476,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             user = request.form.get('user')
             password = request.form.get('password')
             description = request.form.get('description')
+            threshold = request.form.get('threshold')
 
             try:
                 private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
@@ -2464,8 +2505,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor()
-                cursor.execute("CREATE TABLE IF NOT EXISTS host (host VARCHAR(255), user VARCHAR(255), description VARCHAR(255))")
-                cursor.execute("INSERT INTO host (host, user, description) VALUES (%s, %s, %s)", (host, user, description))
+                cursor.execute("CREATE TABLE IF NOT EXISTS host (host VARCHAR(255), user VARCHAR(255), description VARCHAR(255), threshold FLOAT)")
+                cursor.execute("INSERT INTO host (host, user, description, threshold) VALUES (%s, %s, %s, %f)", (host, user, description, threshold))
                 conn.commit()
                 cursor.close()
                 conn.close()
