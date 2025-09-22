@@ -7,12 +7,14 @@
 {% block content %}
 <h1>Available Hosts</h1>
 <table border="1" cellpadding="5">
-<tr><th>Host</th><th>User</th><th>User</th><th>Description</th></tr>
+<tr><th>Host</th><th>User</th><th>User</th><th>Description</th><th>CPU</th><th>MEM</th></tr>
 {% for row in hosts %}
 <tr>
 <td>{{ row['host'] }}</td>
 <td>{{ row['user'] }}</td>
 <td>{{ row['description'] }}</td>
+<td>{{ row['threshold_cpu'] }}</td>
+<td>{{ row['threshold_mem'] }}</td>
 <td>
 <button onclick="deleteHost('{{ row['host'] }}')">Delete</button>
 </td>
@@ -23,10 +25,12 @@
 
 <h2>Add New Host</h2>
 <form id="addForm">
-Host: <input type="text" name="host"><br>
-User: <input type="text" name="user"><br>
-Description: <input type="text" name="description"><br>
-Password: <input type="password" name="password"><br>
+Host: <input type="text" name="host" required><br>
+User: <input type="text" name="user" required><br>
+Description: <input type="text" name="description" required><br>
+CPU: <input type="text" name="cpu" required><br>
+MEM: <input type="text" name="mem" required><br>
+Password: <input type="password" name="password" required><br>
 <button type="submit">Add Host</button>
 </form>
 

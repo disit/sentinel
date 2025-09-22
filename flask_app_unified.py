@@ -367,6 +367,71 @@ def isalive():
     send_telegram(int(os.getenv("telegram-channel","0")), os.getenv("platform-url","unseturl")+" is alive")
     return
 
+def clean_old_db_entries():
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            # to run malicious code, malicious code must be present in the db or the machine in the first place
+            query = '''DELETE FROM checker.cronjob_history WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
+DELETE FROM host_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
+DELETE FROM snmp_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
+DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;'''
+            cursor.execute(query,)
+            conn.commit()
+            print("Weekly deletion of old logs was successful")
+    except:
+        print("Couldn't delete old logs because: "+traceback.format_exc())
+        send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" didn't delete old logs.", os.getenv("platform-url","unseturl")+" didn't delete old logs because of "+traceback.format_exc())
+    
+        
+def populate_tops_entries():
+    try:
+        # Fetch user from DB
+        conn = mysql.connector.connect(**db_conn_info)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT user, host FROM host;")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        outs = []
+        errors = []
+        for row in rows:
+            try:
+                user = row['user']
+                host = row['host']
+                private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+
+                # Connect with key
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(host, username=user, key_filename=private_key_path)
+
+                _, stdout, _ = ssh.exec_command("top -b -n 1")
+                output = stdout.read().decode()
+
+                ssh.close()
+                generated_json=parse_top(output)
+                generated_json["source"] = host
+                outs.append(generated_json)
+            except:
+                error_json = {}
+                error_json['host'] = row['host']
+                error_json['user'] = row['user']
+                error_json['error'] = traceback.format_exc()
+                errors.append(error_json)
+        for result in outs:
+            query = '''INSERT INTO `host_data` (`result`, `host`) VALUES (%s, %s);'''
+            cursor.execute(query, (json.dumps(result), result['source']))
+            conn.commit()
+        for result in errors:
+            query = '''INSERT INTO `host_data` (`errors`, `host`) VALUES (%s, %s);'''
+            cursor.execute(query, (result, result['source']))
+            conn.commit()
+    except Exception as E:
+        raise E
+
+
+
 async def auto_run_tests():
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -622,56 +687,36 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             cron_results = cursor.fetchall()
     except Exception:
         pass
-
-    conn = mysql.connector.connect(**db_conn_info)
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT user, host, threshold FROM host;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    outs = []
+    populate_tops_entries()
+    top_results = []
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY host ORDER BY sampled_at DESC) AS row_num FROM host_data) SELECT host.host as host, sampled_at, data, errors, threshold_cpu, threshold_mem FROM RankedEntries join host on host.host=RankedEntries.host WHERE row_num = 1;'''
+            cursor.execute(query)
+            conn.commit()
+            top_results = cursor.fetchall()
+    except Exception:
+        pass
+    problematic_tops_cpu = []
+    problematic_tops_ram = []
+    
     top_errors = []
-    for row in rows:
-        try:
-            user = row['user']
-            host = row['host']
-            private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
-
-            # Connect with key
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(host, username=user, key_filename=private_key_path)
-
-            _, stdout, _ = ssh.exec_command("top -b -n 1")
-            output = stdout.read().decode()
-
-            ssh.close()
-            generated_json=parse_top(output)
-            generated_json["source"] = host
-            generated_json["threshold"] = row["threshold"]
-            outs.append(generated_json)
-            try:
-                with mysql.connector.connect(**db_conn_info) as conn:
-                    cursor_2 = conn.cursor(buffered=True)
-                    query_2 = '''INSERT INTO `checker`.`host_data` (`host`, `data`) VALUES (%s, %s);'''
-                    cursor_2.execute(query_2,(host,json.dumps(generated_json),))
-                    conn.commit()
-            except:
-                top_errors.append(traceback.format_exc())
-        except:
-            top_errors.append(traceback.format_exc())
-    problematic_tops = []
-    for top in outs:
+    for top_r in top_results:
+        if len(top_r["errors"]) > 0:
+            top_errors.append(top_r)
+            continue
         regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
-
-        matches = re.finditer(regex, top["system_info"]["load_average"], re.MULTILINE)
-
+        matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
         for _, match in enumerate(matches, start=1):
             for groupNum in range(0, len(match.groups())):
-                if (float(match.group(groupNum + 1).replace(",","."))>top["threshold"]):
-                    problematic_tops.append(top)
+                if (float(match.group(groupNum + 1).replace(",","."))>top_r["threshold_cpu"]):
+                    problematic_tops_cpu.append(top_r)
+        if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
+            problematic_tops_ram.append(top_r)
     
-    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops)>0 or len(top_errors)>0:
+                    
+    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
             issues = ["","","","","","","",""]
             if len(names_of_problematic_containers) > 0:
@@ -689,10 +734,12 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 issues[4]=memory_issues
             if len(cron_results)>0:
                 issues[5]=cron_results
-            if len(problematic_tops)>0:
-                issues[6]=problematic_tops
+            if len(problematic_tops_cpu)>0:
+                issues[6]=problematic_tops_cpu
+            if len(problematic_tops_ram)>0:
+                issues[7]=problematic_tops_ram
             if len(top_errors)>0:
-                issues[7]=top_errors
+                issues[8]=top_errors
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -1020,6 +1067,21 @@ def send_advanced_alerts(message):
             for failed_cron in message[5]:
                 prepare_text += f"<br>Cronjob named {failed_cron[3]} assigned to category {failed_cron[5]} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + failed_cron[1] + ' but'} error: {failed_cron[2]} at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
             text_for_email += prepare_text + "<br><br>"
+        if len(message[6])>0:
+            prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
+            for overloaded_cpu_top in message[6]:
+                prepare_text_top_cpu += f"<br>Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"
+            text_for_email += prepare_text_top_cpu + "<br><br>"
+        if len(message[7])>0:
+            prepare_text_top_mem = "<br>These hosts are overloaded on memory:"
+            for overloaded_mem_top in message[7]:
+                prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
+            text_for_email += prepare_text_top_mem + "<br><br>"
+        if len(message[8]>0):
+            prepare_text_top_error = "<br>Couldn't load the tops for these hosts:"
+            for error_top in message[8]:
+                prepare_text_top_error += f"<br>Host named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}</br>"
+            text_for_email += prepare_text_top_error + "<br><br>"
         try:
             if len(text_for_email) > 15:
                 print("Will send email with text:")
@@ -1042,6 +1104,21 @@ def send_advanced_alerts(message):
             text_for_telegram+= message[4] +"\n"
         if len(message[5])>0:
             text_for_telegram+= str(message[5])
+        if len(message[6])>0:
+            prepare_text_top_cpu = "\nThese hosts are overloaded on cpu:"
+            for overloaded_cpu_top in message[6]:
+                prepare_text_top_cpu += f"\nHost named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}"
+            text_for_telegram += prepare_text_top_cpu + "\n\n"
+        if len(message[7])>0:
+            prepare_text_top_mem = "\nThese hosts are overloaded on memory:"
+            for overloaded_mem_top in message[7]:
+                prepare_text_top_mem += f"\nHost named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}"
+            text_for_telegram += prepare_text_top_mem + "\n\n"
+        if len(message[8]>0):
+            prepare_text_top_error = "\nCouldn't load the tops for these hosts:"
+            for error_top in message[8]:
+                prepare_text_top_error += f"\nHost named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}"
+            text_for_telegram += prepare_text_top_error + "\n\n"
         if len(text_for_telegram)>5:  
             try:
                 send_telegram(int(os.getenv("telegram-channel","0")), text_for_telegram)
@@ -1057,6 +1134,7 @@ scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
+scheduler.add_job(clean_old_db_entries, 'cron',week=1)
 scheduler.start()
 auto_alert_status()
 
@@ -2476,7 +2554,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             user = request.form.get('user')
             password = request.form.get('password')
             description = request.form.get('description')
-            threshold = request.form.get('threshold')
+            threshold_cpu = request.form.get('cpu')
+            threshold_mem = request.form.get('mem')
 
             try:
                 private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
@@ -2505,8 +2584,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor()
-                cursor.execute("CREATE TABLE IF NOT EXISTS host (host VARCHAR(255), user VARCHAR(255), description VARCHAR(255), threshold FLOAT)")
-                cursor.execute("INSERT INTO host (host, user, description, threshold) VALUES (%s, %s, %s, %f)", (host, user, description, threshold))
+                cursor.execute("CREATE TABLE IF NOT EXISTS host (host VARCHAR(255), user VARCHAR(255), description VARCHAR(255), threshold_cpu FLOAT), threshold_mem FLOAT)")
+                cursor.execute("INSERT INTO host (host, user, description, threshold) VALUES (%s, %s, %s, %f)", (host, user, description, threshold_cpu, threshold_mem))
                 conn.commit()
                 cursor.close()
                 conn.close()
