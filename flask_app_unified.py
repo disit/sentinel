@@ -420,14 +420,24 @@ def populate_tops_entries():
                 error_json['error'] = traceback.format_exc()
                 errors.append(error_json)
         for result in outs:
+            conn = mysql.connector.connect(**db_conn_info)
+            cursor = conn.cursor(dictionary=True)
             query = '''INSERT INTO `host_data` (`result`, `host`) VALUES (%s, %s);'''
             cursor.execute(query, (json.dumps(result), result['source']))
+            cursor.close()
             conn.commit()
         for result in errors:
+            conn = mysql.connector.connect(**db_conn_info)
+            cursor = conn.cursor(dictionary=True)
             query = '''INSERT INTO `host_data` (`errors`, `host`) VALUES (%s, %s);'''
-            cursor.execute(query, (result, result['source']))
+            cursor.execute(query, (json.dumps(result), result['host']))
             conn.commit()
+            cursor.close()
+        conn.close()
     except Exception as E:
+        print("DEBUG")
+        print(outs)
+        print(errors)
         raise E
 
 
@@ -718,7 +728,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
-            issues = ["","","","","","","",""]
+            issues = ["","","","","","","","",""]
             if len(names_of_problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
@@ -1077,7 +1087,7 @@ def send_advanced_alerts(message):
             for overloaded_mem_top in message[7]:
                 prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
             text_for_email += prepare_text_top_mem + "<br><br>"
-        if len(message[8]>0):
+        if len(message[8])>0:
             prepare_text_top_error = "<br>Couldn't load the tops for these hosts:"
             for error_top in message[8]:
                 prepare_text_top_error += f"<br>Host named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}</br>"
@@ -1114,7 +1124,7 @@ def send_advanced_alerts(message):
             for overloaded_mem_top in message[7]:
                 prepare_text_top_mem += f"\nHost named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}"
             text_for_telegram += prepare_text_top_mem + "\n\n"
-        if len(message[8]>0):
+        if len(message[8])>0:
             prepare_text_top_error = "\nCouldn't load the tops for these hosts:"
             for error_top in message[8]:
                 prepare_text_top_error += f"\nHost named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}"
