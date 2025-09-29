@@ -6,74 +6,121 @@ def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
     return tuple(int(x) for x in oid_str.split('.'))
 
-async def safe_snmp_walk(host):
+async def safe_snmp_walk(host_data, safe=True):
     """
     Walk only the relevant OIDs for memory, disk, and CPU.
     Returns a dict {oid: value}.
     """
-    snmpEngine = SnmpEngine()
-    transport = await UdpTransportTarget.create((host, 161))
-    
-    user_data = UsmUserData(
-        userName="sentinel",
-        authKey="sentinelXPWD",
-        privKey="sentinelXPWD",
-        authProtocol=usmHMAC384SHA512AuthProtocol,
-        privProtocol=usmAesCfb128Protocol
-    )
-    base_oids = [
-        "1.3.6.1.2.1.25.2.3.1",   # hrStorageTable (memory & disk)
-        "1.3.6.1.2.1.25.3.3.1.2",  # hrProcessorLoad (CPU)
-        "1.3.6.1.4.1.2021.10.1.3"
-    ]
-
-    results = {}
-
-    for base_oid in base_oids:
-        current_oid = ObjectIdentity(base_oid)
-        last_oid = None
+    if safe:
+        snmpEngine = SnmpEngine()
+        transport = await UdpTransportTarget.create((host_data["host"], 161))
         
-        
+        user = host_data["user"]
+        auth_pass = host_data["auth_pass"]
+        priv_pass = host_data["priv_pass"]
+        auth_protocol = usmHMACSHAAuthProtocol if host_data["auth_type"].upper().startswith("SHA") else usmHMACMD5AuthProtocol
+        priv_protocol = usmAesCfb128Protocol if host_data["priv_type"].upper().startswith("AES") else usmDESPrivProtocol
 
-        while True:
-            errorIndication, errorStatus, errorIndex, varBinds = await next_cmd(
-                snmpEngine,
-                user_data,
-                transport,
-                ContextData(),
-                ObjectType(current_oid),
-                lexicographicMode=True,
-            )
+        usm
+        user_data = UsmUserData(
+            userName=host_data["user"],
+            authKey="sentinelXPWD",
+            privKey="sentinelXPWD",
+            authProtocol=usmHMAC384SHA512AuthProtocol,
+            privProtocol=usmAesCfb128Protocol
+        )
 
-            if errorIndication or errorStatus or not varBinds:
-                break
+        results = {}
 
-            stop_walk = False  # <--- flag to break the while loop
+        for base_oid in ["1.3.6.1.2.1.25.2.3.1", "1.3.6.1.2.1.25.3.3.1.2", "1.3.6.1.4.1.2021.10.1.3"]: # hrStorageTable (memory & disk), hrProcessorLoad (CPU), load values
+            current_oid = ObjectIdentity(base_oid)
+            last_oid = None
+            
+            
 
-            for varBind in varBinds:
-                oid, value = str(varBind[0]), varBind[1].prettyPrint()
+            while True:
+                errorIndication, errorStatus, errorIndex, varBinds = await next_cmd(
+                    snmpEngine,
+                    user_data,
+                    transport,
+                    ContextData(),
+                    ObjectType(current_oid),
+                    lexicographicMode=True,
+                )
 
-                if not oid.startswith(base_oid):
-                    stop_walk = True
+                if errorIndication or errorStatus or not varBinds:
                     break
 
-                if last_oid and oid_tuple(oid) <= oid_tuple(last_oid):
-                    stop_walk = True
+                stop_walk = False  # <--- flag to break the while loop
+
+                for varBind in varBinds:
+                    oid, value = str(varBind[0]), varBind[1].prettyPrint()
+
+                    if not oid.startswith(base_oid):
+                        stop_walk = True
+                        break
+
+                    if last_oid and oid_tuple(oid) <= oid_tuple(last_oid):
+                        stop_walk = True
+                        break
+
+                    last_oid = oid
+                    results[oid] = value
+                    current_oid = ObjectIdentity(oid)
+
+                if stop_walk:
                     break
 
-                last_oid = oid
-                results[oid] = value
-                current_oid = ObjectIdentity(oid)
+        snmpEngine.close_dispatcher()
+        return results
+    else:
+        snmpEngine = SnmpEngine()
+        transport = await UdpTransportTarget.create((host_data["host"], 161))
+        results = {}
 
-            if stop_walk:
-                break
+        for base_oid in ["1.3.6.1.2.1.25.2.3.1", "1.3.6.1.2.1.25.3.3.1.2", "1.3.6.1.4.1.2021.10.1.3"]: # hrStorageTable (memory & disk), hrProcessorLoad (CPU), load values
+            current_oid = ObjectIdentity(base_oid)
+            last_oid = None
 
-    snmpEngine.close_dispatcher()
-    return results
+            while True:
+                errorIndication, errorStatus, errorIndex, varBinds = await next_cmd(
+                    snmpEngine,
+                    CommunityData("public2", mpModel=1),  # SNMPv2c
+                    transport,
+                    ContextData(),
+                    ObjectType(current_oid),
+                    lexicographicMode=True
+                )
 
-async def get_system_info(host):
+                if errorIndication or errorStatus or not varBinds:
+                    break
+                
+                stop_walk = False  # <--- flag to break the while loop
+
+                for varBind in varBinds:
+                    oid, value = str(varBind[0]), varBind[1].prettyPrint()
+                    print(oid, value)
+
+                    if not oid.startswith(base_oid):
+                        stop_walk = True
+                        break
+
+                    if last_oid and oid_tuple(oid) <= oid_tuple(last_oid):
+                        stop_walk = True
+                        break
+
+                    last_oid = oid
+                    results[oid] = value
+                    current_oid = ObjectIdentity(oid)
+                if stop_walk:
+                    break
+
+        snmpEngine.close_dispatcher()
+        return results
+
+async def get_system_info_snmp(host):
     # Walk HOST-RESOURCES-MIB
-    data = await safe_snmp_walk(host)
+    data = await safe_snmp_walk(host, True)
 
     memory = {}
     disk = {}
@@ -121,9 +168,8 @@ async def get_system_info(host):
     loads = {k: data.get(oid) for k, oid in load_oids.items()}
     return memory, disk, cpu, loads
 
-async def main():
-    host = "192.168.0.38"
-    memory, disk, cpu, loads = await get_system_info(host)
+async def gather_snmp_info(host):
+    memory, disk, cpu, loads = await get_system_info_snmp(host)
 
     print("\nMemory Usage:")
     for row, info in memory.items():
@@ -148,6 +194,7 @@ async def main():
 
 
 first = datetime.datetime.now()
-asyncio.run(main())
+host={"host":"192.168.0.38"}
+asyncio.run(gather_snmp_info(host))
 second = datetime.datetime.now()
 print(f"That took {str(second-first)} seconds")

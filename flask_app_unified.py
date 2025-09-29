@@ -2543,12 +2543,12 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
     # hosts stuff        
     @app.route('/hosts_control_panel')
-    def index():
+    def hosts_control_panel():
         if 'username' in session:
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
-                cursor.execute("SELECT host, user, description, threshold FROM host")
+                cursor.execute("SELECT host, user, description, threshold_cpu, threshold_mem FROM host")
                 rows = cursor.fetchall()
                 cursor.close()
                 conn.close()
@@ -2562,7 +2562,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         if 'username' in session:
             host = request.form.get('host')
             user = request.form.get('user')
-            password = request.form.get('password')
+            password = request.form.get('psw')
             description = request.form.get('description')
             threshold_cpu = request.form.get('cpu')
             threshold_mem = request.form.get('mem')
@@ -2594,8 +2594,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor()
-                cursor.execute("CREATE TABLE IF NOT EXISTS host (host VARCHAR(255), user VARCHAR(255), description VARCHAR(255), threshold_cpu FLOAT), threshold_mem FLOAT)")
-                cursor.execute("INSERT INTO host (host, user, description, threshold) VALUES (%s, %s, %s, %f)", (host, user, description, threshold_cpu, threshold_mem))
+                cursor.execute("INSERT INTO host (host, user, description, threshold_cpu, threshold_mem) VALUES (%s, %s, %s, %s, %s)", (host, user, description, threshold_cpu, threshold_mem))
                 conn.commit()
                 cursor.close()
                 conn.close()
@@ -2719,6 +2718,26 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
+    
+    # end host stuff
+    
+    # begin snmp stuff
+    @app.route('/snmp_control_panel', methods=['GET'])
+    def snmp_control_panel():
+        if 'username' in session:
+            try:
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT host, user, description, threshold, protocol, details FROM snmp_host")
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                return render_template("control_panel_snmp.html", hosts_snmp=rows)
+            except Exception:
+                return f"Error loading hosts: {traceback.format_exc()}"
+        return redirect(url_for('login'))
+    
+    # end snmp stuff
 
     return app
     
