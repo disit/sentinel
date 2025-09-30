@@ -1,0 +1,42 @@
+<html>
+    <head>
+        <title>SNMP Info for {{ host }}</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; }
+            table { border-collapse: collapse; margin-bottom: 20px; width: 80%; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <h1>SNMP Info for {{ host }}</h1>
+
+        <h2>Memory Usage</h2>
+        <table>
+            <tr><th>Description</th><th>Used (MB)</th><th>Total (MB)</th></tr>
+            {% for mem in data.memory %}
+            <tr><td>{{ mem.description }}</td><td>{{ mem.used_MB }}</td><td>{{ mem.total_MB }}</td></tr>
+            {% endfor %}
+        </table>
+
+        <h2>Disk Usage</h2>
+        <table>
+            <tr><th>Description</th><th>Used (MB)</th><th>Total (MB)</th></tr>
+            {% for disk in data.disks %}
+            <tr><td>{{ disk.description }}</td><td>{{ disk.used_MB }}</td><td>{{ disk.total_MB }}</td></tr>
+            {% endfor %}
+        </table>
+
+        <h2>CPU Load</h2>
+        {% if data.cpu.error %}
+            <p>{{ data.cpu.error }}</p>
+        {% else %}
+            <p>Per-core: {{ data.cpu.per_core }}</p>
+            <p>Average: {{ data.cpu.average }}%</p>
+        {% endif %}
+
+        <h2>Load Averages</h2>
+        <p>1 min: {{ data.load_avg["1min"] }} | 5 min: {{ data.load_avg["5min"] }} | 15 min: {{ data.load_avg["15min"] }}</p>
+    </body>
+</html>

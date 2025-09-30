@@ -6,28 +6,25 @@ def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
     return tuple(int(x) for x in oid_str.split('.'))
 
-async def safe_snmp_walk(host_data, safe=True):
+async def safe_snmp_walk(host_data):
     """
     Walk only the relevant OIDs for memory, disk, and CPU.
     Returns a dict {oid: value}.
     """
-    if safe:
+    if host_data['safe']:
         snmpEngine = SnmpEngine()
         transport = await UdpTransportTarget.create((host_data["host"], 161))
         
         user = host_data["user"]
         auth_pass = host_data["auth_pass"]
         priv_pass = host_data["priv_pass"]
-        auth_protocol = usmHMACSHAAuthProtocol if host_data["auth_type"].upper().startswith("SHA") else usmHMACMD5AuthProtocol
-        priv_protocol = usmAesCfb128Protocol if host_data["priv_type"].upper().startswith("AES") else usmDESPrivProtocol
 
-        usm
         user_data = UsmUserData(
-            userName=host_data["user"],
-            authKey="sentinelXPWD",
-            privKey="sentinelXPWD",
-            authProtocol=usmHMAC384SHA512AuthProtocol,
-            privProtocol=usmAesCfb128Protocol
+            userName=user,
+            authKey=auth_pass,
+            privKey=priv_pass,
+            authProtocol=usmHMAC384SHA512AuthProtocol, #hardcoded
+            privProtocol=usmAesCfb128Protocol #hardcoded
         )
 
         results = {}
@@ -120,7 +117,7 @@ async def safe_snmp_walk(host_data, safe=True):
 
 async def get_system_info_snmp(host):
     # Walk HOST-RESOURCES-MIB
-    data = await safe_snmp_walk(host, True)
+    data = await safe_snmp_walk(host)
 
     memory = {}
     disk = {}
@@ -194,7 +191,9 @@ async def gather_snmp_info(host):
 
 
 first = datetime.datetime.now()
-host={"host":"192.168.0.38"}
+host={"user":"sentinel","host":"192.168.0.38","authpass":"sentinelXPWD","priv_pass":"sentinelXPWD","secure":bool(False if "False" else True)}
+print(host['secure'])
+exit(0)
 asyncio.run(gather_snmp_info(host))
 second = datetime.datetime.now()
 print(f"That took {str(second-first)} seconds")

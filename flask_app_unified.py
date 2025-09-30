@@ -43,8 +43,214 @@ import jwt
 import asyncio
 import time
 import paramiko
-
+from pysnmp.hlapi.v3arch.asyncio import *
 from werkzeug.middleware.proxy_fix import ProxyFix
+
+
+def oid_tuple(oid_str):
+    """Convert OID string to tuple of integers for proper comparison"""
+    return tuple(int(x) for x in oid_str.split('.'))
+
+async def safe_snmp_walk(host_data):
+    """
+    Walk only the relevant OIDs for memory, disk, and CPU.
+    Returns a dict {oid: value}.
+    """
+    if host_data['safe']:
+        snmpEngine = SnmpEngine()
+        transport = await UdpTransportTarget.create((host_data["host"], 161))
+        
+        user = host_data["user"]
+        json_details=json.loads(host_data["details"])
+        auth_pass = json_details["auth_pass"]
+        priv_pass = json_details["priv_pass"]
+
+        user_data = UsmUserData(
+            userName=user,
+            authKey=auth_pass,
+            privKey=priv_pass,
+            authProtocol=usmHMAC384SHA512AuthProtocol, #hardcoded
+            privProtocol=usmAesCfb128Protocol #hardcoded
+        )
+
+        results = {}
+
+        for base_oid in ["1.3.6.1.2.1.25.2.3.1", "1.3.6.1.2.1.25.3.3.1.2", "1.3.6.1.4.1.2021.10.1.3"]: # hrStorageTable (memory & disk), hrProcessorLoad (CPU), load values
+            current_oid = ObjectIdentity(base_oid)
+            last_oid = None
+            
+            
+
+            while True:
+                errorIndication, errorStatus, errorIndex, varBinds = await next_cmd(
+                    snmpEngine,
+                    user_data,
+                    transport,
+                    ContextData(),
+                    ObjectType(current_oid),
+                    lexicographicMode=True,
+                )
+
+                if errorIndication or errorStatus or not varBinds:
+                    break
+
+                stop_walk = False  # <--- flag to break the while loop
+
+                for varBind in varBinds:
+                    oid, value = str(varBind[0]), varBind[1].prettyPrint()
+
+                    if not oid.startswith(base_oid):
+                        stop_walk = True
+                        break
+
+                    if last_oid and oid_tuple(oid) <= oid_tuple(last_oid):
+                        stop_walk = True
+                        break
+
+                    last_oid = oid
+                    results[oid] = value
+                    current_oid = ObjectIdentity(oid)
+
+                if stop_walk:
+                    break
+
+        snmpEngine.close_dispatcher()
+        return results
+    else:
+        snmpEngine = SnmpEngine()
+        transport = await UdpTransportTarget.create((host_data["host"], 161))
+        results = {}
+
+        for base_oid in ["1.3.6.1.2.1.25.2.3.1", "1.3.6.1.2.1.25.3.3.1.2", "1.3.6.1.4.1.2021.10.1.3"]: # hrStorageTable (memory & disk), hrProcessorLoad (CPU), load values
+            current_oid = ObjectIdentity(base_oid)
+            last_oid = None
+
+            while True:
+                errorIndication, errorStatus, errorIndex, varBinds = await next_cmd(
+                    snmpEngine,
+                    CommunityData("public2", mpModel=1),  # SNMPv2c
+                    transport,
+                    ContextData(),
+                    ObjectType(current_oid),
+                    lexicographicMode=True
+                )
+
+                if errorIndication or errorStatus or not varBinds:
+                    break
+                
+                stop_walk = False  # <--- flag to break the while loop
+
+                for varBind in varBinds:
+                    oid, value = str(varBind[0]), varBind[1].prettyPrint()
+                    print(oid, value)
+
+                    if not oid.startswith(base_oid):
+                        stop_walk = True
+                        break
+
+                    if last_oid and oid_tuple(oid) <= oid_tuple(last_oid):
+                        stop_walk = True
+                        break
+
+                    last_oid = oid
+                    results[oid] = value
+                    current_oid = ObjectIdentity(oid)
+                if stop_walk:
+                    break
+
+        snmpEngine.close_dispatcher()
+        return results
+
+async def get_system_info_snmp(host):
+    # Walk HOST-RESOURCES-MIB
+    data = await safe_snmp_walk(host)
+
+    memory = {}
+    disk = {}
+    cpu = {}
+
+    for oid, value in data.items():
+        parts = oid.split('.')
+        # hrStorageTable: 1.3.6.1.2.1.25.2.3.1
+        if oid.startswith("1.3.6.1.2.1.25.2.3.1"):
+            column = int(parts[-2])
+            row = parts[-1]
+            if row not in memory and row not in disk:
+                row_dict = {}
+            else:
+                row_dict = memory.get(row, disk.get(row, {}))
+
+            if column == 3:
+                row_dict['descr'] = value
+            elif column == 4:
+                row_dict['alloc_unit'] = int(value)
+            elif column == 5:
+                row_dict['size'] = int(value)
+            elif column == 6:
+                row_dict['used'] = int(value)
+
+            # classify memory vs disk based on descr
+            descr = row_dict.get('descr', '').lower()
+            if 'memory' in descr or 'ram' in descr:
+                memory[row] = row_dict
+            else:
+                disk[row] = row_dict
+
+    # CPU: hrProcessorLoad
+    cpu_load_oids = {oid: value for oid, value in data.items() if oid.startswith("1.3.6.1.2.1.25.3.3.1.2")}
+    if cpu_load_oids:
+        cpu_percentages = [int(v) for v in cpu_load_oids.values()]
+        avg_cpu = sum(cpu_percentages) / len(cpu_percentages)
+        cpu['per_core'] = cpu_percentages
+        cpu['average'] = avg_cpu
+    load_oids = {
+        "1min": "1.3.6.1.4.1.2021.10.1.3.1",
+        "5min": "1.3.6.1.4.1.2021.10.1.3.2",
+        "15min": "1.3.6.1.4.1.2021.10.1.3.3",
+    }
+    loads = {k: data.get(oid) for k, oid in load_oids.items()}
+    return memory, disk, cpu, loads
+
+async def gather_snmp_info(host):
+    memory, disk, cpu, loads = await get_system_info_snmp(host)
+
+    result = {
+        "memory": [],
+        "disks": [],
+        "cpu": {},
+        "load_avg": loads
+    }
+
+    # Memory
+    for row, info in memory.items():
+        used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
+        total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
+        result["memory"].append({
+            "description": info.get('descr', 'unknown'),
+            "used_MB": round(used_bytes / 1024 / 1024, 1),
+            "total_MB": round(total_bytes / 1024 / 1024, 1),
+        })
+
+    # Disks
+    for row, info in disk.items():
+        used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
+        total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
+        result["disks"].append({
+            "description": info.get('descr', 'unknown'),
+            "used_MB": round(used_bytes / 1024 / 1024, 1),
+            "total_MB": round(total_bytes / 1024 / 1024, 1),
+        })
+
+    # CPU
+    if cpu:
+        result["cpu"] = {
+            "per_core": cpu.get("per_core", []),
+            "average": round(cpu.get("average", 0), 1),
+        }
+    else:
+        result["cpu"] = {"error": "No CPU info available via hrProcessorLoad"}
+
+    return result
 
 ALGORITHM = 'HS256'
 def string_of_list_to_list(string):
@@ -2737,8 +2943,89 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return f"Error loading hosts: {traceback.format_exc()}"
         return redirect(url_for('login'))
     
+    @app.route('/add_snmp', methods=['POST'])
+    def add_snmp():
+        if 'username' in session:
+            user = request.form.get('user', None)
+            description = request.form.get('description', None)
+            details = request.form.get('details', None)
+            cpu = request.form.get('cpu', None)
+            mem = request.form.get('mem', None)
+            protocol = request.form.get('protocol', None)
+            host = request.form.get('host', None)
+            PrivKey = request.form.get('PrivKey', None)
+            AuthKey = request.form.get('AuthKey', None)
+            try:
+                
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor()
+                if protocol=="True":
+                    details = json.dumps({"PrivKey":PrivKey, "AuthKey":AuthKey})
+                elif protocol=="False":
+                    details = None
+                else:
+                    return jsonify({"error": "Illegal protocol detected"}), 500
+                cursor.execute("INSERT INTO snmp_host (host, user, description, threshold_cpu, threshold_mem, details, protocol) VALUES (%s, %s, %s, %s, %s)", (host, user, description, cpu, mem, details, protocol))
+                conn.commit()
+                cursor.close()
+                conn.close()
+
+                return jsonify({"status": "ok"})
+
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
+
+    @app.route('/delete_snmp_host', methods=['POST'])
+    def delete_snmp_host():
+        if 'username' in session:
+            host = request.form.get('host')
+
+            try:
+                # Fetch user from DB
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT user FROM snmp_host WHERE host=%s", (host,))
+                row = cursor.fetchone()
+
+                if not row:
+                    cursor.close()
+                    conn.close()
+                    return jsonify({"error": "Host not found in DB"}), 400
+
+                cursor.execute("DELETE FROM snmp_host WHERE host=%s", (host,))
+                conn.commit()
+                cursor.close()
+                conn.close()
+                return jsonify({"status": "deleted"})
+
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
     # end snmp stuff
 
+    @app.route("/snmp_info", methods=["GET"])
+    def snmp_info():
+        if 'username' in session:
+            host = request.args.get("host", None)
+            if host is None:
+                return render_template("error_showing.html", r = "No SNMP host was selected, please ensure to provide it in the body of the request under 'host'"), 400
+            try:
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT * FROM host WHERE host=%s", (host,))
+                row = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                if not row:
+                    return render_template("error_showing.html", r = "The provided host wasn't found in the db"), 404
+                received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],}
+                data = asyncio.run(gather_snmp_info(received_data))
+                return render_template("snmp_shower.html", host=host, data=data)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        
+        return redirect(url_for('login'))
     return app
     
 if __name__ == "__main__":
