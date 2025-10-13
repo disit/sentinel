@@ -382,7 +382,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             newstr += curstr+"<br>"
     return newstr
 
-KEY_DIR = "./ssh_keys"
+KEY_DIR = "/ssh_keys"
 os.makedirs(KEY_DIR, exist_ok=True)
 
 
@@ -1315,17 +1315,26 @@ def send_advanced_alerts(message):
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
             for overloaded_cpu_top in message[6]:
-                prepare_text_top_cpu += f"<br>Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"
+                try:
+                    prepare_text_top_cpu += f"<br>Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"
+                except:
+                    prepare_text_top_cpu += f"<br>There was an issue reading an overloaded cpu top: {traceback.format_exc()}</br><br>String was {str(overloaded_cpu_top)}</br>"
             text_for_email += prepare_text_top_cpu + "<br><br>"
         if len(message[7])>0:
             prepare_text_top_mem = "<br>These hosts are overloaded on memory:"
             for overloaded_mem_top in message[7]:
-                prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
+                try:
+                    prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
+                except:
+                    prepare_text_top_mem += f"<br>There was an issue reading an overloaded mem top: {traceback.format_exc()}</br><br>String was {str(overloaded_mem_top)}</br>"
             text_for_email += prepare_text_top_mem + "<br><br>"
         if len(message[8])>0:
             prepare_text_top_error = "<br>Couldn't load the tops for these hosts:"
             for error_top in message[8]:
-                prepare_text_top_error += f"<br>Host named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}</br>"
+                try:
+                    prepare_text_top_error += f"<br>Host named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}</br>"
+                except:
+                    prepare_text_top_error += f"<br>There was an issue reading a top: {traceback.format_exc()}</br><br>String was {str(error_top)}</br>"
             text_for_email += prepare_text_top_error + "<br><br>"
         try:
             if len(text_for_email) > 15:
