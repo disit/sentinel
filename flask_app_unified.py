@@ -728,17 +728,43 @@ def auto_alert_status():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
-                for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
-                    try:
-                        total_answer = total_answer + json.loads(obtained)
-                    except:
+                try:
+                    for r in results:
+                        obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except:
-                            pass
+                            try:
+                                obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                                total_answer = total_answer + json.loads(obtained)
+                            except:
+                                pass
+                except requests.exceptions.ConnectionError:
+                    pass
             containers_merged = containers_merged + total_answer
+            new_containers_merged = []
+            for current in new_containers_merged:
+                td = {}
+                td["Command"] = current["Command"]
+                td["CreatedAt"] = current["CreatedAt"]
+                td["ID"] = current["ID"]
+                td["Image"] = current["Image"]
+                td["Labels"] = current["Labels"]
+                td["Mounts"] = current["Mounts"]
+                td["Names"] = current["Names"]
+                td["Name"] = current["Names"]
+                td["Ports"] = current["Ports"]
+                td["RunningFor"] = current["RunningFor"]
+                td["State"] = current["State"]
+                td["Status"] = current["Status"]
+                td["Container"] = current["Container"]
+                # host origin = node, sorta
+                td["Node"] = "host" #current[""]
+                td["Volumes"] = current["LocalVolumes"]
+                td["Namespace"] = "'Docker'"
+                new_containers_merged.append(td)
+            containers_merged = new_containers_merged
+        else:
             new_containers_merged = []
             for current in new_containers_merged:
                 td = {}
@@ -1117,16 +1143,19 @@ def update_container_state_db():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
-                for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
-                    try:
-                        total_answer = total_answer + json.loads(obtained)
-                    except:
+                try:
+                    for r in results:
+                        obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except:
-                            pass
+                            try:
+                                obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                                total_answer = total_answer + json.loads(obtained)
+                            except:
+                                pass
+                except requests.exceptions.ConnectionError:
+                    pass
             containers_merged = containers_merged + total_answer
             new_containers_merged = []
             for current in new_containers_merged:
@@ -2235,10 +2264,10 @@ def create_app():
                 conn.commit()
                 results = cursor.fetchall()
                 try:
-                    r = requests.post(results[0][0]+"/sentinel/reboot_container",  data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                    r = requests.post(results[0][0]+"/sentinel/reboot_container",  data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
                     return r.text
                 except:
-                    r = requests.post(results[0][0]+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                    r = requests.post(results[0][0]+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
                     return r.text
         except Exception:
             print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
@@ -2408,12 +2437,12 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 total_answer=[]
                 errors=[]
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
                         except Exception as E:
                             errors.append("Reading containers from "+r[0]+" failed: the backed received this exception: "+str(E))
@@ -2746,7 +2775,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     subprocess.run(f'rm -f *snap4city*-certification-*.rar', shell=True)
                     for r in results:
                         file_name, content_disposition = "", ""
-                        obtained = requests.get(r[0]+"/sentinel/certification", data={"auth":jwt.encode({'sub': username,'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                        obtained = requests.get(r[0]+"/sentinel/certification", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
                         if 'Content-Disposition' in obtained.headers:
                             content_disposition = obtained.headers['Content-Disposition']
                         if 'filename=' in content_disposition:

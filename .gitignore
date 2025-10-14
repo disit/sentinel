@@ -2,3 +2,4 @@ playground/main.py
 playground/pods.json
 ssh_keys
 ./sketches.py
+./local_instance
