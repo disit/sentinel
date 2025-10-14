@@ -920,8 +920,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     top_errors = []
     for top_r in top_results:
         try:
-            if len(top_r["errors"]) > 0:
-                top_errors.append(top_r)
+            if len(top_r["error"]) > 0:
+                top_errors.append(top_r["error"])
                 continue
             regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
             matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
@@ -1288,17 +1288,27 @@ def send_advanced_alerts(message):
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
             for overloaded_cpu_top in message[6]:
-                prepare_text_top_cpu += f"<br>Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"
+                try:
+                    prepare_text_top_cpu += f"<br>Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"
+                except:
+                    prepare_text_top_cpu += f"<br>Issue while interpreting cpu top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_cpu_top)}</br>"
             text_for_email += prepare_text_top_cpu + "<br><br>"
         if len(message[7])>0:
             prepare_text_top_mem = "<br>These hosts are overloaded on memory:"
             for overloaded_mem_top in message[7]:
-                prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
+                try:
+                    prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
+                except:
+                    prepare_text_top_mem += f"<br>Issue while interpreting mem top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_mem_top)}</br>"
+
             text_for_email += prepare_text_top_mem + "<br><br>"
         if len(message[8])>0:
             prepare_text_top_error = "<br>Couldn't load the tops for these hosts:"
             for error_top in message[8]:
-                prepare_text_top_error += f"<br>Host named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}</br>"
+                try:
+                    prepare_text_top_error += f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}</br>"
+                except:
+                    prepare_text_top_error += f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br><br> Original object: {str(error_top)}</br>"
             text_for_email += prepare_text_top_error + "<br><br>"
         try:
             if len(text_for_email) > 15:
@@ -1325,17 +1335,27 @@ def send_advanced_alerts(message):
         if len(message[6])>0:
             prepare_text_top_cpu = "\nThese hosts are overloaded on cpu:"
             for overloaded_cpu_top in message[6]:
-                prepare_text_top_cpu += f"\nHost named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}"
+                try:
+                    prepare_text_top_cpu += f"\nHost named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}"
+                except:
+                    prepare_text_top_cpu += f"\nIssue while interpreting cpu top: ({traceback.format_exc()})\n Original object: {str(overloaded_cpu_top)}</br>"
             text_for_telegram += prepare_text_top_cpu + "\n\n"
         if len(message[7])>0:
             prepare_text_top_mem = "\nThese hosts are overloaded on memory:"
             for overloaded_mem_top in message[7]:
-                prepare_text_top_mem += f"\nHost named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}"
+                try:
+                    prepare_text_top_mem += f"\nHost named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}"
+                except:
+                    prepare_text_top_mem += f"\nIssue while interpreting mem top: ({traceback.format_exc()})\n Original object: {str(overloaded_mem_top)}</br>"
             text_for_telegram += prepare_text_top_mem + "\n\n"
         if len(message[8])>0:
             prepare_text_top_error = "\nCouldn't load the tops for these hosts:"
             for error_top in message[8]:
-                prepare_text_top_error += f"\nHost named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}"
+                try:
+                    prepare_text_top_error += f"\nHost named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}"
+                except:
+                    prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n Original object: {str(error_top)}</br>"
+
             text_for_telegram += prepare_text_top_error + "\n\n"
         if len(text_for_telegram)>5:  
             try:
