@@ -1,8 +1,9 @@
-waitress
 apscheduler
 flask[async]
-requests
-mysql-connector-python
-reportlab
 jwt
+mysql-connector-python
 paramiko
+pysnmp
+reportlab
+requests
+waitress

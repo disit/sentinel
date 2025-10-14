@@ -330,13 +330,13 @@ db_conn_info = {
 }
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
-    if not os.getenv("running_as_kubernetes",None):
+    if "False" == os.getenv("running_as_kubernetes","False"):
         using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     else:
         using_these = '|'.join('^{0}'.format(w).strip() for w in containers.split(", ") if len(w)>0)
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
-        if not os.getenv("running_as_kubernetes",None):
+        if "False" == os.getenv("running_as_kubernetes","False"):
             query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
         else:
             if len(using_these)<1:
@@ -350,7 +350,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
     if because:
         print(f"because: {because}")
     for a in now_it_is:
-        if not os.getenv("running_as_kubernetes",None):
+        if "False" == os.getenv("running_as_kubernetes","False"):
             curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         else:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
@@ -708,7 +708,7 @@ async def run_shell_command(name, command):
 
 
 def auto_alert_status():
-    if not os.getenv("running_as_kubernetes",None):
+    if "False" == os.getenv("running_as_kubernetes","False"):
         
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -847,7 +847,7 @@ def auto_alert_status():
     containers_which_should_be_running_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and not ("running" in c["State"])]
     
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
-    if not os.getenv("running_as_kubernetes",None): #todo troubleshoot here
+    if "False" == os.getenv("running_as_kubernetes","False"): #todo troubleshoot here
         containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
     else:
         containers_which_are_running_but_are_not_healthy=[]
@@ -864,7 +864,7 @@ def auto_alert_status():
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    if not os.getenv("running_as_kubernetes",None): #todo troubleshoot here
+    if "False" == os.getenv("running_as_kubernetes","False"): #todo troubleshoot here
         containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
         containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
     else:
@@ -879,7 +879,7 @@ def auto_alert_status():
                     except ValueError:
                         pass
         containers_which_are_not_expected = og_conts
-    if not os.getenv("running_as_kubernetes",None):
+    if "False" == os.getenv("running_as_kubernetes","False"):
         top = get_top()
         load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
         load_issues=""
@@ -919,18 +919,20 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     
     top_errors = []
     for top_r in top_results:
-        if len(top_r["errors"]) > 0:
+        try:
+            if len(top_r["errors"]) > 0:
+                top_errors.append(top_r)
+                continue
+            regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
+            matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
+            for _, match in enumerate(matches, start=1):
+                for groupNum in range(0, len(match.groups())):
+                    if (float(match.group(groupNum + 1).replace(",","."))>top_r["threshold_cpu"]):
+                        problematic_tops_cpu.append(top_r)
+            if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
+                problematic_tops_ram.append(top_r)
+        except:
             top_errors.append(top_r)
-            continue
-        regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
-        matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
-        for _, match in enumerate(matches, start=1):
-            for groupNum in range(0, len(match.groups())):
-                if (float(match.group(groupNum + 1).replace(",","."))>top_r["threshold_cpu"]):
-                    problematic_tops_cpu.append(top_r)
-        if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
-            problematic_tops_ram.append(top_r)
-    
                     
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
@@ -940,7 +942,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                if not os.getenv("running_as_kubernetes",None):
+                if "False" == os.getenv("running_as_kubernetes","False"):
                     issues[2]=[a[0] for a in containers_which_are_not_expected]
                 else:
                     issues[2]=containers_which_are_not_expected
@@ -1096,7 +1098,7 @@ def send_alerts(message):
         print("Error sending alerts:",traceback.format_exc())
         
 def update_container_state_db():
-    if not os.getenv("running_as_kubernetes",None):
+    if "False" == os.getenv("running_as_kubernetes","False"):
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -1258,7 +1260,7 @@ def runcronjobs():
 def send_advanced_alerts(message):
     try:
         container_source = ""
-        if not os.getenv("running_as_kubernetes",None):
+        if "False" == os.getenv("running_as_kubernetes","False"):
             container_source="docker"
         else:
             container_source="kubernetes"
@@ -1373,7 +1375,7 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        if not os.getenv("running_as_kubernetes",None):
+                        if "False" == os.getenv("running_as_kubernetes","False"):
                             return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
                         else:
                             return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
@@ -1382,7 +1384,7 @@ def create_app():
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        if not os.getenv("running_as_kubernetes",None):
+                        if "False" == os.getenv("running_as_kubernetes","False"):
                             return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
                         else:
                             return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
@@ -1459,7 +1461,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    if not os.getenv("running_as_kubernetes",None):
+                    if "False" == os.getenv("running_as_kubernetes","False"):
                         query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
                         cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['id'],))
                     else:
@@ -2064,7 +2066,7 @@ def create_app():
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''select command, command_explained, id from tests_table where container_name =%s;'''
                     
-                    if not os.getenv("running_as_kubernetes",None):
+                    if "False" == os.getenv("running_as_kubernetes","False"):
                         container = request.form.to_dict()['container']
                     else:
                         container = '-'.join(request.form.to_dict()['container'].split('-')[:-2])
@@ -2151,7 +2153,7 @@ def create_app():
     @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
         
-        if not os.getenv("running_as_kubernetes",None):
+        if "False" == os.getenv("running_as_kubernetes","False"):
             try:
                 jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
                 result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
@@ -2312,7 +2314,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/container/<podname>")
     def get_container_logs(podname):
         if 'username' in session:
-            if not os.getenv("running_as_kubernetes",None):
+            if "False" == os.getenv("running_as_kubernetes","False"):
 
                 process = subprocess.Popen(
                     'docker logs '+podname+" --tail "+str(config["default-log-length"]),
@@ -2425,7 +2427,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
     
     def get_container_data(do_not_jsonify=False):
-        if not os.getenv("running_as_kubernetes",None):
+        if "False" == os.getenv("running_as_kubernetes","False"):
             containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_merged = []
