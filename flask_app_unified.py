@@ -745,7 +745,7 @@ def auto_alert_status():
             new_containers_merged = []
             for current in new_containers_merged:
                 td = {}
-                td["Command"] = current["Command"]
+                #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
@@ -768,7 +768,7 @@ def auto_alert_status():
             new_containers_merged = []
             for current in new_containers_merged:
                 td = {}
-                td["Command"] = current["Command"]
+                #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
@@ -891,6 +891,7 @@ def auto_alert_status():
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
     if "False" == os.getenv("running_as_kubernetes","False"): #todo troubleshoot here
+        print(containers_merged)
         containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
         containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
     else:
@@ -1125,6 +1126,7 @@ def send_alerts(message):
         
 def update_container_state_db():
     if "False" == os.getenv("running_as_kubernetes","False"):
+        print("Loading as docker...")
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -1157,28 +1159,28 @@ def update_container_state_db():
                 except requests.exceptions.ConnectionError:
                     pass
             containers_merged = containers_merged + total_answer
-            new_containers_merged = []
-            for current in new_containers_merged:
-                td = {}
-                td["Command"] = current["Command"]
-                td["CreatedAt"] = current["CreatedAt"]
-                td["ID"] = current["ID"]
-                td["Image"] = current["Image"]
-                td["Labels"] = current["Labels"]
-                td["Mounts"] = current["Mounts"]
-                td["Names"] = current["Names"]
-                td["Name"] = current["Names"]
-                td["Ports"] = current["Ports"]
-                td["RunningFor"] = current["RunningFor"]
-                td["State"] = current["State"]
-                td["Status"] = current["Status"]
-                td["Container"] = current["Container"]
-                # host origin = node, sorta
-                td["Node"] = "host" #current[""]
-                td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
-                new_containers_merged.append(td)
-            containers_merged = new_containers_merged
+        new_containers_merged = []
+        for current in containers_merged:
+            td = {}
+            #td["Command"] = current["Command"]
+            td["CreatedAt"] = current["CreatedAt"]
+            td["ID"] = current["ID"]
+            td["Image"] = current["Image"]
+            td["Labels"] = current["Labels"]
+            td["Mounts"] = current["Mounts"]
+            td["Names"] = current["Names"]
+            td["Name"] = current["Names"]
+            td["Ports"] = current["Ports"]
+            td["RunningFor"] = current["RunningFor"]
+            td["State"] = current["State"]
+            td["Status"] = current["Status"]
+            td["Container"] = current["Container"]
+            # host origin = node, sorta
+            td["Node"] = "host" #current[""]
+            td["Volumes"] = current["LocalVolumes"]
+            td["Namespace"] = "Docker"
+            new_containers_merged.append(td)
+        containers_merged = new_containers_merged
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
@@ -1424,19 +1426,13 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        if "False" == os.getenv("running_as_kubernetes","False"):
-                            return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
-                        else:
-                            return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
+                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        if "False" == os.getenv("running_as_kubernetes","False"):
-                            return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
-                        else:
-                            return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
+                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
@@ -2490,7 +2486,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             new_containers_merged = []
             for current in new_containers_merged:
                 td = {}
-                td["Command"] = current["Command"]
+                #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]

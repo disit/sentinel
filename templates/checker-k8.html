@@ -705,7 +705,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 				else if (index_of_below_array === 12) {
 					var content_of_id_cell;
 					try {
-						if (cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
+						if (cellData === "running" || cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
 							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 						}
@@ -1124,7 +1124,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			}, 500);
 		});
 </script>
-<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column;width:fit-content;min-width: 1000px;">
+<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column;min-width: 1000px;">
 	<div class="collapse navbar-collapse container-fluid" id="navbarSupportedContent">
 		<ul class="navbar-nav mr-auto">
 			<li class="nav-item active">
