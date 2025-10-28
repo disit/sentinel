@@ -723,7 +723,7 @@ def auto_alert_status():
         if os.getenv("is-multi",None):
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                query = '''SELECT hostname FROM checker.ip_table'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
@@ -761,7 +761,7 @@ def auto_alert_status():
                 # host origin = node, sorta
                 td["Node"] = "host" #current[""]
                 td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
+                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
                 new_containers_merged.append(td)
             containers_merged = new_containers_merged
         else:
@@ -784,10 +784,10 @@ def auto_alert_status():
                 # host origin = node, sorta
                 td["Node"] = "host" #current[""]
                 td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
+                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
                 new_containers_merged.append(td)
             containers_merged = new_containers_merged
-    else:
+    else: # TODO this is not ready for multi!
         
         raw_jsons = []
         for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
@@ -1140,7 +1140,7 @@ def update_container_state_db():
         if os.getenv("is-multi",None):
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                query = '''SELECT hostname FROM checker.ip_table;'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
@@ -1178,7 +1178,7 @@ def update_container_state_db():
             # host origin = node, sorta
             td["Node"] = "host" #current[""]
             td["Volumes"] = current["LocalVolumes"]
-            td["Namespace"] = "Docker"
+            td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
             new_containers_merged.append(td)
         containers_merged = new_containers_merged
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -1270,7 +1270,10 @@ def runcronjobs():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             # to run malicious code, malicious code must be present in the db or the machine in the first place
-            query = '''SELECT * FROM cronjobs;'''
+            hostname=subprocess.check_output("hostname", shell=True).decode().strip()
+            query = f'SELECT * FROM cronjobs where `where_to_run`="{hostname}"'
+            if os.getenv("is-master",True): # the master will run the unassigned ones
+                query+="or `where_to_run` is Null"
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
@@ -1575,8 +1578,8 @@ def create_app():
                     if os.getenv('UNSAFE_MODE') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`) VALUES (%s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],))
+                    query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],))
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -1594,8 +1597,8 @@ def create_app():
                     if os.getenv('UNSAFE_MODE') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s WHERE (`idcronjobs` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s WHERE (`idcronjobs` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2247,7 +2250,7 @@ def create_app():
     
     @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
     def reboot_container_advanced(container_id):
-        if not os.getenv("is-multi",None):
+        if not os.getenv("is-multi",None): #todo make this work on multi
             return "Disabled for non-clustered environments", 500
         if not config['is-master']:
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -2359,66 +2362,68 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/container/<podname>")
     def get_container_logs(podname):
         if 'username' in session:
-            if "False" == os.getenv("running_as_kubernetes","False"):
+            if not os.getenv("is-multi",True): #todo make this work on multi
+                if "False" == os.getenv("running_as_kubernetes","False"):
 
-                process = subprocess.Popen(
-                    'docker logs '+podname+" --tail "+str(config["default-log-length"]),
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
-                )
-                out=[]
-                for line in iter(process.stdout.readline, ''):
-                    out.append(line[:-1])
-                process.stdout.close()
-                r = '<br>'.join(out)
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
-            else:
-                prefetch = subprocess.Popen(
-               f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
-                )
-                namespace = ""
-                try:
-                    namespace = prefetch.stdout.readlines()[0].strip()
-                except IndexError:
-                    pass
-                if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
-                    return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
-                process = subprocess.Popen(
-               f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
-                )
-                out=[]
-                if os.getenv('log_previous_container_if_kubernetes'):
-                    process_previous = subprocess.Popen(
-               f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
+                    process = subprocess.Popen(
+                        'docker logs '+podname+" --tail "+str(config["default-log-length"]),
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
                     )
-                    for line in iter(process_previous.stdout.readline, ''):
+                    out=[]
+                    for line in iter(process.stdout.readline, ''):
                         out.append(line[:-1])
-                for line in iter(process.stdout.readline, ''):
-                    out.append(line[:-1])
-                
-                process.stdout.close()
-                r = '<br>'.join(out)
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
-        
+                    process.stdout.close()
+                    r = '<br>'.join(out)
+                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                else:
+                    prefetch = subprocess.Popen(
+                f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
+                    )
+                    namespace = ""
+                    try:
+                        namespace = prefetch.stdout.readlines()[0].strip()
+                    except IndexError:
+                        pass
+                    if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
+                        return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
+                    process = subprocess.Popen(
+                f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
+                    )
+                    out=[]
+                    if os.getenv('log_previous_container_if_kubernetes'):
+                        process_previous = subprocess.Popen(
+                f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
+                        )
+                        for line in iter(process_previous.stdout.readline, ''):
+                            out.append(line[:-1])
+                    for line in iter(process.stdout.readline, ''):
+                        out.append(line[:-1])
+                    
+                    process.stdout.close()
+                    r = '<br>'.join(out)
+                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+            else: # guess where to get logs TODO
+                pass
         return redirect(url_for('login'))
         
     @app.route("/advanced_read_containers", methods=['POST'])
     def check_adv():
-        if not os.getenv("is-multi",True):
+        if not os.getenv("is-multi",True): #todo make this work on multi
             return "Disabled for non-clustered environments", 500
         if not os.getenv('is-master'):
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -2426,7 +2431,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             results = None
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                query = '''SELECT hostname FROM checker.ip_table'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
@@ -2502,7 +2507,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 # host origin = node, sorta
                 td["Node"] = "host" #current[""]
                 td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
+                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
                 new_containers_merged.append(td)
             containers_merged = new_containers_merged
             if do_not_jsonify:
@@ -2761,7 +2766,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 results = None
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT distinct position FROM checker.component_to_category;'''
+                    query = '''SELECT hostname FROM checker.ip_table;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
@@ -2981,7 +2986,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
-                cursor.execute("SELECT host, user, description, threshold, protocol, details FROM snmp_host")
+                cursor.execute("SELECT host, user, description, threshold_cpu, protocol, details, threshold_mem FROM snmp_host")
                 rows = cursor.fetchall()
                 cursor.close()
                 conn.close()

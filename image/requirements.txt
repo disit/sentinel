@@ -1,6 +1,6 @@
 apscheduler
 flask[async]
-jwt
+PyJWT
 mysql-connector-python
 paramiko
 pysnmp
