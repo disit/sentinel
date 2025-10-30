@@ -2965,6 +2965,84 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     
     # end host stuff
     
+    # begin sentinel host stuff
+        
+    @app.route('/sentinel_hosts_control_panel')
+    def sentinel_hosts_control_panel():
+        if not os.getenv("is-multi","False") == "True":
+            return "Disabled for non-clustered environments", 500
+        if 'username' in session:
+            try:
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT hostname, ip FROM ip_table")
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                return render_template("multi-host-sentinel-manager.html", hosts=rows)
+            except Exception:
+                return f"Error loading hosts: {traceback.format_exc()}"
+        return redirect(url_for('login'))
+
+    @app.route('/add_sentinel_host', methods=['POST'])
+    def add_sentinel_host():
+        if not os.getenv("is-multi","False") == "True":
+            return "Disabled for non-clustered environments", 500
+        if 'username' in session:
+            hostname = request.form.get('hostname')
+            ip = request.form.get(key='ip')
+
+            try:
+                
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO ip_table (hostname, ip) VALUES (%s, %s)", (hostname, ip))
+                conn.commit()
+                cursor.close()
+                conn.close()
+
+                return jsonify({"status": "ok"})
+
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
+    
+    
+    @app.route('/delete_sentinel_host', methods=['POST'])
+    def delete_sentinel_host():
+        if not os.getenv("is-multi","False") == "True":
+            return "Disabled for non-clustered environments", 500
+        if 'username' in session:
+            hostname = request.form.get('hostname')
+
+            try:
+                # Fetch user from DB
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT hostname FROM ip_table WHERE hostname=%s", (hostname,))
+                row = cursor.fetchone()
+
+                if not row:
+                    cursor.close()
+                    conn.close()
+                    return jsonify({"error": "Host not found in DB"}), 400
+
+                user = row['user']
+                cursor.execute("DELETE FROM ip_table WHERE hostname=%s", (hostname,))
+                conn.commit()
+                cursor.close()
+                conn.close()
+
+                return jsonify({"status": "deleted"})
+
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
+    
+    
+    # end sentinel host stuff 
+    
+    
     # begin snmp stuff
     @app.route('/snmp_control_panel', methods=['GET'])
     def snmp_control_panel():

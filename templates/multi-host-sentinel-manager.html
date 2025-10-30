@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+{% extends "main.html" %}
+{% block title %}SnapSentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<h1>Sentinel Hosts</h1>
+<table border="1" cellpadding="5" id="hosts_table">
+<thead><tr><th>IP</th><th>Hostname</th><th>Delete Sentinel Host</th></tr></thead>
+{% for row in hosts %}
+<tr>
+<td>{{ row['ip'] }}</td>
+<td>{{ row['hostname'] }}</td>
+<td><button class="btn btn-danger" onclick="deleteHost('{{ row['host'] }}')">Delete</button></td>
+</tr>
+{% endfor %}
+</table>
+
+<h2>Add New Host</h2>
+<form id="addForm">
+Hostname: <input id="hostname" type="text" class="form-control" name="hostname" required><br>
+IP: <input id="ip" type="text" class="form-control" name="ip" required><br>
+<button id="button_add" class="form-control" class="btn btn-info">Add Sentinel Host</button>
+</form>
+
+
+<script>
+$('#hosts_table').DataTable();
+function deleteHost(host) {
+    e.preventDefault();
+        try {
+            $.ajax({
+                url: './delete_sentinel_host',
+                data: {hostname: hostname},
+                type: 'POST',
+                success: function(response) {
+                    alert("Host was deleted!");
+                    location.reload();
+                },
+                error: function(error) {
+                    alert("Host was not deleted because of: " + error);
+                }
+            });
+        }
+        catch (exception_var) {
+            console.log(exception_var);
+        }
+};
+
+
+
+$('#button_add').on('click', function(e) {
+    e.preventDefault();
+    try {
+        $.ajax({
+            url: './add_sentinel_host',
+            data: {hostname: $('#hostname').val(), ip: $('#ip').val()},
+            type: 'POST',
+            success: function(response) {
+                alert("Host was added!");
+                location.reload();
+            },
+            error: function(error) {
+                alert("Host was not added because of: " + error);
+            }
+        });
+    }
+    catch (exception_var) {
+        console.log(exception_var);
+    }
+});
+</script>
+{% endblock %}
