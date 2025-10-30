@@ -351,7 +351,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         print(f"because: {because}")
     for a in now_it_is:
         if "False" == os.getenv("running_as_kubernetes","False"):
-            curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
+            curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         else:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         
@@ -723,7 +723,7 @@ def auto_alert_status():
         if os.getenv("is-multi",None):
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                query = '''SELECT hostname FROM checker.ip_table'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
@@ -745,7 +745,7 @@ def auto_alert_status():
             new_containers_merged = []
             for current in new_containers_merged:
                 td = {}
-                td["Command"] = current["Command"]
+                #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
@@ -761,14 +761,14 @@ def auto_alert_status():
                 # host origin = node, sorta
                 td["Node"] = "host" #current[""]
                 td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
+                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
                 new_containers_merged.append(td)
             containers_merged = new_containers_merged
         else:
             new_containers_merged = []
             for current in new_containers_merged:
                 td = {}
-                td["Command"] = current["Command"]
+                #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
@@ -784,10 +784,10 @@ def auto_alert_status():
                 # host origin = node, sorta
                 td["Node"] = "host" #current[""]
                 td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
+                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
                 new_containers_merged.append(td)
             containers_merged = new_containers_merged
-    else:
+    else: # TODO this is not ready for multi!
         
         raw_jsons = []
         for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
@@ -891,6 +891,7 @@ def auto_alert_status():
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
     if "False" == os.getenv("running_as_kubernetes","False"): #todo troubleshoot here
+        print(containers_merged)
         containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
         containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
     else:
@@ -945,18 +946,20 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     
     top_errors = []
     for top_r in top_results:
-        if len(top_r["errors"]) > 0:
+        try:
+            if len(top_r["error"]) > 0:
+                top_errors.append(top_r["error"])
+                continue
+            regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
+            matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
+            for _, match in enumerate(matches, start=1):
+                for groupNum in range(0, len(match.groups())):
+                    if (float(match.group(groupNum + 1).replace(",","."))>top_r["threshold_cpu"]):
+                        problematic_tops_cpu.append(top_r)
+            if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
+                problematic_tops_ram.append(top_r)
+        except:
             top_errors.append(top_r)
-            continue
-        regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
-        matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
-        for _, match in enumerate(matches, start=1):
-            for groupNum in range(0, len(match.groups())):
-                if (float(match.group(groupNum + 1).replace(",","."))>top_r["threshold_cpu"]):
-                    problematic_tops_cpu.append(top_r)
-        if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
-            problematic_tops_ram.append(top_r)
-    
                     
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
@@ -1123,6 +1126,7 @@ def send_alerts(message):
         
 def update_container_state_db():
     if "False" == os.getenv("running_as_kubernetes","False"):
+        print("Loading as docker...")
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -1136,7 +1140,7 @@ def update_container_state_db():
         if os.getenv("is-multi",None):
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                query = '''SELECT hostname FROM checker.ip_table;'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
@@ -1155,28 +1159,28 @@ def update_container_state_db():
                 except requests.exceptions.ConnectionError:
                     pass
             containers_merged = containers_merged + total_answer
-            new_containers_merged = []
-            for current in new_containers_merged:
-                td = {}
-                td["Command"] = current["Command"]
-                td["CreatedAt"] = current["CreatedAt"]
-                td["ID"] = current["ID"]
-                td["Image"] = current["Image"]
-                td["Labels"] = current["Labels"]
-                td["Mounts"] = current["Mounts"]
-                td["Names"] = current["Names"]
-                td["Name"] = current["Names"]
-                td["Ports"] = current["Ports"]
-                td["RunningFor"] = current["RunningFor"]
-                td["State"] = current["State"]
-                td["Status"] = current["Status"]
-                td["Container"] = current["Container"]
-                # host origin = node, sorta
-                td["Node"] = "host" #current[""]
-                td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
-                new_containers_merged.append(td)
-            containers_merged = new_containers_merged
+        new_containers_merged = []
+        for current in containers_merged:
+            td = {}
+            #td["Command"] = current["Command"]
+            td["CreatedAt"] = current["CreatedAt"]
+            td["ID"] = current["ID"]
+            td["Image"] = current["Image"]
+            td["Labels"] = current["Labels"]
+            td["Mounts"] = current["Mounts"]
+            td["Names"] = current["Names"]
+            td["Name"] = current["Names"]
+            td["Ports"] = current["Ports"]
+            td["RunningFor"] = current["RunningFor"]
+            td["State"] = current["State"]
+            td["Status"] = current["Status"]
+            td["Container"] = current["Container"]
+            # host origin = node, sorta
+            td["Node"] = "host" #current[""]
+            td["Volumes"] = current["LocalVolumes"]
+            td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
+            new_containers_merged.append(td)
+        containers_merged = new_containers_merged
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
@@ -1266,7 +1270,10 @@ def runcronjobs():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             # to run malicious code, malicious code must be present in the db or the machine in the first place
-            query = '''SELECT * FROM cronjobs;'''
+            hostname=subprocess.check_output("hostname", shell=True).decode().strip()
+            query = f'SELECT * FROM cronjobs where `where_to_run`="{hostname}"'
+            if os.getenv("is-master",True): # the master will run the unassigned ones
+                query+="or `where_to_run` is Null"
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
@@ -1318,7 +1325,7 @@ def send_advanced_alerts(message):
                 try:
                     prepare_text_top_cpu += f"<br>Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"
                 except:
-                    prepare_text_top_cpu += f"<br>There was an issue reading an overloaded cpu top: {traceback.format_exc()}</br><br>String was {str(overloaded_cpu_top)}</br>"
+                    prepare_text_top_cpu += f"<br>Issue while interpreting cpu top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_cpu_top)}</br>"
             text_for_email += prepare_text_top_cpu + "<br><br>"
         if len(message[7])>0:
             prepare_text_top_mem = "<br>These hosts are overloaded on memory:"
@@ -1326,15 +1333,16 @@ def send_advanced_alerts(message):
                 try:
                     prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
                 except:
-                    prepare_text_top_mem += f"<br>There was an issue reading an overloaded mem top: {traceback.format_exc()}</br><br>String was {str(overloaded_mem_top)}</br>"
+                    prepare_text_top_mem += f"<br>Issue while interpreting mem top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_mem_top)}</br>"
+
             text_for_email += prepare_text_top_mem + "<br><br>"
         if len(message[8])>0:
             prepare_text_top_error = "<br>Couldn't load the tops for these hosts:"
             for error_top in message[8]:
                 try:
-                    prepare_text_top_error += f"<br>Host named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}</br>"
+                    prepare_text_top_error += f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}</br>"
                 except:
-                    prepare_text_top_error += f"<br>There was an issue reading a top: {traceback.format_exc()}</br><br>String was {str(error_top)}</br>"
+                    prepare_text_top_error += f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br><br> Original object: {str(error_top)}</br>"
             text_for_email += prepare_text_top_error + "<br><br>"
         try:
             if len(text_for_email) > 15:
@@ -1361,17 +1369,27 @@ def send_advanced_alerts(message):
         if len(message[6])>0:
             prepare_text_top_cpu = "\nThese hosts are overloaded on cpu:"
             for overloaded_cpu_top in message[6]:
-                prepare_text_top_cpu += f"\nHost named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}"
+                try:
+                    prepare_text_top_cpu += f"\nHost named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}"
+                except:
+                    prepare_text_top_cpu += f"\nIssue while interpreting cpu top: ({traceback.format_exc()})\n Original object: {str(overloaded_cpu_top)}</br>"
             text_for_telegram += prepare_text_top_cpu + "\n\n"
         if len(message[7])>0:
             prepare_text_top_mem = "\nThese hosts are overloaded on memory:"
             for overloaded_mem_top in message[7]:
-                prepare_text_top_mem += f"\nHost named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}"
+                try:
+                    prepare_text_top_mem += f"\nHost named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}"
+                except:
+                    prepare_text_top_mem += f"\nIssue while interpreting mem top: ({traceback.format_exc()})\n Original object: {str(overloaded_mem_top)}</br>"
             text_for_telegram += prepare_text_top_mem + "\n\n"
         if len(message[8])>0:
             prepare_text_top_error = "\nCouldn't load the tops for these hosts:"
             for error_top in message[8]:
-                prepare_text_top_error += f"\nHost named {error_top['host']} ({error_top['description']}) couldn't have resources collected because: {error_top['error']}"
+                try:
+                    prepare_text_top_error += f"\nHost named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}"
+                except:
+                    prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n Original object: {str(error_top)}</br>"
+
             text_for_telegram += prepare_text_top_error + "\n\n"
         if len(text_for_telegram)>5:  
             try:
@@ -1411,19 +1429,13 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        if "False" == os.getenv("running_as_kubernetes","False"):
-                            return render_template("checker.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
-                        else:
-                            return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
+                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        if "False" == os.getenv("running_as_kubernetes","False"):
-                            return render_template("checker-admin.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
-                        else:
-                            return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
+                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
@@ -1566,8 +1578,8 @@ def create_app():
                     if os.getenv('UNSAFE_MODE') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`) VALUES (%s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],))
+                    query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],))
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -1585,8 +1597,8 @@ def create_app():
                     if os.getenv('UNSAFE_MODE') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s WHERE (`idcronjobs` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s WHERE (`idcronjobs` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2238,7 +2250,7 @@ def create_app():
     
     @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
     def reboot_container_advanced(container_id):
-        if not os.getenv("is-multi",None):
+        if not os.getenv("is-multi",None): #todo make this work on multi
             return "Disabled for non-clustered environments", 500
         if not config['is-master']:
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -2350,66 +2362,68 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/container/<podname>")
     def get_container_logs(podname):
         if 'username' in session:
-            if "False" == os.getenv("running_as_kubernetes","False"):
+            if not os.getenv("is-multi",True): #todo make this work on multi
+                if "False" == os.getenv("running_as_kubernetes","False"):
 
-                process = subprocess.Popen(
-                    'docker logs '+podname+" --tail "+str(config["default-log-length"]),
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
-                )
-                out=[]
-                for line in iter(process.stdout.readline, ''):
-                    out.append(line[:-1])
-                process.stdout.close()
-                r = '<br>'.join(out)
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
-            else:
-                prefetch = subprocess.Popen(
-               f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
-                )
-                namespace = ""
-                try:
-                    namespace = prefetch.stdout.readlines()[0].strip()
-                except IndexError:
-                    pass
-                if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
-                    return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
-                process = subprocess.Popen(
-               f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
-                )
-                out=[]
-                if os.getenv('log_previous_container_if_kubernetes'):
-                    process_previous = subprocess.Popen(
-               f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
+                    process = subprocess.Popen(
+                        'docker logs '+podname+" --tail "+str(config["default-log-length"]),
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
                     )
-                    for line in iter(process_previous.stdout.readline, ''):
+                    out=[]
+                    for line in iter(process.stdout.readline, ''):
                         out.append(line[:-1])
-                for line in iter(process.stdout.readline, ''):
-                    out.append(line[:-1])
-                
-                process.stdout.close()
-                r = '<br>'.join(out)
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
-        
+                    process.stdout.close()
+                    r = '<br>'.join(out)
+                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                else:
+                    prefetch = subprocess.Popen(
+                f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
+                    )
+                    namespace = ""
+                    try:
+                        namespace = prefetch.stdout.readlines()[0].strip()
+                    except IndexError:
+                        pass
+                    if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
+                        return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
+                    process = subprocess.Popen(
+                f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
+                    )
+                    out=[]
+                    if os.getenv('log_previous_container_if_kubernetes'):
+                        process_previous = subprocess.Popen(
+                f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                        text=True
+                        )
+                        for line in iter(process_previous.stdout.readline, ''):
+                            out.append(line[:-1])
+                    for line in iter(process.stdout.readline, ''):
+                        out.append(line[:-1])
+                    
+                    process.stdout.close()
+                    r = '<br>'.join(out)
+                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+            else: # guess where to get logs TODO
+                pass
         return redirect(url_for('login'))
         
     @app.route("/advanced_read_containers", methods=['POST'])
     def check_adv():
-        if not os.getenv("is-multi",True):
+        if not os.getenv("is-multi",True): #todo make this work on multi
             return "Disabled for non-clustered environments", 500
         if not os.getenv('is-master'):
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -2417,7 +2431,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             results = None
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
-                query = '''SELECT distinct position FROM checker.component_to_category;'''
+                query = '''SELECT hostname FROM checker.ip_table'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
@@ -2477,7 +2491,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             new_containers_merged = []
             for current in new_containers_merged:
                 td = {}
-                td["Command"] = current["Command"]
+                #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
@@ -2493,7 +2507,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 # host origin = node, sorta
                 td["Node"] = "host" #current[""]
                 td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "'Docker'"
+                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
                 new_containers_merged.append(td)
             containers_merged = new_containers_merged
             if do_not_jsonify:
@@ -2752,7 +2766,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 results = None
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT distinct position FROM checker.component_to_category;'''
+                    query = '''SELECT hostname FROM checker.ip_table;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
@@ -3050,7 +3064,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
-                cursor.execute("SELECT host, user, description, threshold, protocol, details FROM snmp_host")
+                cursor.execute("SELECT host, user, description, threshold_cpu, protocol, details, threshold_mem FROM snmp_host")
                 rows = cursor.fetchall()
                 cursor.close()
                 conn.close()

@@ -14,7 +14,7 @@ services:
         max-file: '10'
         max-size: 100m
     ports:
-    - published: 3306
+    - published: 3311
       target: 3306
     restart: unless-stopped
     volumes:
@@ -26,7 +26,7 @@ services:
     container_name: sentinel
     environment:
     - DOCKER_HOST=tcp://docker-socket-proxy:2375
-    image: fabriziomereu/sentinel:v0.5.70
+    image: fabriziomereu/sentinel:v0.5.86
     logging:
       driver: json-file
       options:
@@ -52,7 +52,7 @@ services:
       - INFO=1            # Allow basic system info
       - NETWORKS=0        # Disallow network changes
       - VOLUMES=0         # Disallow volume changes
-      - BUILD=1           # Allow docker build
+      - BUILD=0           # Disallow docker build
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:

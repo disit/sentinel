@@ -11,6 +11,7 @@
 		<th>Name</th>
 		<th>Command</th>
 		<th>Category</th>
+		<th>Where To Run</th>
 		<th>Delete</th>
 		<th>Edit</th>
 	  </tr>
@@ -22,8 +23,9 @@
 	  <td>{{item[1]}}</td>
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
+	  <td>{{item[4]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -56,7 +58,11 @@
 					</div>
 					<div class="form-group">
 						<label for="CommandAdd">Command</label>
-						<input type="text" class="form-control" id="CommandAdd"  placeholder="Insert a bash command" required>
+						<input type="text" class="form-control" id="CommandAdd" placeholder="Insert a bash command" required>
+					</div>
+					<div class="form-group">
+						<label for="WhereToRunAdd">Where to run</label>
+						<input type="text" class="form-control" id="WhereToRunAdd" placeholder="Insert where to run this cronjob (leave empty for master)">
 					</div>
 				</form>
 			</div>
@@ -101,6 +107,10 @@
 					<div class="form-group">
 						<label for="CommandEdit">Command</label>
 						<input type="text" class="form-control" id="CommandEdit" placeholder="Insert a bash command" required>
+					</div>
+					<div class="form-group">
+						<label for="WhereToRunEdit">Where to run</label>
+						<input type="text" class="form-control" id="WhereToRunEdit" placeholder="Insert where to run this cronjob (leave empty for master)">
 					</div>
 				</form>
 			</div>
@@ -155,9 +165,11 @@
 		var name = $(this).data('name');
 		var command = $(this).data('command');
 		var category = $(this).data('category');
+		var where_to_run = $(this).data('where');
 		$('#CronJobEditId').val(id);
 		$('#NameCronJobEdit').val(name);
 		$('#CommandEdit').val(command);
+		$('#WhereToRunEdit').val(where_to_run);
 
 		let select = document.getElementById('category-selection-edit');
 
@@ -205,11 +217,12 @@
 		var category = $('#category-selection').val();
 		var command = $('#CommandAdd').val();
 		var name = $('#NameCronJobAdd').val();
+		var where = $('#WhereToRunAdd').val();
 		if (password) {
 			try {
 				$.ajax({
 					url: './add_cronjob',
-					data: {psw: password, category: category, command: command, name: name},
+					data: {psw: password, category: category, command: command, name: name, where_to_run: where},
 					type: 'POST',
 					success: function(response) {
 						alert("Cronjob was added!");
@@ -234,11 +247,12 @@
 	var category = $('#category-selection-edit').val();
 	var command = $('#CommandEdit').val();
 	var name = $('#NameCronJobEdit').val();
+	var where = $('#WhereToRunEdit').val();
 	if (password) {
 		try {
 			$.ajax({
 				url: './edit_cronjob',
-				data: {psw: password, command: command, name: name},
+				data: {psw: password, command: command, name: name, category: category, where_to_run:where},
 				type: 'POST',
 				success: function(response) {
 					alert("Cronjob was edited!");

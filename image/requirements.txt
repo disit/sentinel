@@ -1,8 +1,8 @@
 apscheduler
 flask[async]
+PyJWT
 mysql-connector-python
 paramiko
-PyJWT
 pysnmp
 reportlab
 requests
