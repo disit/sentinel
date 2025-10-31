@@ -16,7 +16,7 @@
 	];
 	var less_columns = true;
 	var container_names = [];
-	var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 13, visible: false},{target: 14, visible: false}]};
+	var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]};
 	var container_rows = {};
 	var iframes = {};
 	var closed_categories = new Set();
@@ -699,10 +699,14 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			elements.forEach(cellData => {
 				const td = document.createElement("td");
 				if (index_of_below_array === 6) {
+					{%if multi == "True"%}
+					var content_of_id_cell = '<a target="_blank" href="./container/'+elements[12]+'/'+elements[6]+'">'+cellData+'</a>';
+					{% else %}
 					var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'">'+cellData+'</a>';
+					{%endif%}
 					td.innerHTML = content_of_id_cell;
 				}
-				else if (index_of_below_array === 12) {
+				else if (index_of_below_array === 13) {
 					var content_of_id_cell;
 					try {
 						if (cellData === "running" || cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
@@ -722,7 +726,11 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			});
 			
 			var rebootbutton = document.createElement("td");
+			{%if multi == "True"%}
+			rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-source="`+elements[12]+`" data-containerid="`+elements[6]+`" data-containercategory="`+name_of_table_value+`">Reboot</button>`;
+			{% else %}
 			rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-containerid="`+elements[6]+`" data-containercategory="`+name_of_table_value+`">Reboot</button>`;
+			{%endif%}
 			row.appendChild(rebootbutton);
 			var testsbutton = document.createElement("td");
 			testsbutton.innerHTML=`<input type="button" name="`+elements[6]+`" value="Check the port..." class="btn btn-info" onclick="runTests('`+elements[6]+`', this, '`+name_of_table_value+`')"/>`;
@@ -783,7 +791,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 	};
 	
 	function makeTable(containerdata) {
-		const headerData = ["Container ID", "Created at", "ID", "Image", "Labels", "Mounts", "Name", "Names", "Namespace", "Node", "Ports", "Running For", "State", "Status", "Volumes", "Restart", "Is alive port test", "Last test results", "Contacts", "Operations"];
+		const headerData = ["Container ID", "Created at", "ID", "Image", "Labels", "Mounts", "Name", "Names", "Namespace", "Node", "Ports", "Running For", "Source", "State", "Status", "Volumes", "Restart", "Is alive port test", "Last test results", "Contacts", "Operations"];
 		
 		const tableContainer = document.getElementById("table-container");
 		tableContainer.setAttribute("style", "display: flex; flex-wrap: wrap;")
@@ -900,6 +908,9 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			var category = $(this).data('containercategory');
 			$('#containeridmodal').val(id);
 			$('#containercategorymodal').val(category);
+			if ($(this).data('containercategory')) {
+				$('#containersourcemodal').val($(this).data('containercategory'));
+			}			
 			$('#passwordModal').modal('show');
 		});
 		
@@ -963,6 +974,12 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			var password = $('#passwordInput').val();
 			var id = $('#containeridmodal').val();
 			var category = $('#containercategorymodal').val();
+			if ($('#containersourcemodal').val()) {
+				var source = ('#containersourcemodal').val();
+			}
+			else {
+				var source = "";
+			}
 			var result_loc = document.getElementById(id+"-reboot-result");
 			result_loc.innerHTML='Rebooting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
 			var string = new Date().toLocaleString();
@@ -970,7 +987,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 				try {
 					$.ajax({
 						url: './reboot_container',
-						data: {id: id, psw: password},
+						data: {id: id, psw: password, source: source},
 						type: 'POST',
 						success: function(response) {
 							logging('<b>' + id + "</b> was rebooted!", category+"-logs");
@@ -1250,6 +1267,9 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 					<div class="form-group">
 						<label for="containeridmodal">Container ID</label>
 						<input type="text" class="form-control" id="containeridmodal" readonly>
+					</div>
+					<div class="form-group">
+						<input type="text" class="form-control" id="containersourcemodal" readonly>
 					</div>
 					<div class="form-group">
 						<input type="text" class="form-control" id="containercategorymodal" readonly hidden>

@@ -342,13 +342,10 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             if len(using_these)<1:
                 return ""
             query2 = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(using_these)
-        print(f"\n\nQuery for format_error_to_send: {query2}\n\n")
         
         cursor.execute(query2)
         now_it_is = cursor.fetchall()
     newstr=""
-    if because:
-        print(f"because: {because}")
     for a in now_it_is:
         if "False" == os.getenv("running_as_kubernetes","False"):
             curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
@@ -674,7 +671,7 @@ async def auto_run_tests():
 
 async def run_shell_command(name, command):
     try:
-        print("run_shell_command: start "+name+" cmd:"+command)
+        #print("run_shell_command: start "+name+" cmd:"+command)
         start = time.time()
         process = await asyncio.create_subprocess_shell(
             command,
@@ -693,7 +690,7 @@ async def run_shell_command(name, command):
             print("run_shell_command: end "+name+" exception elapsed "+str(end-start)+"s result: "+str(process_return_code))
             return {"container":name, "result": f"Command {command} timed out after 10 seconds.", "command": command} 
         end = time.time()
-        print("run_shell_command: end "+name+" elapsed "+str(end-start)+"s result:"+str(process.returncode))
+        #print("run_shell_command: end "+name+" elapsed "+str(end-start)+"s result:"+str(process.returncode))
 
         output = stdout.decode("cp437") if stdout else ""
         error = stderr.decode("cp437") if stderr else ""
@@ -708,6 +705,8 @@ async def run_shell_command(name, command):
 
 
 def auto_alert_status():
+    if os.getenv("is-master","False") == "False": #slaves don't send status
+        return 
     if "False" == os.getenv("running_as_kubernetes","False"):
         
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -720,7 +719,8 @@ def auto_alert_status():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        if os.getenv("is-multi",None):
+        if os.getenv("is-multi","True") == "True":
+            print("Alerting as multi...")
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT hostname FROM checker.ip_table'''
@@ -730,23 +730,31 @@ def auto_alert_status():
                 total_answer=[]
                 try:
                     for r in results:
+                        print(r)
                         obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
                         try:
                             total_answer = total_answer + json.loads(obtained)
+                            print(f"Received {obtained[:100]}... from {r[0]}")
                         except:
                             try:
                                 obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                                 total_answer = total_answer + json.loads(obtained)
-                            except:
-                                pass
-                except requests.exceptions.ConnectionError:
-                    pass
+                                print(f"Received {obtained[:100]}... from {r[0]}")
+                            except Exception as E:
+                                print("Error on multi reading container data:", str(E))
+                except requests.exceptions.ConnectionError as E: 
+                    print("Error on multi reading container data:", str(E))
             containers_merged = containers_merged + total_answer
             new_containers_merged = []
+            source = subprocess.check_output("hostname", shell=True).decode().strip()
             for current in new_containers_merged:
                 td = {}
                 #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
+                try: #it is set if it comes from elsewhere
+                    td["Source"] = current["Source"]
+                except:
+                    td["Source"] = source
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
                 td["Labels"] = current["Labels"]
@@ -766,10 +774,15 @@ def auto_alert_status():
             containers_merged = new_containers_merged
         else:
             new_containers_merged = []
+            source = subprocess.check_output("hostname", shell=True).decode().strip()
             for current in new_containers_merged:
                 td = {}
                 #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
+                try: #it is set if it comes from elsewhere
+                    td["Source"] = current["Source"]
+                except:
+                    td["Source"] = source
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
                 td["Labels"] = current["Labels"]
@@ -1125,6 +1138,8 @@ def send_alerts(message):
         print("Error sending alerts:",traceback.format_exc())
         
 def update_container_state_db():
+    if os.getenv("is-master","False") == "False": #slaves don't write to db
+        return 
     if "False" == os.getenv("running_as_kubernetes","False"):
         print("Loading as docker...")
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -1137,7 +1152,8 @@ def update_container_state_db():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        if os.getenv("is-multi",None):
+        if os.getenv("is-multi","False") == "True":
+            print("Updating container data as multi...")
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT hostname FROM checker.ip_table;'''
@@ -1147,6 +1163,9 @@ def update_container_state_db():
                 total_answer=[]
                 try:
                     for r in results:
+                        print(f"Is {subprocess.check_output('hostname', shell=True).decode().strip()} in {r[0]}")
+                        if subprocess.check_output("hostname", shell=True).decode().strip() in r[0]:
+                            continue # don't take yourself
                         obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                         try:
                             total_answer = total_answer + json.loads(obtained)
@@ -1159,11 +1178,17 @@ def update_container_state_db():
                 except requests.exceptions.ConnectionError:
                     pass
             containers_merged = containers_merged + total_answer
+        else:
+            print("NOT updating container data as multi...")
         new_containers_merged = []
+        source = subprocess.check_output("hostname", shell=True).decode().strip()
         for current in containers_merged:
             td = {}
-            #td["Command"] = current["Command"]
             td["CreatedAt"] = current["CreatedAt"]
+            try: #it is set if it comes from elsewhere
+                td["Source"] = current["Source"]
+            except:
+                td["Source"] = source
             td["ID"] = current["ID"]
             td["Image"] = current["Image"]
             td["Labels"] = current["Labels"]
@@ -1177,8 +1202,14 @@ def update_container_state_db():
             td["Container"] = current["Container"]
             # host origin = node, sorta
             td["Node"] = "host" #current[""]
-            td["Volumes"] = current["LocalVolumes"]
-            td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
+            try:
+                td["Volumes"] = current["LocalVolumes"]
+            except KeyError: #happens when docker data comes also from another sentinel instance
+                td["Volumes"] = current["Volumes"]
+            try: #it is set if it comes from elsewhere
+                td["Namespace"] = current["Namespace"]
+            except: #happens when docker data comes also from another sentinel instance
+                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
             new_containers_merged.append(td)
         containers_merged = new_containers_merged
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -1272,7 +1303,7 @@ def runcronjobs():
             # to run malicious code, malicious code must be present in the db or the machine in the first place
             hostname=subprocess.check_output("hostname", shell=True).decode().strip()
             query = f'SELECT * FROM cronjobs where `where_to_run`="{hostname}"'
-            if os.getenv("is-master",True): # the master will run the unassigned ones
+            if os.getenv("is-master","False") == "True": # the master will run the unassigned ones
                 query+="or `where_to_run` is Null"
             cursor.execute(query)
             conn.commit()
@@ -1298,8 +1329,6 @@ def send_advanced_alerts(message):
             container_source="docker"
         else:
             container_source="kubernetes"
-        for b in range(len(message)):
-            print(f"Content #{b} of errors: {message[b]}")
         text_for_email = ""
         if len(message[0])>0:
             text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
@@ -1429,13 +1458,13 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'])
+                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],multi=os.getenv("is-multi","False"))
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"))
+                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"),multi=os.getenv("is-multi","False"))
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
@@ -2046,14 +2075,18 @@ def create_app():
         
     @app.route("/read_containers", methods=['POST'])
     def check():
-        if os.getenv("is-multi",None):
+        if os.getenv("is-multi","False") == "True":
             try:
-                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret",""), algorithms=[ALGORITHM])
                 return get_container_data()
             except jwt.ExpiredSignatureError:
+                print("Token expired")
                 return jsonify({'error': 'Token expired'}), 401
             except jwt.InvalidTokenError:
+                print("Token invalid:", request.form.to_dict()['auth'])
                 return jsonify({'error': 'Invalid token'}), 401
+            except Exception:
+                print(f"Something failed:", traceback.format_exc())
         elif 'username' in session:
             return get_container_data()
         return redirect(url_for('login'))
@@ -2064,7 +2097,7 @@ def create_app():
     @app.route("/read_containers_db", methods=['GET'])
     def check_container_db():
         if 'username' in session:
-            if not os.getenv("is-master",True):
+            if not os.getenv("is-master","False") == "True":
                 return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
@@ -2250,9 +2283,9 @@ def create_app():
     
     @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
     def reboot_container_advanced(container_id):
-        if not os.getenv("is-multi",None): #todo make this work on multi
+        if os.getenv("is-multi","False") == "True": #todo make this work on multi
             return "Disabled for non-clustered environments", 500
-        if not config['is-master']:
+        if not os.getenv("is-master","False") == "True":
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
@@ -2362,7 +2395,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/container/<podname>")
     def get_container_logs(podname):
         if 'username' in session:
-            if not os.getenv("is-multi",True): #todo make this work on multi
+            if os.getenv("is-multi","False") != "True": #todo make this work on multi
                 if "False" == os.getenv("running_as_kubernetes","False"):
 
                     process = subprocess.Popen(
@@ -2423,7 +2456,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         
     @app.route("/advanced_read_containers", methods=['POST'])
     def check_adv():
-        if not os.getenv("is-multi",True): #todo make this work on multi
+        if not os.getenv("is-multi","False") != "True": #todo make this work on multi
             return "Disabled for non-clustered environments", 500
         if not os.getenv('is-master'):
             return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -2489,10 +2522,15 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                                 if value1 == value2:
                                     containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
             new_containers_merged = []
-            for current in new_containers_merged:
+            source = subprocess.check_output("hostname", shell=True).decode().strip()
+            for current in containers_merged:
                 td = {}
                 #td["Command"] = current["Command"]
                 td["CreatedAt"] = current["CreatedAt"]
+                try: #it is set if it comes from elsewhere
+                    td["Source"] = current["Source"]
+                except:
+                    td["Source"] = source
                 td["ID"] = current["ID"]
                 td["Image"] = current["Image"]
                 td["Labels"] = current["Labels"]
@@ -2758,7 +2796,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/clustered_certification", methods=['GET'])
     def clustered_certification():
         if 'username' in session:
-            if not os.getenv("is-multi",True):
+            if not os.getenv("is-multi","True"):
                 return "Disabled for non-clustered environments", 500
             if session['username'] != "admin":
                 return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
