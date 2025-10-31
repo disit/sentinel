@@ -33,7 +33,7 @@
 			<li class="nav-item active">
 				<input type="button" class="btn btn-info" value="Open SNMP control panel (beta)" onclick="window.open('./snmp_control_panel')"/>
 			</li>
-			{%if row['protocol'] == "True"%}
+			{%if multi == "True"%}
 			<li class="nav-item active">
 				<input type="button" class="btn btn-info" value="Open Sentinel Hosts Control Panel" onclick="window.open('./sentinel_hosts_control_panel')"/>
 			</li>

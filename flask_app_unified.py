@@ -329,7 +329,7 @@ db_conn_info = {
     "auth_plugin": 'mysql_native_password'
 }
 
-def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None):
+def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): # FIXME sends "heatmap2geosrv" but should look for "heatmap2geosrv-*" (k8s/docker mixup)
     if "False" == os.getenv("running_as_kubernetes","False"):
         using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     else:
@@ -342,13 +342,13 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
             if len(using_these)<1:
                 return ""
             query2 = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(using_these)
-        
+        print("Format Error to Send\nQuery used:" +query2)
         cursor.execute(query2)
         now_it_is = cursor.fetchall()
     newstr=""
     for a in now_it_is:
         if "False" == os.getenv("running_as_kubernetes","False"):
-            curstr="In category " + a[0] + ", located in " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
+            curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
         else:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         
@@ -720,7 +720,6 @@ def auto_alert_status():
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
         if os.getenv("is-multi","True") == "True":
-            print("Alerting as multi...")
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT hostname FROM checker.ip_table'''
@@ -730,11 +729,9 @@ def auto_alert_status():
                 total_answer=[]
                 try:
                     for r in results:
-                        print(r)
                         obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
                         try:
                             total_answer = total_answer + json.loads(obtained)
-                            print(f"Received {obtained[:100]}... from {r[0]}")
                         except:
                             try:
                                 obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
@@ -1141,7 +1138,6 @@ def update_container_state_db():
     if os.getenv("is-master","False") == "False": #slaves don't write to db
         return 
     if "False" == os.getenv("running_as_kubernetes","False"):
-        print("Loading as docker...")
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -1153,7 +1149,6 @@ def update_container_state_db():
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
         if os.getenv("is-multi","False") == "True":
-            print("Updating container data as multi...")
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT hostname FROM checker.ip_table;'''
@@ -1163,7 +1158,6 @@ def update_container_state_db():
                 total_answer=[]
                 try:
                     for r in results:
-                        print(f"Is {subprocess.check_output('hostname', shell=True).decode().strip()} in {r[0]}")
                         if subprocess.check_output("hostname", shell=True).decode().strip() in r[0]:
                             continue # don't take yourself
                         obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
@@ -1330,6 +1324,8 @@ def send_advanced_alerts(message):
         else:
             container_source="kubernetes"
         text_for_email = ""
+        for a in range(len(message)):
+            print(f"Element {a}: "+str(message[a])[:100])
         if len(message[0])>0:
             text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
