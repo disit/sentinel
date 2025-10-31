@@ -5,31 +5,23 @@
 {{ super() }}
 {% endblock %}
 {% block content %}
-<h1>Available Hosts</h1>
+<h1>Sentinel Hosts</h1>
 <table border="1" cellpadding="5" id="hosts_table">
-<thead><tr><th>Host</th><th>User</th><th>Description</th><th>CPU</th><th>MEM</th><th>Delete host</th></tr></thead>
+<thead><tr><th>IP</th><th>Hostname</th><th>Delete Sentinel Host</th></tr></thead>
 {% for row in hosts %}
 <tr>
-<td>{{ row['host'] }}</td>
-<td>{{ row['user'] }}</td>
-<td>{{ row['description'] }}</td>
-<td>{{ row['threshold_cpu'] }}</td>
-<td>{{ row['threshold_mem'] }}</td>
+<td>{{ row['ip'] }}</td>
+<td>{{ row['hostname'] }}</td>
 <td><button class="btn btn-danger" onclick="deleteHost('{{ row['host'] }}')">Delete</button></td>
 </tr>
 {% endfor %}
 </table>
-<input type="button" class="btn btn-info" value="Open Top View" onclick="window.open('./get_host_tops')"/>
 
 <h2>Add New Host</h2>
 <form id="addForm">
-Host: <input id="host" type="text" class="form-control" name="host" required><br>
-User: <input id="user" type="text" class="form-control" name="user" required><br>
-Description: <input id="description" type="text" class="form-control" name="description" required><br>
-CPU: <input id="cpu" type="number" step="0.01" min="0" class="form-control" name="cpu" required><br>
-MEM: <input id="mem" type="number" step="0.01" min="0" class="form-control" name="mem" required><br>
-Password: <input id="psw" type="password" class="form-control" name="password" required><br>
-<button id="button_add" class="form-control" class="btn btn-info">Add Host</button>
+Hostname: <input id="hostname" type="text" class="form-control" name="hostname" required><br>
+IP: <input id="ip" type="text" class="form-control" name="ip" required><br>
+<button id="button_add" class="form-control" class="btn btn-info">Add Sentinel Host</button>
 </form>
 
 
@@ -39,8 +31,8 @@ function deleteHost(host) {
     e.preventDefault();
         try {
             $.ajax({
-                url: './delete_saved_host',
-                data: {host: host},
+                url: './delete_sentinel_host',
+                data: {hostname: hostname},
                 type: 'POST',
                 success: function(response) {
                     alert("Host was deleted!");
@@ -62,8 +54,8 @@ $('#button_add').on('click', function(e) {
     e.preventDefault();
     try {
         $.ajax({
-            url: './connect_host',
-            data: {psw: $('#psw').val(), user: $('#user').val(), description: $('#description').val(), cpu: $('#cpu').val(), mem: $('#mem').val(), host: $('#host').val()},
+            url: './add_sentinel_host',
+            data: {hostname: $('#hostname').val(), ip: $('#ip').val()},
             type: 'POST',
             success: function(response) {
                 alert("Host was added!");
