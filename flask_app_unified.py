@@ -719,85 +719,34 @@ def auto_alert_status():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        if os.getenv("is-multi","True") == "True":
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                query = '''SELECT hostname FROM checker.ip_table'''
-                cursor.execute(query)
-                conn.commit()
-                results = cursor.fetchall()
-                total_answer=[]
-                try:
-                    for r in results:
-                        obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
-                        try:
-                            total_answer = total_answer + json.loads(obtained)
-                        except:
-                            try:
-                                obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
-                                total_answer = total_answer + json.loads(obtained)
-                                print(f"Received {obtained[:100]}... from {r[0]}")
-                            except Exception as E:
-                                print("Error on multi reading container data:", str(E))
-                except requests.exceptions.ConnectionError as E: 
-                    print("Error on multi reading container data:", str(E))
-            containers_merged = containers_merged + total_answer
-            new_containers_merged = []
-            source = subprocess.check_output("hostname", shell=True).decode().strip()
-            for current in new_containers_merged:
-                td = {}
-                #td["Command"] = current["Command"]
-                td["CreatedAt"] = current["CreatedAt"]
-                try: #it is set if it comes from elsewhere
-                    td["Source"] = current["Source"]
-                except:
-                    td["Source"] = source
-                td["ID"] = current["ID"]
-                td["Image"] = current["Image"]
-                td["Labels"] = current["Labels"]
-                td["Mounts"] = current["Mounts"]
-                td["Names"] = current["Names"]
-                td["Name"] = current["Names"]
-                td["Ports"] = current["Ports"]
-                td["RunningFor"] = current["RunningFor"]
-                td["State"] = current["State"]
-                td["Status"] = current["Status"]
-                td["Container"] = current["Container"]
-                # host origin = node, sorta
-                td["Node"] = "host" #current[""]
-                td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
-                new_containers_merged.append(td)
-            containers_merged = new_containers_merged
-        else:
-            new_containers_merged = []
-            source = subprocess.check_output("hostname", shell=True).decode().strip()
-            for current in new_containers_merged:
-                td = {}
-                #td["Command"] = current["Command"]
-                td["CreatedAt"] = current["CreatedAt"]
-                try: #it is set if it comes from elsewhere
-                    td["Source"] = current["Source"]
-                except:
-                    td["Source"] = source
-                td["ID"] = current["ID"]
-                td["Image"] = current["Image"]
-                td["Labels"] = current["Labels"]
-                td["Mounts"] = current["Mounts"]
-                td["Names"] = current["Names"]
-                td["Name"] = current["Names"]
-                td["Ports"] = current["Ports"]
-                td["RunningFor"] = current["RunningFor"]
-                td["State"] = current["State"]
-                td["Status"] = current["Status"]
-                td["Container"] = current["Container"]
-                # host origin = node, sorta
-                td["Node"] = "host" #current[""]
-                td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
-                new_containers_merged.append(td)
-            containers_merged = new_containers_merged
-    else: # TODO this is not ready for multi!
+        
+        new_containers_merged = []
+        source = os.getenv("platform-url","")
+        for current in new_containers_merged:
+            td = {}
+            #td["Command"] = current["Command"]
+            td["CreatedAt"] = current["CreatedAt"]
+            try: #it is set if it comes from elsewhere
+                td["Source"] = current["Source"]
+            except:
+                td["Source"] = source
+            td["ID"] = current["ID"]
+            td["Image"] = current["Image"]
+            td["Labels"] = current["Labels"]
+            td["Mounts"] = current["Mounts"]
+            td["Names"] = current["Names"]
+            td["Name"] = current["Names"]
+            td["Ports"] = current["Ports"]
+            td["RunningFor"] = current["RunningFor"]
+            td["State"] = current["State"]
+            td["Status"] = current["Status"]
+            td["Container"] = current["Container"]
+            # host origin = node, sorta
+            td["Node"] = os.getenv("platform-url","") #current[""]
+            td["Volumes"] = current["LocalVolumes"]
+            td["Namespace"] = "Docker - " + source
+            new_containers_merged.append(td)
+    else:
         
         raw_jsons = []
         for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
@@ -864,6 +813,57 @@ def auto_alert_status():
                 
                 conversions.append(conversion)
         containers_merged = conversions
+    if os.getenv("is-multi","True") == "True":
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = f'''SELECT hostname FROM checker.ip_table WHERE hostname != "{os.getenv("platform-url","")}";''' # ask everyone but yourself for extra containers
+            cursor.execute(query)
+            conn.commit()
+            results = cursor.fetchall()
+            total_answer=[]
+            try:
+                for r in results:
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
+                    try:
+                        total_answer = total_answer + json.loads(obtained)
+                    except:
+                        try:
+                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                            total_answer = total_answer + json.loads(obtained)
+                            print(f"Received {obtained[:100]}... from {r[0]}")
+                        except Exception as E:
+                            print("Error on multi reading container data:", str(E))
+            except requests.exceptions.ConnectionError as E: 
+                print("Error on multi reading container data:", str(E))
+        containers_merged = containers_merged + total_answer
+        new_containers_merged = []
+        source = os.getenv("platform-url","")
+        for current in new_containers_merged:
+            td = {}
+            #td["Command"] = current["Command"]
+            td["CreatedAt"] = current["CreatedAt"]
+            try: #it is set if it comes from elsewhere
+                td["Source"] = current["Source"]
+            except:
+                td["Source"] = source
+            td["ID"] = current["ID"]
+            td["Image"] = current["Image"]
+            td["Labels"] = current["Labels"]
+            td["Mounts"] = current["Mounts"]
+            td["Names"] = current["Names"]
+            td["Name"] = current["Names"]
+            td["Ports"] = current["Ports"]
+            td["RunningFor"] = current["RunningFor"]
+            td["State"] = current["State"]
+            td["Status"] = current["Status"]
+            td["Container"] = current["Container"]
+            # host origin = node, sorta
+            td["Node"] = os.getenv("platform-url","") #current[""]
+            td["Volumes"] = current["LocalVolumes"]
+            td["Namespace"] = "Docker - " + source
+            new_containers_merged.append(td)
+        containers_merged = new_containers_merged
+        
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -876,14 +876,154 @@ def auto_alert_status():
         return
     is_alive_with_ports = asyncio.run(auto_run_tests()) # check namespace here if k8s
     is_alive_with_ports = [a for a in is_alive_with_ports if "Failure" in a["result"]] # only keep those who failed
+    # begin mixed dealing with docker/kubernetes
+    containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
+    containers_merged_kubernetes = [a for a in containers_merged if not a["Namespace"].startswith("Docker - ")]
     
+    components_docker = [a[0] for a in results if a[4]=="docker"]
+    components_kubernetes = [a[0].replace("*","") for a in results if a[4]=="kubernetes"]
+    components_original_docker = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="docker"]
+    components_original_kubernetes = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="kubernetes"]
+    
+    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components_docker) and not ("running" in c["State"])]
+    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in components_kubernetes) and not ("running" in c["State"])]]
+    
+    containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
+    [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
+    
+    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
+    for c_m in containers_merged_kubernetes:
+        if any(c_m["Names"].startswith(value) for value in components_kubernetes):
+            if "restarts" in c_m["State"]:
+                try:
+                    if int(c_m["State"].strip().split("restarts:")[-1]) > 4:
+                        since = sum([int(b[0])*b[1] for b in zip(re.findall("(\d+)", c_m["RunningFor"]),[86400,3600,60,1])])
+                        if since>600 or since==0:
+                            containers_which_are_running_but_are_not_healthy.append(c_m)
+                except Exception:
+                    containers_which_are_running_but_are_not_healthy.append(c_m)
+    problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
+    names_of_problematic_containers = [n["Names"] for n in problematic_containers]
+    
+    containers_which_are_not_expected = list(set(tuple(item) for item in components_original_docker)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged_docker)))
+    containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
+    missing_containers_k = dict(components_original_kubernetes)
+    containers_which_are_not_expected_k = [a for a in missing_containers_k if not a[0].endswith("*")]
+    og_conts = copy.deepcopy(containers_which_are_not_expected_k)
+    for c in containers_merged_kubernetes:
+        for value,_ in list(missing_containers_k.items()):
+            if '-'.join(c["Names"].split('-')[:-2]).startswith(value):
+                try:
+                    og_conts.remove(value)
+                except ValueError:
+                    pass
+    [containers_which_are_not_expected.append(a) for a in og_conts]
+    
+    if "False" == os.getenv("running_as_kubernetes","False"):
+        top = get_top()
+        load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
+        load_issues=""
+        for average, timing in zip(load_averages, [1, 5, 15]):
+            if float(average) > int(os.getenv("load-threshold",1000)):
+                load_issues += "Load threshold above "+str(int(os.getenv("load-threshold",1000))) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
+        memory_issues = ""
+        if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold",1000)):
+            memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold",1000))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
+    else:
+        load_issues = ""
+        memory_issues = ""
+    cron_results = []
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
+            cursor.execute(query)
+            conn.commit()
+            cron_results = cursor.fetchall()
+    except Exception:
+        pass
+    populate_tops_entries()
+    top_results = []
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY host ORDER BY sampled_at DESC) AS row_num FROM host_data) SELECT host.host as host, sampled_at, data, errors, threshold_cpu, threshold_mem FROM RankedEntries join host on host.host=RankedEntries.host WHERE row_num = 1;'''
+            cursor.execute(query)
+            conn.commit()
+            top_results = cursor.fetchall()
+    except Exception:
+        pass
+    problematic_tops_cpu = []
+    problematic_tops_ram = []
+    
+    top_errors = []
+    for top_r in top_results:
+        try:
+            if len(top_r["error"]) > 0:
+                top_errors.append(top_r["error"])
+                continue
+            regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
+            matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
+            for _, match in enumerate(matches, start=1):
+                for groupNum in range(0, len(match.groups())):
+                    if (float(match.group(groupNum + 1).replace(",","."))>top_r["threshold_cpu"]):
+                        problematic_tops_cpu.append(top_r)
+            if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
+                problematic_tops_ram.append(top_r)
+        except:
+            top_errors.append(top_r)
+                    
+    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
+        try:
+            issues = ["","","","","","","","",""]
+            if len(names_of_problematic_containers) > 0:
+                issues[0]=problematic_containers
+            if len(is_alive_with_ports) > 0:
+                issues[1]=is_alive_with_ports
+            if len(containers_which_are_not_expected) > 0:
+                if "False" == os.getenv("running_as_kubernetes","False"):
+                    issues[2]=[a[0] for a in containers_which_are_not_expected]
+                else:
+                    issues[2]=containers_which_are_not_expected
+            if len(load_issues)>0:
+                issues[3]=load_issues
+            if len(memory_issues)>0:
+                issues[4]=memory_issues
+            if len(cron_results)>0:
+                issues[5]=cron_results
+            if len(problematic_tops_cpu)>0:
+                issues[6]=problematic_tops_cpu
+            if len(problematic_tops_ram)>0:
+                issues[7]=problematic_tops_ram
+            if len(top_errors)>0:
+                issues[8]=top_errors
+            send_advanced_alerts(issues)
+        except Exception:
+            print(traceback.format_exc())
+            send_alerts("Couldn't properly send error messages: "+traceback.format_exc())
+            return
+    else:
+        try:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                update_healthy_categories_query=f"UPDATE `checker`.`summary_status` SET `status` = %s;"
+                cursor.execute(update_healthy_categories_query, [greendot])
+                conn.commit()
+                return
+        except Exception:
+            print(traceback.format_exc())
+            send_alerts("Couldn't reach database while not needing to send error messages: "+traceback.format_exc())
+            return
+    return
+    # end mixed dealing with docker/kubernetes
     components = [a[0].replace("*","") for a in results]
     #components_original = [[a[0],a[2]] for a in results]
     components_original = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results]
     containers_which_should_be_running_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and not ("running" in c["State"])]
     
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
-    if "False" == os.getenv("running_as_kubernetes","False"): #todo troubleshoot here
+    if "False" == os.getenv("running_as_kubernetes","False"):
         containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
     else:
         containers_which_are_running_but_are_not_healthy=[]
@@ -1158,7 +1298,7 @@ def update_container_state_db():
                 total_answer=[]
                 try:
                     for r in results:
-                        if subprocess.check_output("hostname", shell=True).decode().strip() in r[0]:
+                        if os.getenv("platform-url","") == r[0]:
                             continue # don't take yourself
                         obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                         try:
@@ -1175,7 +1315,7 @@ def update_container_state_db():
         else:
             print("NOT updating container data as multi...")
         new_containers_merged = []
-        source = subprocess.check_output("hostname", shell=True).decode().strip()
+        source = os.getenv("platform-url","")
         for current in containers_merged:
             td = {}
             td["CreatedAt"] = current["CreatedAt"]
@@ -1195,7 +1335,7 @@ def update_container_state_db():
             td["Status"] = current["Status"]
             td["Container"] = current["Container"]
             # host origin = node, sorta
-            td["Node"] = "host" #current[""]
+            td["Node"] = os.getenv("platform-url","") #current[""]
             try:
                 td["Volumes"] = current["LocalVolumes"]
             except KeyError: #happens when docker data comes also from another sentinel instance
@@ -1203,7 +1343,7 @@ def update_container_state_db():
             try: #it is set if it comes from elsewhere
                 td["Namespace"] = current["Namespace"]
             except: #happens when docker data comes also from another sentinel instance
-                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
+                td["Namespace"] = "Docker - " + source
             new_containers_merged.append(td)
         containers_merged = new_containers_merged
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -1295,8 +1435,7 @@ def runcronjobs():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             # to run malicious code, malicious code must be present in the db or the machine in the first place
-            hostname=subprocess.check_output("hostname", shell=True).decode().strip()
-            query = f'SELECT * FROM cronjobs where `where_to_run`="{hostname}"'
+            query = f'SELECT * FROM cronjobs where `where_to_run`="{os.getenv("platform-url","")}"'
             if os.getenv("is-master","False") == "True": # the master will run the unassigned ones
                 query+="or `where_to_run` is Null"
             cursor.execute(query)
@@ -1497,10 +1636,7 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    if os.getenv("running_as_kubernetes",None):
-                        return render_template("organize_containers_k8s.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
-                    else:
-                        return render_template("organize_containers.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
+                    return render_template("organize_containers_unified.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
                     
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -1516,8 +1652,8 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`) VALUES (%s, %s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],request.form.to_dict()['namespace']))
+                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`) VALUES (%s, %s, %s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],))
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -1534,12 +1670,8 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    if "False" == os.getenv("running_as_kubernetes","False"):
-                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
-                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['id'],))
-                    else:
-                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s where (`component` = %s)'''
-                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['namespace'],request.form.to_dict()['id'],)) 
+                    query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s where (`component` = %s)'''
+                    cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['id'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2229,34 +2361,88 @@ def create_app():
         
     @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
-        
-        if "False" == os.getenv("running_as_kubernetes","False"):
+        if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
             try:
                 jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
-                result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
-                log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
-                return result
-            except jwt.ExpiredSignatureError:
-                return jsonify({'error': 'Token expired'}), 401
-            except jwt.InvalidTokenError:
-                return jsonify({'error': 'Invalid token'}), 401
-            except Exception: #not an intracluster call
-                if 'username' in session:
-                    result = queued_running('docker restart '+request.form.to_dict()['id']).stdout
+            except:
+                return redirect(url_for('login'))
+        if not check_password_hash(users[username], request.form.to_dict()['psw']):
+            return "An incorrect password was provided", 400
+        
+        if os.getenv("is-multi","False") == "False":
+            if "False" == os.getenv("running_as_kubernetes","False"):
+                og_result = queued_running('docker restart '+request.form.to_dict()['id'])
+                result = og_result.stdout
+                if len(og_result.stderr)>0:
+                    log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, request)
+                    return result, 500
+                else:
                     log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
                     return result
-        else:
-            if 'username' in session:
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
-                    return "An incorrect password was provided", 400
+            else:
                 try:
                     result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                     #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
                     log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, request)
                     return result.stdout
                 except Exception:
-                    return f"Issue while rebooting pod: {traceback.format_exc()}", 500
-        return redirect(url_for('login'))
+                    return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
+        else: # we are on multi here
+            if "auth" not in request.form.to_dict():
+                source = request.form.to_dict()['source']
+                if source == os.getenv("platform-url",""):
+                    if "False" == os.getenv("running_as_kubernetes","False"):
+                        og_result = queued_running('docker restart '+request.form.to_dict()['id'])
+                        result = og_result.stdout
+                        if len(og_result.stderr)>0:
+                            log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, request)
+                            return result, 500
+                        else:
+                            log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                            return result
+                    else:
+                        try:
+                            result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
+                            #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
+                            log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, request)
+                            return result.stdout
+                        except Exception:
+                            return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
+                else:
+                    try:
+                        try:
+                            r = requests.post(request.form.to_dict()['source']+"/sentinel/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                            return r.text, r.status_code
+                        except:
+                            r = requests.post(request.form.to_dict()['source']+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                            return r.text, r.status_code
+                    except:
+                        return f"Issue while rebooting pod: {traceback.format_exc()}", 500
+            else:
+                try:
+                    jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                except jwt.ExpiredSignatureError:
+                    return "Token expired", 401
+                except jwt.InvalidTokenError:
+                    return "Token invalid", 401
+                except:
+                    return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
+                if "False" == os.getenv("running_as_kubernetes","False"):
+                    og_result = queued_running('docker restart '+request.form.to_dict()['id'])
+                    result = og_result.stdout
+                    if len(og_result.stderr)>0:
+                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, request)
+                        return result, 500
+                    else:
+                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                        return result
+                else:
+                    try:
+                        result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
+                        log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, request)
+                        return result.stdout
+                    except Exception:
+                        return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
             
     @app.route("/get_muted_components", methods=['GET'])
     def get_muted_components():
@@ -2277,30 +2463,6 @@ def create_app():
                 return traceback.format_exc(), 500
         return redirect(url_for('login'))
     
-    @app.route("/reboot_container_advanced/<container_id>", methods=['POST','GET'])
-    def reboot_container_advanced(container_id):
-        if os.getenv("is-multi","False") == "True": #todo make this work on multi
-            return "Disabled for non-clustered environments", 500
-        if not os.getenv("is-master","False") == "True":
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        try:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                # to run malicious code, malicious code must be present in the db or the machine in the first place
-                query = '''SELECT position FROM checker.component_to_category where component=%s;'''
-                cursor.execute(query, (container_id,))
-                conn.commit()
-                results = cursor.fetchall()
-                try:
-                    r = requests.post(results[0][0]+"/sentinel/reboot_container",  data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
-                    return r.text
-                except:
-                    r = requests.post(results[0][0]+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
-                    return r.text
-        except Exception:
-            print("Something went wrong during advanced container rebooting because of:",traceback.format_exc())
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
-
             
     @app.route("/mute_component_by_hours", methods=['POST'])
     def mute_component_by_hours():
@@ -2388,12 +2550,74 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
     
-    @app.route("/container/<podname>")
+    @app.route("/container/<podname>", methods=['POST'])
     def get_container_logs(podname):
-        if 'username' in session:
-            if os.getenv("is-multi","False") != "True": #todo make this work on multi
-                if "False" == os.getenv("running_as_kubernetes","False"):
+        if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
+            try:
+                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+            except:
+                return redirect(url_for('login'))
 
+        if os.getenv("is-multi","False") == "False":
+            if "False" == os.getenv("running_as_kubernetes","False"):
+                print("Debug for logs:", podname, request.form.to_dict())
+                process = subprocess.Popen(
+                    'docker logs '+podname+" --tail "+str(config["default-log-length"]),
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                out=[]
+                for line in iter(process.stdout.readline, ''):
+                    out.append(line[:-1])
+                process.stdout.close()
+                r = '<br>'.join(out)
+                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+            else:
+                prefetch = subprocess.Popen(
+            f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                namespace = ""
+                try:
+                    namespace = prefetch.stdout.readlines()[0].strip()
+                except IndexError:
+                    pass
+                if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
+                    return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
+                process = subprocess.Popen(
+            f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                )
+                out=[]
+                if os.getenv('log_previous_container_if_kubernetes'):
+                    process_previous = subprocess.Popen(
+            f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                    text=True
+                    )
+                    for line in iter(process_previous.stdout.readline, ''):
+                        out.append(line[:-1])
+                for line in iter(process.stdout.readline, ''):
+                    out.append(line[:-1])
+                
+                process.stdout.close()
+                r = '<br>'.join(out)
+                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+        else:
+            try:
+                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                # if we are here, this was an intracluster call
+                if "False" == os.getenv("running_as_kubernetes","False"):
                     process = subprocess.Popen(
                         'docker logs '+podname+" --tail "+str(config["default-log-length"]),
                         shell=True,
@@ -2446,41 +2670,78 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     process.stdout.close()
                     r = '<br>'.join(out)
                     return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
-            else: # guess where to get logs TODO
-                pass
-        return redirect(url_for('login'))
-        
-    @app.route("/advanced_read_containers", methods=['POST'])
-    def check_adv():
-        if not os.getenv("is-multi","False") != "True": #todo make this work on multi
-            return "Disabled for non-clustered environments", 500
-        if not os.getenv('is-master'):
-            return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
-        try:
-            results = None
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                query = '''SELECT hostname FROM checker.ip_table'''
-                cursor.execute(query)
-                conn.commit()
-                results = cursor.fetchall()
-                total_answer=[]
-                errors=[]
-                for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
-                    try:
-                        total_answer = total_answer + json.loads(obtained)
-                    except:
+            except jwt.ExpiredSignatureError:
+                return "Token expired", 401
+            except jwt.InvalidTokenError:
+                return "Token invalid", 401
+            except KeyError: # we are on multi, there was no token, thereforse this in not an internal call. So, unless it is us, call the proper sentinel and forward the answer
+                if request.form.to_dict()['source'] == os.getenv("platform-url",""): # it is us
+                    if "False" == os.getenv("running_as_kubernetes","False"):
+                        process = subprocess.Popen(
+                            'docker logs '+podname+" --tail "+str(config["default-log-length"]),
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                            text=True
+                        )
+                        out=[]
+                        for line in iter(process.stdout.readline, ''):
+                            out.append(line[:-1])
+                        process.stdout.close()
+                        r = '<br>'.join(out)
+                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                    else:
+                        prefetch = subprocess.Popen(
+                    f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                            text=True
+                        )
+                        namespace = ""
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
-                            total_answer = total_answer + json.loads(obtained)
-                        except Exception as E:
-                            errors.append("Reading containers from "+r[0]+" failed: the backed received this exception: "+str(E))
-                tobereturned_answer = {"result":total_answer, "error":errors}
-                return tobereturned_answer
-        except Exception:
-            print("Something went wrong because of:",traceback.format_exc())
-            return render_template("error_showing.html", r = traceback.format_exc()), 500
+                            namespace = prefetch.stdout.readlines()[0].strip()
+                        except IndexError:
+                            pass
+                        if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
+                            return render_template("error_showing.html", r = f"{podname} wasn't found among the containers"), 500
+                        process = subprocess.Popen(
+                    f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                            text=True
+                        )
+                        out=[]
+                        if os.getenv('log_previous_container_if_kubernetes'):
+                            process_previous = subprocess.Popen(
+                    f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
+                            text=True
+                            )
+                            for line in iter(process_previous.stdout.readline, ''):
+                                out.append(line[:-1])
+                        for line in iter(process.stdout.readline, ''):
+                            out.append(line[:-1])
+                        
+                        process.stdout.close()
+                        r = '<br>'.join(out)
+                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                else:
+                    try:
+                        try:
+                            r = requests.post(request.form.to_dict()['source']+"/sentinel/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                            return r.text, r.status_code
+                        except:
+                            r = requests.post(request.form.to_dict()['source']+"/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                            return r.text, r.status_code
+                    except:
+                        return f"Issue while rebooting pod: {traceback.format_exc()}", 500
+            except:
+                return f"Issue while getting logs of container/pod: {traceback.format_exc()}", 500
+        
     
     @app.route("/advanced-container/<container_name>")
     def get_container_logs_advanced(container_name):
@@ -2518,7 +2779,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                                 if value1 == value2:
                                     containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
             new_containers_merged = []
-            source = subprocess.check_output("hostname", shell=True).decode().strip()
+            source = os.getenv("platform-url","")
             for current in containers_merged:
                 td = {}
                 #td["Command"] = current["Command"]
@@ -2539,9 +2800,9 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 td["Status"] = current["Status"]
                 td["Container"] = current["Container"]
                 # host origin = node, sorta
-                td["Node"] = "host" #current[""]
+                td["Node"] = os.getenv("platform-url","") #current[""]
                 td["Volumes"] = current["LocalVolumes"]
-                td["Namespace"] = "Docker - " + subprocess.check_output("hostname", shell=True).decode().strip()
+                td["Namespace"] = "Docker - " + source
                 new_containers_merged.append(td)
             containers_merged = new_containers_merged
             if do_not_jsonify:

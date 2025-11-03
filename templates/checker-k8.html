@@ -256,30 +256,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		}
 		
 	};
-	
-	function getcontainers(){
-		try {
-			$.ajax({
-				url: './advanced_read_containers',
-				type: 'POST',
-				success: function(response) {
-					makeTable(response.result);
-					if(response.error.length > 0)
-						for (var a of response.error) {add_alert(a)};
-				},
-				error: function(error) {
-					add_alert("Failed to contact the backend for the container status with reason: "+error.statusText);
-					logging("Failed to contact the backend for the container status with reason: "+error.statusText);
-				},
-				timeout: {{timeout}}
-			});
-		}
-		catch (exception_var) {
-			logging(exception_var);
-			add_alert(exception_var);
-		}
-		
-	};
+
 	async function rebootContainer(containerID, element) {
 		element.value = "Restarting...";
 		try {
@@ -699,12 +676,13 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			elements.forEach(cellData => {
 				const td = document.createElement("td");
 				if (index_of_below_array === 6) {
-					{%if multi == "True"%}
-					var content_of_id_cell = '<a target="_blank" href="./container/'+elements[12]+'/'+elements[6]+'">'+cellData+'</a>';
-					{% else %}
-					var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'">'+cellData+'</a>';
-					{%endif%}
+					var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'" data-source="' + elements[12] + '">' + cellData + '</a>';
+
 					td.innerHTML = content_of_id_cell;
+					var link = td.querySelector('a');
+					if (link) {
+						link.addEventListener('click', handlePostLinkClickLogs);
+					}
 				}
 				else if (index_of_below_array === 13) {
 					var content_of_id_cell;
@@ -769,7 +747,6 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[6]+'" id="mutebutton-'+elements[6]+'">Mute</button>';
 			row.appendChild(do_not_update_this_td);
 			tbody.appendChild(row);
-			//problema qui
 			testresults.innerHTML=findClosestKeyStartsWith(row.childNodes[7].innerHTML, test_results_divs).matchValue;
 			// ugly
 			if (testresults.innerHTML == "undefined" || testresults.innerHTML == '[object Object]') {
@@ -790,6 +767,36 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		return table;
 	};
 	
+	function handlePostLinkClickLogs(e) {
+		e.preventDefault();
+		const link = e.currentTarget;
+
+		const bodyData = {
+			id: link.href.split('/').pop(), // or however you want to extract it
+			source: link.dataset.source      // ← from data-source attribute
+		};
+
+		// Build and submit form
+		const form = document.createElement('form');
+		form.action = link.href;
+		form.method = 'POST';
+		form.target = '_blank'; // open in new tab
+		form.style.display = 'none';
+
+		for (const [key, value] of Object.entries(bodyData)) {
+			const input = document.createElement('input');
+			input.type = 'hidden';
+			input.name = key;
+			input.value = value;
+			form.appendChild(input);
+		}
+
+		document.body.appendChild(form);
+		form.submit();
+		form.remove();
+	}
+
+
 	function makeTable(containerdata) {
 		const headerData = ["Container ID", "Created at", "ID", "Image", "Labels", "Mounts", "Name", "Names", "Namespace", "Node", "Ports", "Running For", "Source", "State", "Status", "Volumes", "Restart", "Is alive port test", "Last test results", "Contacts", "Operations"];
 		
@@ -975,7 +982,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			var id = $('#containeridmodal').val();
 			var category = $('#containercategorymodal').val();
 			if ($('#containersourcemodal').val()) {
-				var source = ('#containersourcemodal').val();
+				var source = $('#containersourcemodal').val();
 			}
 			else {
 				var source = "";
@@ -1269,7 +1276,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 						<input type="text" class="form-control" id="containeridmodal" readonly>
 					</div>
 					<div class="form-group">
-						<input type="text" class="form-control" id="containersourcemodal" readonly>
+						<input type="text" class="form-control" id="containersourcemodal" readonly hidden>
 					</div>
 					<div class="form-group">
 						<input type="text" class="form-control" id="containercategorymodal" readonly hidden>
