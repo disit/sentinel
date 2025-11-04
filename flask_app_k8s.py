@@ -263,7 +263,7 @@ def auto_run_tests():
         return badstuff
 
 def auto_alert_status():
-    if not os.getenv("running_as_kubernetes"):
+    if not os.getenv("running-as-kubernetes"):
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -414,7 +414,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             return
 
 def get_top():
-    if os.environ["running_as_kubernetes"] == "True":
+    if os.environ["running-as-kubernetes"] == "True":
         nodes_output = subprocess.run(
             ["kubectl", "get", "nodes", "-o", "json"],
             capture_output=True,
@@ -535,7 +535,7 @@ def send_alerts(message):
         print("Error sending alerts:",traceback.format_exc())
         
 def update_container_state_db():
-    if not os.getenv("running_as_kubernetes"):
+    if not os.getenv("running-as-kubernetes"):
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -737,7 +737,7 @@ def create_app():
     @app.route("/get_local_top", methods=["GET"])
     def get_local_top():
         if 'username' in session:
-            if os.environ["running_as_kubernetes"] == "True":
+            if os.environ["running-as-kubernetes"] == "True":
                 nodes_output = subprocess.run(
                     ["kubectl", "get", "nodes", "-o", "json"],
                     capture_output=True,
@@ -833,7 +833,7 @@ def create_app():
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    if os.getenv("running_as_kubernetes"):
+                    if os.getenv("running-as-kubernetes"):
                         return render_template("organize_containers_k8s.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
                     else:
                         return render_template("organize_containers.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout")))
@@ -1263,7 +1263,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
     
     def get_container_data(do_not_jsonify=False):
-        if not os.getenv("running_as_kubernetes"):
+        if not os.getenv("running-as-kubernetes"):
             containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_merged = []
@@ -1508,9 +1508,9 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
                 script_to_run = "/app/scripts/make_dumps_of_database.sh"
-                if os.getenv("running_as_kubernetes"):
+                if os.getenv("running-as-kubernetes"):
                     script_to_run = "/app/scripts/make_dumps_of_database_k8.sh"
-                make_certification = subprocess.run(f'mkdir -p /app/data; mkdir -p {os.getenv("conf_path")}; cp -r {os.getenv("conf_path")} /app/data/{subfolder}; cd /app/data/{subfolder} && bash {script_to_run} && rar a -k -p{password} snap4city-certification-{password}.rar */ *.*', shell=True, capture_output=True, text=True, encoding="utf_8")
+                make_certification = subprocess.run(f'mkdir -p /app/data; mkdir -p {os.getenv("conf-path")}; cp -r {os.getenv("conf-path")} /app/data/{subfolder}; cd /app/data/{subfolder} && bash {script_to_run} && rar a -k -p{password} snap4city-certification-{password}.rar */ *.*', shell=True, capture_output=True, text=True, encoding="utf_8")
                 if len(make_certification.stderr) > 0:
                     print(make_certification.stderr)
                     return send_file(f'/app/data/{subfolder}/snap4city-certification-{password}.rar')

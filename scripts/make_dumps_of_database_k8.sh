@@ -2,13 +2,13 @@
 # Configuration
 DB_HOST="dashboarddb"
 DB_USER="root"
-DB_PASS="$#dashboard-db-pwd-admin#$"
+db-passwd="$#dashboard-db-pwd-admin#$"
 DUMP_FILE="backup.sql"
 
 
 # Run the dump
 echo "Dumping database..."
-mysqldump -h $DB_HOST -u $DB_USER -p$DB_PASS --all-databases > "backup.sql"
+mysqldump -h $DB_HOST -u $DB_USER -p$db-passwd --all-databases > "backup.sql"
 
 if [ $? -eq 0 ]; then
     echo "Database dumped successfully to $DUMP_FILE"

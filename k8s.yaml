@@ -112,25 +112,23 @@ spec:
           value: http://someurl.com
         - name: platform-explanation # appears in mail/telegram notifications as additional text; is supposed to explain what the sentinel is checking and where/how can it be reached
           value: Some information
-        - name: running_as_kubernetes # must be kept as is to mandate kubernetes execution
+        - name: running-as-kubernetes # must be kept as is to mandate kubernetes execution
           value: "True"  
-        - name: conf_path # where to retrieve the snap4city distribution for generating distributions; it assumes that the path is also reachable, so mind how you mount it
+        - name: conf-path # where to retrieve the snap4city distribution for generating distributions; it assumes that the path is also reachable, so mind how you mount it
           value: "/mnt/data/sentinel/fakeconf/fakeconf" 
         - name: cluster-secret # in case of a sentinel cluster, this secret will ensure the reciprocal authentication (unused)
           value: "This is a super secret" #eg
-        - name: DB_PASS # uses root password of snap4city dashboard database, also shared by other databases. This is used only during certifications and assumes 'dashboarddb' is reachable from the sentinel container
-          value: passpasspass 
         - name: namespaces # list of namespaces to manage
           value: '["n1", "n2"]'
-        - name: log_previous_container_if_kubernetes # unset if not used
+        - name: log-previous-container-if-kubernetes # unset if not used
           value: "true"
-        - name: UNSAFE_MODE # allows for non-container elements to be managed, unsafe as it allows arbitrary code execution on pod/host, set to "true" to activate
+        - name: unsafe-mode # allows for non-container elements to be managed, unsafe as it allows arbitrary code execution on pod/host, set to "true" to activate
           value: "true"
-        - name: database_update_frequency
+        - name: database-update-frequency
           value: "5" # minutes
-        - name: error_notification_frequency
+        - name: error-notification-frequency
           value: "5" # minutes
-        - name: APPLICATION_ROOT # for serving behind nginx
+        - name: application-root # for serving behind nginx
           value: "/sentinel"
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi

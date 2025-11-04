@@ -330,13 +330,13 @@ db_conn_info = {
 }
 
 def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): # FIXME sends "heatmap2geosrv" but should look for "heatmap2geosrv-*" (k8s/docker mixup)
-    if "False" == os.getenv("running_as_kubernetes","False"):
+    if "False" == os.getenv("running-as-kubernetes","False"):
         using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     else:
         using_these = '|'.join('^{0}'.format(w).strip() for w in containers.split(", ") if len(w)>0)
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
-        if "False" == os.getenv("running_as_kubernetes","False"):
+        if "False" == os.getenv("running-as-kubernetes","False"):
             query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
         else:
             if len(using_these)<1:
@@ -347,7 +347,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         now_it_is = cursor.fetchall()
     newstr=""
     for a in now_it_is:
-        if "False" == os.getenv("running_as_kubernetes","False"):
+        if "False" == os.getenv("running-as-kubernetes","False"):
             curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
         else:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
@@ -707,7 +707,7 @@ async def run_shell_command(name, command):
 def auto_alert_status():
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return 
-    if "False" == os.getenv("running_as_kubernetes","False"):
+    if "False" == os.getenv("running-as-kubernetes","False"):
         
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -919,7 +919,7 @@ def auto_alert_status():
                     pass
     [containers_which_are_not_expected.append(a) for a in og_conts]
     
-    if "False" == os.getenv("running_as_kubernetes","False"):
+    if "False" == os.getenv("running-as-kubernetes","False"):
         top = get_top()
         load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
         load_issues=""
@@ -982,7 +982,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                if "False" == os.getenv("running_as_kubernetes","False"):
+                if "False" == os.getenv("running-as-kubernetes","False"):
                     issues[2]=[a[0] for a in containers_which_are_not_expected]
                 else:
                     issues[2]=containers_which_are_not_expected
@@ -1023,7 +1023,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     containers_which_should_be_running_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and not ("running" in c["State"])]
     
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
-    if "False" == os.getenv("running_as_kubernetes","False"):
+    if "False" == os.getenv("running-as-kubernetes","False"):
         containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
     else:
         containers_which_are_running_but_are_not_healthy=[]
@@ -1040,7 +1040,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    if "False" == os.getenv("running_as_kubernetes","False"): #todo troubleshoot here
+    if "False" == os.getenv("running-as-kubernetes","False"): #todo troubleshoot here
         print(containers_merged)
         containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
         containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
@@ -1056,7 +1056,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     except ValueError:
                         pass
         containers_which_are_not_expected = og_conts
-    if "False" == os.getenv("running_as_kubernetes","False"):
+    if "False" == os.getenv("running-as-kubernetes","False"):
         top = get_top()
         load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
         load_issues=""
@@ -1119,7 +1119,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                if "False" == os.getenv("running_as_kubernetes","False"):
+                if "False" == os.getenv("running-as-kubernetes","False"):
                     issues[2]=[a[0] for a in containers_which_are_not_expected]
                 else:
                     issues[2]=containers_which_are_not_expected
@@ -1154,7 +1154,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             return
         
 def get_top():
-    if os.environ["running_as_kubernetes"] == "True":
+    if os.environ["running-as-kubernetes"] == "True":
         nodes_output = subprocess.run(
             ["kubectl", "get", "nodes", "-o", "json"],
             capture_output=True,
@@ -1277,7 +1277,7 @@ def send_alerts(message):
 def update_container_state_db():
     if os.getenv("is-master","False") == "False": #slaves don't write to db
         return 
-    if "False" == os.getenv("running_as_kubernetes","False"):
+    if "False" == os.getenv("running-as-kubernetes","False"):
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -1458,7 +1458,7 @@ def runcronjobs():
 def send_advanced_alerts(message):
     try:
         container_source = ""
-        if "False" == os.getenv("running_as_kubernetes","False"):
+        if "False" == os.getenv("running-as-kubernetes","False"):
             container_source="docker"
         else:
             container_source="kubernetes"
@@ -1565,8 +1565,8 @@ def send_advanced_alerts(message):
         
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error_notification_frequency","5")))
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database_update_frequency", "2")))
+scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error-notification-frequency","5")))
+scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
@@ -1576,7 +1576,7 @@ auto_alert_status()
 
 def create_app():
     app = Flask(__name__)
-    app.config['APPLICATION_ROOT'] =os.getenv("APPLICATION_ROOT", "2")
+    app.config['application-root'] =os.getenv("application-root", "2")
     app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_host=1)
     app.secret_key = b'\x8a\x17\x93kT\xc0\x0b6;\x93\xfdp\x8bLl\xe6u\xa9\xf5x'
     app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
@@ -1707,7 +1707,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''SELECT * FROM checker.cronjobs;'''
@@ -1732,7 +1732,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, %s);'''
@@ -1751,7 +1751,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s WHERE (`idcronjobs` = %s);'''
@@ -1772,7 +1772,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('UNSAFE_MODE') != "true":
+                if os.getenv('unsafe-mode') != "true":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 cursor = conn.cursor(buffered=True)
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
@@ -1791,7 +1791,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''SELECT * FROM checker.extra_resources;'''
@@ -1816,7 +1816,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1836,7 +1836,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1858,7 +1858,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('UNSAFE_MODE') != "true":
+                if os.getenv('unsafe-mode') != "true":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                 cursor = conn.cursor(buffered=True)
@@ -1878,7 +1878,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1900,7 +1900,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1920,7 +1920,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1942,7 +1942,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('UNSAFE_MODE') != "true":
+                if os.getenv('unsafe-mode') != "true":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                 cursor = conn.cursor(buffered=True)
@@ -1962,7 +1962,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1988,7 +1988,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -2008,7 +2008,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -2030,7 +2030,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('UNSAFE_MODE') != "true":
+                if os.getenv('unsafe-mode') != "true":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                 cursor = conn.cursor(buffered=True)
@@ -2050,7 +2050,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query2 = '''SELECT * from categories;'''
@@ -2071,7 +2071,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`categories` (`category`) VALUES (%s);'''
@@ -2090,7 +2090,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`categories` SET `category` = %s (`idcategories` = %s);'''
@@ -2112,7 +2112,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('UNSAFE_MODE') != "true":
+                    if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if not check_password_hash(users[username], request.form.to_dict()['psw']):
@@ -2275,7 +2275,7 @@ def create_app():
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''select command, command_explained, id from tests_table where container_name =%s;'''
                     
-                    if "False" == os.getenv("running_as_kubernetes","False"):
+                    if "False" == os.getenv("running-as-kubernetes","False"):
                         container = request.form.to_dict()['container']
                     else:
                         container = '-'.join(request.form.to_dict()['container'].split('-')[:-2])
@@ -2370,7 +2370,7 @@ def create_app():
             return "An incorrect password was provided", 400
         
         if os.getenv("is-multi","False") == "False":
-            if "False" == os.getenv("running_as_kubernetes","False"):
+            if "False" == os.getenv("running-as-kubernetes","False"):
                 og_result = queued_running('docker restart '+request.form.to_dict()['id'])
                 result = og_result.stdout
                 if len(og_result.stderr)>0:
@@ -2391,7 +2391,7 @@ def create_app():
             if "auth" not in request.form.to_dict():
                 source = request.form.to_dict()['source']
                 if source == os.getenv("platform-url",""):
-                    if "False" == os.getenv("running_as_kubernetes","False"):
+                    if "False" == os.getenv("running-as-kubernetes","False"):
                         og_result = queued_running('docker restart '+request.form.to_dict()['id'])
                         result = og_result.stdout
                         if len(og_result.stderr)>0:
@@ -2427,7 +2427,7 @@ def create_app():
                     return "Token invalid", 401
                 except:
                     return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
-                if "False" == os.getenv("running_as_kubernetes","False"):
+                if "False" == os.getenv("running-as-kubernetes","False"):
                     og_result = queued_running('docker restart '+request.form.to_dict()['id'])
                     result = og_result.stdout
                     if len(og_result.stderr)>0:
@@ -2559,7 +2559,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return redirect(url_for('login'))
 
         if os.getenv("is-multi","False") == "False":
-            if "False" == os.getenv("running_as_kubernetes","False"):
+            if "False" == os.getenv("running-as-kubernetes","False"):
                 print("Debug for logs:", podname, request.form.to_dict())
                 process = subprocess.Popen(
                     'docker logs '+podname+" --tail "+str(config["default-log-length"]),
@@ -2597,7 +2597,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     text=True
                 )
                 out=[]
-                if os.getenv('log_previous_container_if_kubernetes'):
+                if os.getenv('log-previous-container-if-kubernetes'):
                     process_previous = subprocess.Popen(
             f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                     shell=True,
@@ -2617,7 +2617,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
                 # if we are here, this was an intracluster call
-                if "False" == os.getenv("running_as_kubernetes","False"):
+                if "False" == os.getenv("running-as-kubernetes","False"):
                     process = subprocess.Popen(
                         'docker logs '+podname+" --tail "+str(config["default-log-length"]),
                         shell=True,
@@ -2654,7 +2654,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         text=True
                     )
                     out=[]
-                    if os.getenv('log_previous_container_if_kubernetes'):
+                    if os.getenv('log-previous-container-if-kubernetes'):
                         process_previous = subprocess.Popen(
                 f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                         shell=True,
@@ -2676,7 +2676,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return "Token invalid", 401
             except KeyError: # we are on multi, there was no token, thereforse this in not an internal call. So, unless it is us, call the proper sentinel and forward the answer
                 if request.form.to_dict()['source'] == os.getenv("platform-url",""): # it is us
-                    if "False" == os.getenv("running_as_kubernetes","False"):
+                    if "False" == os.getenv("running-as-kubernetes","False"):
                         process = subprocess.Popen(
                             'docker logs '+podname+" --tail "+str(config["default-log-length"]),
                             shell=True,
@@ -2713,7 +2713,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             text=True
                         )
                         out=[]
-                        if os.getenv('log_previous_container_if_kubernetes'):
+                        if os.getenv('log-previous-container-if-kubernetes'):
                             process_previous = subprocess.Popen(
                     f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                             shell=True,
@@ -2767,7 +2767,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
     
     def get_container_data(do_not_jsonify=False):
-        if "False" == os.getenv("running_as_kubernetes","False"):
+        if "False" == os.getenv("running-as-kubernetes","False"):
             containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
             containers_merged = []
@@ -2882,7 +2882,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             print(type(get_container_data(True)),str(get_container_data(True)))
             for container_data in get_container_data(True):
                 process = subprocess.Popen(
-                    f'{"kubectl" if os.getenv("running_as_kubernetes",None) else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length",1000) + {"--namespace "+container_data['Namespace'] if os.getenv("running_as_kubernetes",None) else ""}),
+                    f'{"kubectl" if os.getenv("running-as-kubernetes",None) else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length",1000) + {"--namespace "+container_data['Namespace'] if os.getenv("running-as-kubernetes",None) else ""}),
                     shell=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
@@ -3038,9 +3038,9 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
                 script_to_run = "/app/scripts/make_dumps_of_database.sh"
-                if os.getenv("running_as_kubernetes",None):
+                if os.getenv("running-as-kubernetes",None):
                     script_to_run = "/app/scripts/make_dumps_of_database_k8.sh"
-                make_certification = subprocess.run(f'mkdir -p /app/data; mkdir -p {os.getenv("conf_path","/home/debian")}; cp -r {os.getenv("conf_path","/home/debian")} /app/data/{subfolder}; cd /app/data/{subfolder} && bash {script_to_run} && rar a -k -p{password} snap4city-certification-{password}.rar */ *.*', shell=True, capture_output=True, text=True, encoding="utf_8")
+                make_certification = subprocess.run(f'mkdir -p /app/data; mkdir -p {os.getenv("conf-path","/home/debian")}; cp -r {os.getenv("conf-path","/home/debian")} /app/data/{subfolder}; cd /app/data/{subfolder} && bash {script_to_run} && rar a -k -p{password} snap4city-certification-{password}.rar */ *.*', shell=True, capture_output=True, text=True, encoding="utf_8")
                 if len(make_certification.stderr) > 0:
                     print(make_certification.stderr)
                     return send_file(f'/app/data/{subfolder}/snap4city-certification-{password}.rar')
