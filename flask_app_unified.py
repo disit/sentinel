@@ -752,6 +752,7 @@ def auto_alert_status():
         for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
             raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
         conversions=[]
+        source = os.getenv("platform-url","")
         for raw_json in raw_jsons:
             for item in raw_json["items"]:
                 conversion = {}
@@ -763,6 +764,7 @@ def auto_alert_status():
                         conversion["Command"] = full_command
                 except Exception as E: # no command set, read from image
                     conversion["Command"] = "Command not found"
+                conversion["Source"]=source
                 conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
                 conversion["ID"] = item["metadata"]["uid"]
                 conversion["Image"] = item["spec"]["containers"][0]["image"]
@@ -823,7 +825,7 @@ def auto_alert_status():
             total_answer=[]
             try:
                 for r in results:
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret",None), algorithm=ALGORITHM)}).text
+                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
                     except:
@@ -858,7 +860,10 @@ def auto_alert_status():
             td["Status"] = current["Status"]
             td["Container"] = current["Container"]
             # host origin = node, sorta
-            td["Node"] = os.getenv("platform-url","") #current[""]
+            try:
+                td["Node"] = current["Node"]
+            except KeyError: #happens when docker data comes also from another sentinel instance
+                td["Node"] = os.getenv("platform-url","")
             td["Volumes"] = current["LocalVolumes"]
             td["Namespace"] = "Docker - " + source
             new_containers_merged.append(td)
@@ -1337,6 +1342,10 @@ def update_container_state_db():
             # host origin = node, sorta
             td["Node"] = os.getenv("platform-url","") #current[""]
             try:
+                td["Node"] = current["Node"]
+            except KeyError: #happens when docker data comes also from another sentinel instance
+                td["Node"] = os.getenv("platform-url","")
+            try:
                 td["Volumes"] = current["LocalVolumes"]
             except KeyError: #happens when docker data comes also from another sentinel instance
                 td["Volumes"] = current["Volumes"]
@@ -1357,6 +1366,7 @@ def update_container_state_db():
         for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
             raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
         conversions=[]
+        source = os.getenv("platform-url","")
         for raw_json in raw_jsons:
             for item in raw_json["items"]:
                 conversion = {}
@@ -1368,6 +1378,7 @@ def update_container_state_db():
                         conversion["Command"] = full_command
                 except Exception as E: # no command set, read from image
                     conversion["Command"] = "Command not found"
+                conversion["Source"]=source
                 conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
                 conversion["ID"] = item["metadata"]["uid"]
                 conversion["Image"] = item["spec"]["containers"][0]["image"]
@@ -1427,7 +1438,7 @@ def queued_running(command):
     print("Locking executor due to running", command)
     with mutex:
         answer = subprocess.run(command, shell=True, capture_output=True, text=True, encoding="utf_8")
-    print ("Unlocked executor")
+    print("Unlocked executor")
     return answer
     
 def runcronjobs():
@@ -2674,7 +2685,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return "Token expired", 401
             except jwt.InvalidTokenError:
                 return "Token invalid", 401
-            except KeyError: # we are on multi, there was no token, thereforse this in not an internal call. So, unless it is us, call the proper sentinel and forward the answer
+            except KeyError: # we are on multi, there was no token, therefore this in not an internal call. So, unless it is us, call the proper sentinel and forward the answer
                 if request.form.to_dict()['source'] == os.getenv("platform-url",""): # it is us
                     if "False" == os.getenv("running-as-kubernetes","False"):
                         process = subprocess.Popen(
@@ -2731,12 +2742,14 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
                 else:
                     try:
-                        try:
-                            r = requests.post(request.form.to_dict()['source']+"/sentinel/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                        '''try:
+                            r = requests.post(request.form.to_dict()['source']+"/sentinel/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                            print(f"calling {request.form.to_dict()['source']} for {request.form.to_dict()['id']} resulted in {r.text[:100]}")
                             return r.text, r.status_code
-                        except:
-                            r = requests.post(request.form.to_dict()['source']+"/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
-                            return r.text, r.status_code
+                        except:'''
+                        r = requests.post(request.form.to_dict()['source']+"/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                        print(f"calling {request.form.to_dict()['source']} for {request.form.to_dict()['id']} resulted in {r.text[:100]}")
+                        return r.text, r.status_code
                     except:
                         return f"Issue while rebooting pod: {traceback.format_exc()}", 500
             except:
@@ -2814,6 +2827,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
                 raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
             conversions=[]
+        source = os.getenv("platform-url","")
         for raw_json in raw_jsons:
             for item in raw_json["items"]:
                 conversion = {}
@@ -2826,6 +2840,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 except Exception as E: # no command set, read from image
                     #conversion["Command"] = subprocess.run(f"kubectl exec {item['metadata']['name']} -n {namespace} -- cat /proc/1/cmdline | tr '\0' ' '", shell=True, capture_output=True, text=True, encoding="utf_8").stdout
                     conversion["Command"] = "Command not found"
+                conversion["Source"]=source
                 conversion["CreatedAt"] = item["metadata"]["creationTimestamp"]
                 conversion["ID"] = item["metadata"]["uid"]
                 conversion["Image"] = item["spec"]["containers"][0]["image"]
