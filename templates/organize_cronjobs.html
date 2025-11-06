@@ -169,7 +169,7 @@
 		$('#CronJobEditId').val(id);
 		$('#NameCronJobEdit').val(name);
 		$('#CommandEdit').val(command);
-		$('#WhereToRunEdit').val(where_to_run);
+		if (where_to_run==="master") {$('#WhereToRunEdit').val("");} else {$('#WhereToRunEdit').val(where_to_run);}
 
 		let select = document.getElementById('category-selection-edit');
 

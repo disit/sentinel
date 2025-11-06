@@ -1,0 +1,44 @@
+reanimate certification
+format_error_to_send should be multi
+organize containers html weird "{kind}" element
+
+
+ERROR:flask_app_unified:Exception on /generate_pdf [GET]
+Traceback (most recent call last):
+  File "/app/flask_app_unified.py", line 3042, in generate_pdf
+    content.append(Paragraph(substring, styles["Normal"]))
+  File "/usr/local/lib/python3.10/site-packages/reportlab/platypus/paragraph.py", line 1859, in __init__
+    self._setup(text, style, bulletText or getattr(style,'bulletText',None), frags, cleanBlockQuotedText)
+  File "/usr/local/lib/python3.10/site-packages/reportlab/platypus/paragraph.py", line 1880, in _setup
+    style, frags, bulletTextFrags = _parser.parse(text,style)
+  File "/usr/local/lib/python3.10/site-packages/reportlab/platypus/paraparser.py", line 3221, in parse
+    return self._complete_parse()
+  File "/usr/local/lib/python3.10/site-packages/reportlab/platypus/paraparser.py", line 3155, in _complete_parse
+    self._syntax_error('parse ended with %d unclosed tags\n %s' % (len(self._stack),'\n '.join((x.__tag__ for x in reversed(self._stack)))))
+  File "/usr/local/lib/python3.10/site-packages/reportlab/platypus/paraparser.py", line 2780, in _syntax_error
+    raise ValueError('paraparser: syntax error: %s' % message)
+ValueError: paraparser: syntax error: parse ended with 1 unclosed tags
+ para
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+  File "/usr/local/lib/python3.10/site-packages/asgiref/sync.py", line 325, in __call__
+    return call_result.result()
+  File "/usr/local/lib/python3.10/concurrent/futures/_base.py", line 451, in result
+    return self.__get_result()
+  File "/usr/local/lib/python3.10/concurrent/futures/_base.py", line 403, in __get_result
+    raise self._exception
+  File "/usr/local/lib/python3.10/site-packages/asgiref/sync.py", line 365, in main_wrap
+    result = await awaitable
+  File "/app/flask_app_unified.py", line 3044, in generate_pdf
+    content.append(Paragraph(html(substring), styles["Normal"]))
+TypeError: 'module' object is not callable

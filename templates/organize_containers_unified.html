@@ -64,6 +64,10 @@
 						<label for="PositionAdd">Position</label>
 						<input type="text" class="form-control" id="PositionAdd" placeholder="Address of the Snap4Sentinel instance's host which holds the container" required>
 					</div>
+					<div class="form-group">
+						<label for="NamespaceAdd">Namespace (ignored when kind isn't docker)</label>
+						<input type="text" class="form-control" id="NamespaceAdd" required>
+					</div>
 					<label for="kind-selection">Select container kind:</label>
 					<select id="kind-selection" name="kind-selection" class="form-select">
 						<option value="docker">Docker</option>
@@ -79,7 +83,7 @@
 	</div>
 </div>
 
-<div class="modal fade" id="editComponent" tabindex="-1" role="dialog" aria-labelledby="editComponentModal" aria-hidden="true">
+<div class="modal fade" id="editComponentModal" tabindex="-1" role="dialog" aria-labelledby="editComponentModal" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
@@ -111,6 +115,10 @@
 					<div class="form-group">
 						<label for="PositionEdit">Position</label>
 						<input type="text" class="form-control" id="PositionEdit" placeholder="Address of the Snap4Sentinel instance's host which holds the container" required>
+					</div>
+					<div class="form-group">
+						<label for="NamespaceEdit">Namespace (ignored when kind isn't docker)</label>
+						<input type="text" class="form-control" id="NamespaceEdit" required>
 					</div>
 					<label for="kind-selection-edit">Select container kind:</label>
 					<select id="kind-selection-edit" name="kind-selection-edit" class="form-select">
@@ -227,11 +235,12 @@
 		var kind = $('#kind-selection').val();
 		var contacts = $('#ContactsAdd').val();
 		var position = $('#PositionAdd').val();
+		var namespace = $('#NamespaceAdd').val();
 		if (password) {
 			try {
 				$.ajax({
 					url: './add_container',
-					data: {id: id, psw: password, category: category, contacts: contacts, position: position, kind: kind},
+					data: {id: id, psw: password, category: category, contacts: contacts, position: position, kind: kind, namespace: namespace},
 					type: 'POST',
 					success: function(response) {
 						alert(id + " was added!");
@@ -258,11 +267,12 @@
 	var kind = $('#kind-selection-edit').val();
 	var contacts = $('#ContactsEdit').val();
 	var position = $('#PositionEdit').val();
+	var namespace = $('#NamespaceEdit').val();
 	if (password) {
 		try {
 			$.ajax({
 				url: './edit_container',
-				data: {id: id, psw: password, category: category, contacts: contacts, kind: kind, position: position},
+				data: {id: id, psw: password, category: category, contacts: contacts, kind: kind, position: position, namespace: namespace},
 				type: 'POST',
 				success: function(response) {
 					alert(id + " was edited!");

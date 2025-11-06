@@ -18,12 +18,12 @@
   <tbody>
 {%for item in extra_resources%}
     <tr>
-	  <td>{{item[0]}}</td>
 	  <td>{{item[1]}}</td>
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
+	  <td>{{item[0]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteExtraResource" data-component="{{item[0]}}" id="deleteExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editExtraResource" data-component="{{item[0]}}" data-information="{{item[1] | e}}" data-description="{{item[2] | e}}" data-category="{{item[3] | e}}" id="editExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editExtraResource" data-component="{{item[0]}}" data-information="{{item[1] | e}}" data-description="{{item[2] | e}}" data-category="{{item[4] | e}}" id="editExtraResource{{item[0]}}" onClick="$('#addExtraResourceModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>

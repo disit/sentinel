@@ -46,7 +46,6 @@ import paramiko
 from pysnmp.hlapi.v3arch.asyncio import *
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-
 def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
     return tuple(int(x) for x in oid_str.split('.'))
@@ -160,6 +159,7 @@ async def safe_snmp_walk(host_data):
 
         snmpEngine.close_dispatcher()
         return results
+
 
 async def get_system_info_snmp(host):
     # Walk HOST-RESOURCES-MIB
@@ -896,7 +896,7 @@ def auto_alert_status():
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
     
-    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
+    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components_docker) and "unhealthy" in c["Status"]]
     for c_m in containers_merged_kubernetes:
         if any(c_m["Names"].startswith(value) for value in components_kubernetes):
             if "restarts" in c_m["State"]:
@@ -1159,7 +1159,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             return
         
 def get_top():
-    if os.environ["running-as-kubernetes"] == "True":
+    if os.getenv("running-as-kubernetes", "True") == "True":
         nodes_output = subprocess.run(
             ["kubectl", "get", "nodes", "-o", "json"],
             capture_output=True,
@@ -1664,7 +1664,11 @@ def create_app():
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`) VALUES (%s, %s, %s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],))
+                    if request.form.to_dict()['kind'] == "Kubernetes":
+                        cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],))
+                    else:
+                        cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],request.form.to_dict()['position'],request.form.to_dict()['kind'],))
+
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -1681,8 +1685,17 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s where (`component` = %s)'''
-                    cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['id'],))
+                    if request.form.to_dict()['kind'] == "Kubernetes":
+                        if request.form.to_dict()['position']=="": #if namespace left empty, just leave the old one
+                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `kind` = %s where (`component` = %s)'''
+                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['kind'],request.form.to_dict()['id'],))
+                        else:
+                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s where (`component` = %s)'''
+                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['id'],))
+                    else:
+                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s where (`component` = %s)'''
+                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['id'],))
+                    
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -1721,7 +1734,7 @@ def create_app():
                     if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT * FROM checker.cronjobs;'''
+                    query = '''SELECT idcronjobs, name, command, category, where_to_run FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master' FROM checker.cronjobs where where_to_run is null;'''
                     query2 = '''SELECT * from categories;'''
                     cursor.execute(query)
                     conn.commit()
@@ -1746,8 +1759,13 @@ def create_app():
                     if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],))
+                    if request.form.to_dict()['where_to_run'] != "":
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],))
+                    else:
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, NULL);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],))
+                    
                     conn.commit()
                     return "ok", 201
             except Exception:
@@ -1805,7 +1823,7 @@ def create_app():
                     if os.getenv('unsafe-mode') != "true":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT * FROM checker.extra_resources;'''
+                    query = '''SELECT `categories`.category as name_category, `extra_resources`.id_category as id_category, `extra_resources`.resource_address as resource_address, `extra_resources`.resource_information as resource_information, `extra_resources`.resource_description as resource_description FROM checker.extra_resources join categories on id_category=id_category;'''
                     query2 = '''SELECT * from categories;'''
                     cursor.execute(query)
                     conn.commit()
@@ -2216,7 +2234,7 @@ def create_app():
     def check():
         if os.getenv("is-multi","False") == "True":
             try:
-                jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret",""), algorithms=[ALGORITHM])
+                jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
                 return get_container_data()
             except jwt.ExpiredSignatureError:
                 print("Token expired")
@@ -2303,7 +2321,7 @@ def create_app():
                             query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
                             cursor.execute(query_1,(f"{command_ran.stdout}\n{command_ran.stderr}", container,r[0],))
                             conn.commit()
-                            log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, request, which_test="is alive " + str(r[2]))
+                            log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, which_test="is alive " + str(r[2]),user_op=session['username'])
                         except Exception:
                             return jsonify(f"Test of {request.form.to_dict()['container']} had a runtime error with the cause: {traceback.format_exc()}"), 500
                     if len(results) == 0:
@@ -2342,7 +2360,7 @@ def create_app():
                         query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
                         cursor.execute(query_1,(string_used, test_name,r[0],))
                         conn.commit()
-                        log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, request, which_test="advanced test - "+str(r[1]))
+                        log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, which_test="advanced test - "+str(r[1]),user_op=session['username'])
                     return jsonify(total_result)
             except Exception:
                 print("Something went wrong during tests running because of",traceback.format_exc())
@@ -2374,27 +2392,33 @@ def create_app():
     def reboot_container():
         if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
             try:
-                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
             except:
                 return redirect(url_for('login'))
-        if not check_password_hash(users[username], request.form.to_dict()['psw']):
-            return "An incorrect password was provided", 400
+        try:
+            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                return "An incorrect password was provided", 400
+        except KeyError: # no psw found
+            if os.getenv("is-multi","False") == "True" and "auth" in request.form.to_dict(): # on multi not having the psw is allowed if it has a token, because it is a intracluster call
+                pass
+            else:
+                return "An incorrect password was provided", 400
         
         if os.getenv("is-multi","False") == "False":
             if "False" == os.getenv("running-as-kubernetes","False"):
                 og_result = queued_running('docker restart '+request.form.to_dict()['id'])
                 result = og_result.stdout
                 if len(og_result.stderr)>0:
-                    log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, request)
+                    log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, user_op=session['username'])
                     return result, 500
                 else:
-                    log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                    log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=session['username'])
                     return result
             else:
                 try:
                     result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                     #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
-                    log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, request)
+                    log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=session['username'])
                     return result.stdout
                 except Exception:
                     return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
@@ -2406,32 +2430,29 @@ def create_app():
                         og_result = queued_running('docker restart '+request.form.to_dict()['id'])
                         result = og_result.stdout
                         if len(og_result.stderr)>0:
-                            log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, request)
+                            log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, user_op=session['username'])
                             return result, 500
                         else:
-                            log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                            log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=session['username'])
                             return result
                     else:
                         try:
                             result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                             #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
-                            log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, request)
+                            log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=session['username'])
                             return result.stdout
                         except Exception:
                             return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
                 else:
                     try:
-                        try:
-                            r = requests.post(request.form.to_dict()['source']+"/sentinel/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
-                            return r.text, r.status_code
-                        except:
-                            r = requests.post(request.form.to_dict()['source']+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
-                            return r.text, r.status_code
+                        r = requests.post(request.form.to_dict()['source']+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM),"id":request.form.to_dict()['id']})
+                        print(f"asking {request.form.to_dict()['source']} to reboot {request.form.to_dict()['id']} resulted in code {r.status_code} and body {r.text[:100]}...")
+                        return r.text, r.status_code
                     except:
                         return f"Issue while rebooting pod: {traceback.format_exc()}", 500
             else:
                 try:
-                    jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                    jwt_token=jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
                 except jwt.ExpiredSignatureError:
                     return "Token expired", 401
                 except jwt.InvalidTokenError:
@@ -2442,15 +2463,15 @@ def create_app():
                     og_result = queued_running('docker restart '+request.form.to_dict()['id'])
                     result = og_result.stdout
                     if len(og_result.stderr)>0:
-                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, request)
+                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr,user_op=jwt_token["sub"])
                         return result, 500
                     else:
-                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, request)
+                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result,user_op=jwt_token["sub"])
                         return result
                 else:
                     try:
                         result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
-                        log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, request)
+                        log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout,user_op=jwt_token["sub"])
                         return result.stdout
                     except Exception:
                         return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
@@ -2520,7 +2541,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         SELECT * FROM RankedEntries WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
-                    log_to_db('getting_tests', 'Tests results were read', request)
+                    log_to_db('getting_tests', 'Tests results were read')
                     results = cursor.fetchall()
                     return jsonify(results)
             except Exception:
@@ -2529,14 +2550,18 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
         
     # this is only called serverside
-    def log_to_db(table, log, _=None, which_test=""): #FIXME, remove 3rd param from other calls
+    def log_to_db(table, log, which_test="", user_op=""):
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
+                try:
+                    user = session['username']
+                except KeyError:
+                    user = user_op
                 cursor = conn.cursor(buffered=True)
                 if table != "test_ran":
-                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator) VALUES (NOW(),'{}','{}')'''.format(table, log.replace("'","''"), session['username']))
+                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator) VALUES (NOW(),'{}','{}')'''.format(table, log.replace("'","''"), user))
                 else:
-                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator, test) VALUES (NOW(),'{}','{}','{}')'''.format(table, log.replace("'","''"), session['username'], which_test))
+                    cursor.execute('''INSERT INTO `{}` (datetime, log, perpetrator, test) VALUES (NOW(),'{}','{}','{}')'''.format(table, log.replace("'","''"), user, which_test))
                 conn.commit()
         except Exception:
             print("Something went wrong during db logging because of:",traceback.format_exc(), "- in:",table)
@@ -2553,7 +2578,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         SELECT * FROM RankedEntries WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
-                    log_to_db('getting_tests', 'Tests results were read', request)
+                    log_to_db('getting_tests', 'Tests results were read', user_op=session['username'])
                     results = cursor.fetchall()
                     return jsonify(results)
             except Exception:
@@ -2565,7 +2590,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     def get_container_logs(podname):
         if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
             try:
-                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
             except:
                 return redirect(url_for('login'))
 
@@ -2584,7 +2609,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     out.append(line[:-1])
                 process.stdout.close()
                 r = '<br>'.join(out)
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                if "raw" not in request.form.to_dict().keys():
+                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                else:
+                    r = r.replace("<br>","\n")
+                    return r, 200
             else:
                 prefetch = subprocess.Popen(
             f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
@@ -2623,10 +2652,14 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 
                 process.stdout.close()
                 r = '<br>'.join(out)
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                if "raw" not in request.form.to_dict().keys():
+                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                else:
+                    r = r.replace("<br>","\n")
+                    return r, 200
         else:
             try:
-                jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])
+                jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
                 # if we are here, this was an intracluster call
                 if "False" == os.getenv("running-as-kubernetes","False"):
                     process = subprocess.Popen(
@@ -2641,7 +2674,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         out.append(line[:-1])
                     process.stdout.close()
                     r = '<br>'.join(out)
-                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                    if "raw" not in request.form.to_dict().keys():
+                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                    else:
+                        r = r.replace("<br>","\n")
+                        return r, 200
                 else:
                     prefetch = subprocess.Popen(
                 f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
@@ -2680,7 +2717,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     
                     process.stdout.close()
                     r = '<br>'.join(out)
-                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                    if "raw" not in request.form.to_dict().keys():
+                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                    else:
+                        r = r.replace("<br>","\n")
+                        return r, 200
             except jwt.ExpiredSignatureError:
                 return "Token expired", 401
             except jwt.InvalidTokenError:
@@ -2700,7 +2741,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             out.append(line[:-1])
                         process.stdout.close()
                         r = '<br>'.join(out)
-                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                        if "raw" not in request.form.to_dict().keys():
+                            return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                        else:
+                            r = r.replace("<br>","\n")
+                            return r, 200
                     else:
                         prefetch = subprocess.Popen(
                     f"kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}'",
@@ -2739,7 +2784,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         
                         process.stdout.close()
                         r = '<br>'.join(out)
-                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                        if "raw" not in request.form.to_dict().keys():
+                            return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                        else:
+                            r = r.replace("<br>","\n")
+                            return r, 200
                 else:
                     try:
                         '''try:
@@ -2747,9 +2796,12 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             print(f"calling {request.form.to_dict()['source']} for {request.form.to_dict()['id']} resulted in {r.text[:100]}")
                             return r.text, r.status_code
                         except:'''
-                        r = requests.post(request.form.to_dict()['source']+"/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
-                        print(f"calling {request.form.to_dict()['source']} for {request.form.to_dict()['id']} resulted in {r.text[:100]}")
-                        return r.text, r.status_code
+                        if "raw" not in request.form.to_dict().keys():
+                            r = requests.post(request.form.to_dict()['source']+"/container/"+podname, data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
+                            return r.text, r.status_code
+                        else:
+                            r = requests.post(request.form.to_dict()['source']+"/container/"+podname, data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM), "raw":"True"})
+                            return r.text, r.status_code
                     except:
                         return f"Issue while rebooting pod: {traceback.format_exc()}", 500
             except:
@@ -2889,13 +2941,26 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         if do_not_jsonify:
             return conversions
         return jsonify(conversions)
+
     
     @app.route("/generate_pdf", methods=['GET'])
-    def generate_pdf(): # no multi
+    async def generate_pdf(): # TODO no multi yet
         if 'username' in session:
             data_stored = []
-            print(type(get_container_data(True)),str(get_container_data(True)))
-            for container_data in get_container_data(True):
+            data = check_container_db()["result"]
+            containers = {}
+            for container in data:
+                try:
+                    request=requests.post(os.getenv("platform-url")+"/container/"+container["Name"], data={"id":container["Name"], "source":container["Source"],"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM), "raw":"True"})
+                    request.raise_for_status()
+                    containers[container["Name"]+"-"+container["Source"]]=request.text
+                except Exception:
+                    print(traceback.format_exc())
+            for key, value in containers.items():
+                data_stored.append({"header": key, "string": value})
+            '''     
+            for container_data in get_container_data(True): # instead, use the container data from db, and for each of them build the call for the logs
+                
                 process = subprocess.Popen(
                     f'{"kubectl" if os.getenv("running-as-kubernetes",None) else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length",1000) + {"--namespace "+container_data['Namespace'] if os.getenv("running-as-kubernetes",None) else ""}),
                     shell=True,
@@ -2910,6 +2975,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 r = '<br>'.join(out)
                 #r = '<br>'.join(subprocess.run('docker logs '+container_data['ID'] + ' --tail '+os.getenv("default-log-length"), shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n'))
                 data_stored.append({"header": container_data['Name'], "string": r})
+            '''
             
             # Create a PDF document
             subfolder = "pdf"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -2932,7 +2998,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         SELECT * FROM RankedEntries WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
-                    log_to_db('getting_tests', 'Tests results were read', request)
+                    log_to_db('getting_tests', 'Tests results were read', user_op=session['username'])
                     results = cursor.fetchall()
                     tests_out = results
             except Exception:
@@ -2940,7 +3006,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             # index
             content.append(Paragraph("The following are hyperlinks to logs of each container.", styles["Heading1"]))
             for pair in data_stored:
-                if pair["header"] in ['dashboard-backend','myldap']:
+                if any(pair["header"].startswith(prefix) for prefix in ['dashboard-backend','myldap']):
                     continue
                 content.append(Paragraph(f'<a href="#c-{pair["header"]}" color="blue">Container {pair["header"]}</a>', styles["Normal"]))
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2962,8 +3028,9 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             
             # Iterate over pairs
             for pair in data_stored:
-                if pair["header"] in ['dashboard-backend','myldap']:
+                if any(pair["header"].startswith(prefix) for prefix in ['dashboard-backend','myldap']):
                     continue
+                print(f"doing {pair['header']} with {pair['string'][:200]}")
                 header = pair["header"]
                 string = pair["string"]
                 strings = string.split("<br>")
@@ -2989,12 +3056,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             response = send_file(pdf_output_path)
             return response
         return redirect(url_for('login'))
-        
-    def find_target_folder(parent_folder):  #TODO won't work as intended in k8s
-        for root, dirs, files in os.walk(parent_folder):
-            if "docker-compose.yml" in files and "setup.sh" in files:
-                return root
-        return None
+
         
     @app.route("/download")
     def redirect_to_download():
@@ -3038,7 +3100,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         if 'username' in session:
             if session['username'] != "admin":
                 try:
-                    if jwt.decode(request.form.to_dict()['auth'], app.config['SECRET_KEY'], algorithms=[ALGORITHM])['sub'] == "admin": #maybe authenticate with token
+                    if jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])['sub'] == "admin": #maybe authenticate with token
                         pass
                     else:
                         return render_template("error_showing.html", r = "User is not authorized to perform the operation."), 401
@@ -3351,7 +3413,6 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     conn.close()
                     return jsonify({"error": "Host not found in DB"}), 400
 
-                user = row['user']
                 cursor.execute("DELETE FROM ip_table WHERE hostname=%s", (hostname,))
                 conn.commit()
                 cursor.close()
