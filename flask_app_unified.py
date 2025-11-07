@@ -329,7 +329,31 @@ db_conn_info = {
     "auth_plugin": 'mysql_native_password'
 }
 
-def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): # FIXME sends "heatmap2geosrv" but should look for "heatmap2geosrv-*" (k8s/docker mixup)
+def mixed_format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
+    # split containers for naming reasons
+    k8s_c = [container for container in containers if container["Namespace"].startswith("Docker")]
+    doc_c = [container for container in containers if not container["Namespace"].startswith("Docker")]
+    k8s_c_names = '|'.join('^{0}'.format(w).strip() for w in k8s_c["Name"].split(", ") if len(w)>0)
+    doc_c_names = ', '.join('"{0}"'.format(w).strip() for w in doc_c["Name"].split(", "))
+    with mysql.connector.connect(**db_conn_info) as conn:
+        cursor = conn.cursor(buffered=True)
+        k8s_matches, doc_matches= [], []
+        if len(k8s_c_names)>0:
+            query_k8s = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(k8s_c_names)
+            print("Format Error to Send (K8s Containers) \nQuery used:" + query_k8s)
+            cursor.execute(query_k8s)
+            k8s_matches = cursor.fetchall()
+        if len(doc_c_names)>0:
+            query_doc = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(doc_c_names)
+            print("Format Error to Send (Docker Containers) \nQuery used:" + query_doc)
+            cursor.execute(query_doc)
+            doc_matches = cursor.fetchall()
+        if len(doc_matches) == 0 and len(k8s_matches) == 0:
+            return ""  #found nothing
+    return "hi"
+
+def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): 
+    
     if "False" == os.getenv("running-as-kubernetes","False"):
         using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
     else:
@@ -378,6 +402,7 @@ def format_error_to_send(instance_of_problem, containers, because = None, explai
         else:
             newstr += curstr+"<br>"
     return newstr
+
 
 KEY_DIR = "/ssh_keys"
 os.makedirs(KEY_DIR, exist_ok=True)
@@ -1639,7 +1664,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''SELECT * FROM checker.component_to_category;'''
+                    query = '''SELECT component, category, `references`, position, cast(kind as char) as kind FROM checker.component_to_category;'''
                     query2 = '''SELECT category from categories;'''
                     cursor.execute(query)
                     conn.commit()
@@ -3033,6 +3058,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 print(f"doing {pair['header']} with {pair['string'][:200]}")
                 header = pair["header"]
                 string = pair["string"]
+                string = html.escape(string)
+                string = string.replace("\n","<br>")
                 strings = string.split("<br>")
                 # Add header to content
                 content.append(Paragraph(f'<b><a name="c-{header}"></a>{header}</b>', styles["Heading1"]))
