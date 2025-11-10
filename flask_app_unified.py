@@ -329,6 +329,52 @@ db_conn_info = {
     "auth_plugin": 'mysql_native_password'
 }
 
+def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
+    # split containers for naming reasons
+    
+    container_names = [c["container"] for c in containers]
+    container_names = '|'.join('^{0}'.format(w).strip() for w in container_names if len(w)>0)
+    with mysql.connector.connect(**db_conn_info) as conn:
+        cursor = conn.cursor(buffered=True)
+        matches = []
+        if len(container_names)>0:
+            query = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(container_names)
+            cursor.execute(query)
+            matches = cursor.fetchall()
+        
+        if len(matches) ==0:
+            return ""  #found nothing
+        newstr=""
+        for a in matches:
+            curstr="In category " + a[0] + ", in namespace " + a[2] + " the container named " + a[1] + " " + instance_of_problem
+            if because:
+                reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
+                
+                if len(reason) == 1:
+                    use_this_reason=because[reason[0]]
+                else:
+                    if len(reason) == 0:
+                        print("fuzzy search failed, trying second one")
+                        reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
+                        if len(reason) == 1:
+                            print("second fuzzy search succeeded")
+                            use_this_reason=because[reason[0]]
+                        else:
+                            if len(reason) == 0:
+                                use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
+                            else:
+                                use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+                    else:
+                        use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+                try:
+                    newstr += curstr + explain_reason + use_this_reason+"<br>"
+                except Exception as E:
+                    newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
+            else:
+                newstr += curstr+"<br>"
+        return newstr
+        
+
 def mixed_format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
     # split containers for naming reasons
     k8s_c = [container for container in containers if container["Namespace"].startswith("Docker")]
@@ -340,69 +386,61 @@ def mixed_format_error_to_send(instance_of_problem, containers, because = None, 
         k8s_matches, doc_matches= [], []
         if len(k8s_c_names)>0:
             query_k8s = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(k8s_c_names)
-            print("Format Error to Send (K8s Containers) \nQuery used:" + query_k8s)
             cursor.execute(query_k8s)
             k8s_matches = cursor.fetchall()
         if len(doc_c_names)>0:
             query_doc = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(doc_c_names)
-            print("Format Error to Send (Docker Containers) \nQuery used:" + query_doc)
             cursor.execute(query_doc)
             doc_matches = cursor.fetchall()
-        if len(doc_matches) == 0 and len(k8s_matches) == 0:
+        if len(doc_matches) + len(k8s_matches) == 0:
             return ""  #found nothing
-    return "hi"
-
-def format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): 
-    
-    if "False" == os.getenv("running-as-kubernetes","False"):
-        using_these = ', '.join('"{0}"'.format(w).strip() for w in containers.split(", "))
-    else:
-        using_these = '|'.join('^{0}'.format(w).strip() for w in containers.split(", ") if len(w)>0)
-    with mysql.connector.connect(**db_conn_info) as conn:
-        cursor = conn.cursor(buffered=True)
-        if "False" == os.getenv("running-as-kubernetes","False"):
-            query2 = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(using_these)
-        else:
-            if len(using_these)<1:
-                return ""
-            query2 = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(using_these)
-        print("Format Error to Send\nQuery used:" +query2)
-        cursor.execute(query2)
-        now_it_is = cursor.fetchall()
-    newstr=""
-    for a in now_it_is:
-        if "False" == os.getenv("running-as-kubernetes","False"):
-            curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
-        else:
+        newstr=""
+        for a in k8s_matches:
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
-        
-        if because:
-            reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
-            
-            if len(reason) == 1:
-                use_this_reason=because[reason[0]]
-            else:
-                if len(reason) == 0:
-                    print("fuzzy search failed, trying second one")
-                    reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
-                    if len(reason) == 1:
-                        print("second fuzzy search succeeded")
-                        use_this_reason=because[reason[0]]
-                    else:
-                        if len(reason) == 0:
-                            use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
-                        else:
-                            use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+            if because:
+                reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
+                
+                if len(reason) == 1:
+                    use_this_reason=because[reason[0]]
                 else:
-                    use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
-            try:
-                newstr += curstr + explain_reason + use_this_reason+"<br>"
-            except Exception as E:
-                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
-        else:
-            newstr += curstr+"<br>"
-    return newstr
-
+                    if len(reason) == 0:
+                        print("fuzzy search failed, trying second one")
+                        reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
+                        if len(reason) == 1:
+                            print("second fuzzy search succeeded")
+                            use_this_reason=because[reason[0]]
+                        else:
+                            if len(reason) == 0:
+                                use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
+                            else:
+                                use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+                    else:
+                        use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+                try:
+                    newstr += curstr + explain_reason + use_this_reason+"<br>"
+                except Exception as E:
+                    newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
+            else:
+                newstr += curstr+"<br>"
+        for a in doc_matches:
+            curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
+            if because:
+                reason=[c for _,c in enumerate([a for a in because.keys()]) if c==a[1]]
+                
+                if len(reason) == 1:
+                    use_this_reason=because[reason[0]]
+                else:
+                    if len(reason) == 0:
+                        use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
+                    else:
+                        use_this_reason=because[reason[0]]
+                try:
+                    newstr += curstr + explain_reason + use_this_reason+"<br>"
+                except Exception:
+                    newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
+            else:
+                newstr += curstr+"<br>"
+        return newstr
 
 KEY_DIR = "/ssh_keys"
 os.makedirs(KEY_DIR, exist_ok=True)
@@ -1012,10 +1050,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
             if len(containers_which_are_not_expected) > 0:
-                if "False" == os.getenv("running-as-kubernetes","False"):
-                    issues[2]=[a[0] for a in containers_which_are_not_expected]
-                else:
-                    issues[2]=containers_which_are_not_expected
+                issues[2]=containers_which_are_not_expected
             if len(load_issues)>0:
                 issues[3]=load_issues
             if len(memory_issues)>0:
@@ -1493,23 +1528,17 @@ def runcronjobs():
 
 def send_advanced_alerts(message):
     try:
-        container_source = ""
-        if "False" == os.getenv("running-as-kubernetes","False"):
-            container_source="docker"
-        else:
-            container_source="kubernetes"
         text_for_email = ""
         for a in range(len(message)):
             print(f"Element {a}: "+str(message[a])[:100])
         if len(message[0])>0:
-            text_for_email = format_error_to_send("is not in the correct status ",containers=", ".join(['-'.join(a["Name"].split('-')[:-2]) for a in message[0]]),because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
+            text_for_email = mixed_format_error_to_send("is not in the correct status ",containers=message[0],because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
         if len(message[1])>0:
-            containers = ", ".join([a["container"] for a in message[1]])
+            #containers = ", ".join([a["container"] for a in message[1]])
             becauses = dict([[a["container"],a["command"]] for a in message[1]])
-            text_for_email+= format_error_to_send("is not answering correctly to its 'is alive' test ",containers=containers,because=becauses,explain_reason="given the failure of: ")+"<br><br>"    
+            text_for_email+= mixed_format_error_to_send_tests_test_ran("is not answering correctly to its 'is alive' test ",containers=message[1],because=becauses,explain_reason="given the failure of: ")+"<br><br>"    
         if len(message[2])>0:
-            containers = ", ".join(message[2])
-            text_for_email+= format_error_to_send(f"wasn't found running in {container_source} ",containers=containers)+"<br><br>"
+            text_for_email+= mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=message[2])+"<br><br>"
         if len(message[3])>0:
             text_for_email+= message[3] + '<br><br>'
         if len(message[4])>0:
@@ -2550,7 +2579,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     results = cursor.fetchall()
                     return jsonify(results)
             except Exception:
-                print("Something went wrong during muting a component because of:",traceback.format_exc())
+                print("Something went wrong during getting a cronjob because of:",traceback.format_exc())
                 return traceback.format_exc(), 500
         return redirect(url_for('login'))
         
@@ -2983,24 +3012,6 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     print(traceback.format_exc())
             for key, value in containers.items():
                 data_stored.append({"header": key, "string": value})
-            '''     
-            for container_data in get_container_data(True): # instead, use the container data from db, and for each of them build the call for the logs
-                
-                process = subprocess.Popen(
-                    f'{"kubectl" if os.getenv("running-as-kubernetes",None) else "docker"} logs '+container_data['Name']+" --tail "+str(os.getenv("default-log-length",1000) + {"--namespace "+container_data['Namespace'] if os.getenv("running-as-kubernetes",None) else ""}),
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  # Merge stderr into stdout to preserve order
-                    text=True
-                )
-                out=[]
-                for line in iter(process.stdout.readline, ''):
-                    out.append(line[:-1])
-                process.stdout.close()
-                r = '<br>'.join(out)
-                #r = '<br>'.join(subprocess.run('docker logs '+container_data['ID'] + ' --tail '+os.getenv("default-log-length"), shell=True, capture_output=True, text=True, encoding="utf_8").stdout.split('\n'))
-                data_stored.append({"header": container_data['Name'], "string": r})
-            '''
             
             # Create a PDF document
             subfolder = "pdf"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -3012,7 +3023,9 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             content = []
             extra_logs = []
             tests_out = None
+            cronjobs_out = None
             extra_tests = []
+            cronjobs = []
             
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -3026,6 +3039,19 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     log_to_db('getting_tests', 'Tests results were read', user_op=session['username'])
                     results = cursor.fetchall()
                     tests_out = results
+            except Exception:
+                print("Something went wrong because of:",traceback.format_exc())
+                
+            try: # cronjobs
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    log_to_db('getting_tests', 'Cronjobs results were read', user_op=session['username'])
+                    results = cursor.fetchall()
+                    cronjobs_out = results
             except Exception:
                 print("Something went wrong because of:",traceback.format_exc())
             # index
@@ -3047,7 +3073,12 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 if not test:
                     break
                 content.append(Paragraph(f'<a href="#t-{test[3]}" color="blue">Test of {test[3]}</a>', styles["Normal"]))
-                extra_tests.append(test)
+                extra_tests.append(test)            
+            for cronjob in cronjobs_out:
+                if not cronjob:
+                    break
+                content.append(Paragraph(f'<a href="#t-{cronjob[3]}" color="blue">Cronjob {cronjob[3]}</a>', styles["Normal"]))
+                cronjobs.append(cronjob)
             content.append(PageBreak())
             
             
@@ -3076,6 +3107,13 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             for test in extra_tests:
                 content.append(Paragraph(f'<b><a name="t-{test[3]}"></a>{test[3]}</b>', styles["Heading1"]))
                 content.append(Paragraph(test[2].replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
+                content.append(PageBreak())
+            for cronjob in cronjobs:
+                content.append(Paragraph(f'<b><a name="c-{cronjob[3]}"></a>{cronjob[3]}</b>', styles["Heading1"]))
+                content.append(Paragraph(html.escape(cronjob[1]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
+                if cronjob[2]:
+                    content.append(Paragraph(f'<br><b><a name="c-{cronjob[3]}-errors"></a>Errors</b>', styles["Heading2"]))
+                    content.append(Paragraph(html.escape(cronjob[2]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
                 content.append(PageBreak())
             # Add content to the PDF document
             doc.build(content)
