@@ -767,7 +767,7 @@ async def run_shell_command(name, command):
         return {"container":name, "result": f"Command {command} had an error:\n{traceback.format_exc()}", "command": command}
 
 
-def auto_alert_status():
+def auto_alert_status(): #FIXME kubernetes master ignores all other sentinels!
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return 
     if "False" == os.getenv("running-as-kubernetes","False"):
@@ -1339,7 +1339,7 @@ def send_alerts(message):
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
-def update_container_state_db():
+def update_container_state_db(): #FIXME kubernetes master ignores all other sentinels!
     if os.getenv("is-master","False") == "False": #slaves don't write to db
         return 
     if "False" == os.getenv("running-as-kubernetes","False"):
