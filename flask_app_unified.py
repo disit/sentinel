@@ -1785,7 +1785,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''SELECT idcronjobs, name, command, category, where_to_run FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master' FROM checker.cronjobs where where_to_run is null;'''
@@ -1810,7 +1810,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
@@ -1834,7 +1834,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s WHERE (`idcronjobs` = %s);'''
@@ -1855,7 +1855,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('unsafe-mode') != "true":
+                if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 cursor = conn.cursor(buffered=True)
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
@@ -1874,7 +1874,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''SELECT `categories`.category as name_category, `extra_resources`.id_category as id_category, `extra_resources`.resource_address as resource_address, `extra_resources`.resource_information as resource_information, `extra_resources`.resource_description as resource_description FROM checker.extra_resources join categories on id_category=id_category;'''
@@ -1899,7 +1899,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1919,7 +1919,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1941,7 +1941,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('unsafe-mode') != "true":
+                if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                 cursor = conn.cursor(buffered=True)
@@ -1961,7 +1961,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -1983,7 +1983,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -2003,7 +2003,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -2025,7 +2025,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('unsafe-mode') != "true":
+                if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                 cursor = conn.cursor(buffered=True)
@@ -2045,7 +2045,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -2071,7 +2071,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -2091,7 +2091,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                     cursor = conn.cursor(buffered=True)
@@ -2113,7 +2113,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                if os.getenv('unsafe-mode') != "true":
+                if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 
                 cursor = conn.cursor(buffered=True)
@@ -2133,7 +2133,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query2 = '''SELECT * from categories;'''
@@ -2154,7 +2154,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`categories` (`category`) VALUES (%s);'''
@@ -2173,7 +2173,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`categories` SET `category` = %s (`idcategories` = %s);'''
@@ -2195,7 +2195,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     if session['username']!="admin":
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "true":
+                    if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if not check_password_hash(users[username], request.form.to_dict()['psw']):
@@ -2691,7 +2691,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     text=True
                 )
                 out=[]
-                if os.getenv('log-previous-container-if-kubernetes'):
+                if os.getenv('log-previous-container-if-kubernetes') !=None::
                     process_previous = subprocess.Popen(
             f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                     shell=True,
@@ -2756,7 +2756,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         text=True
                     )
                     out=[]
-                    if os.getenv('log-previous-container-if-kubernetes'):
+                    if os.getenv('log-previous-container-if-kubernetes') !=None:
                         process_previous = subprocess.Popen(
                 f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                         shell=True,
@@ -2823,7 +2823,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             text=True
                         )
                         out=[]
-                        if os.getenv('log-previous-container-if-kubernetes'):
+                        if os.getenv('log-previous-container-if-kubernetes') !=None::
                             process_previous = subprocess.Popen(
                     f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                             shell=True,
