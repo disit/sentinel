@@ -1,0 +1,84 @@
+services:
+  sentinel:
+    container_name: sentinel
+    hostname: sentinel:9080
+    image: replacethisimage
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DOCKER_HOST: "tcp://docker-socket-proxy:2375"
+    ports:
+      - "9080:9080"
+    #command: /bin/bash -c "sleep 3600"
+    logging:
+      driver: json-file
+      options:
+        max-file: '10'
+        max-size: 100m
+    restart: unless-stopped
+    volumes:
+      - ./users.txt:/app/users.txt:rw
+      - sentinel:/app/data:rw
+      - ./conf.json:/app/conf.json:r
+      - ./confs_here:/confs_here
+      - sentinel-keys:/ssh_keys:rw
+  sentinel-2:
+    hostname: sentinel-2
+    container_name: sentinel-2
+    image: replacethisimage
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DOCKER_HOST: "tcp://docker-socket-proxy:2375"
+    ports:
+      - "10080:9080"
+    #command: /bin/bash -c "sleep 3600"
+    logging:
+      driver: json-file
+      options:
+        max-file: '10'
+        max-size: 100m
+    restart: unless-stopped
+    volumes:
+      - ./users.txt:/app/users.txt:rw
+      - sentinel:/app/data:rw
+      - ./conf-slave.json:/app/conf.json:r
+      - ./confs_here:/confs_here
+      - sentinel-keys:/ssh_keys:rw
+  sentinel-db:
+    container_name: sentinel-db
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "no"
+      MYSQL_DATABASE: checker
+      MYSQL_PASSWORD: sentinel
+      MYSQL_ROOT_PASSWORD: sentinelroot
+      MYSQL_USER: user
+      TZ: Europe/Rome
+    image: mariadb:10.3
+    ports:
+    - "3333:3306"
+    logging:
+      driver: json-file
+      options:
+        max-file: '10'
+        max-size: 100m
+    restart: unless-stopped
+    volumes:
+      - sentinel-db:/var/lib/mysql:rw
+      - ./dump.sql:/docker-entrypoint-initdb.d/0_init.sql:rw  # tentative init
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: docker_socket_proxy
+    environment:
+      - CONTAINERS=1      # Allow listing/running containers
+      - IMAGES=1          # Allow image inspection/pulling
+      - INFO=1            # Allow basic system info
+      - NETWORKS=0        # Disallow network changes
+      - VOLUMES=0         # Disallow volume changes
+      - BUILD=0           # Allow docker build
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "2375:2375"
+volumes:
+  sentinel: {}
+  sentinel-db: {}
+  sentinel-keys: {}
