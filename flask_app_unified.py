@@ -1363,6 +1363,7 @@ def update_container_state_db():
                 total_answer=[]
                 try:
                     for r in results:
+                        print("asking",r[0])
                         if os.getenv("platform-url","") == r[0]:
                             continue # don't take yourself
                         obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
@@ -1373,9 +1374,9 @@ def update_container_state_db():
                                 obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                                 total_answer = total_answer + json.loads(obtained)
                             except:
-                                pass
+                                print(traceback.format_exc())
                 except requests.exceptions.ConnectionError:
-                    pass
+                    print(traceback.format_exc())
             containers_merged = containers_merged + total_answer
         else:
             print("NOT updating container data as multi...")
@@ -2211,21 +2212,19 @@ def create_app():
         return redirect(url_for('login'))
     
     
-   
-    
-    
-    
     @app.route("/login", methods=['GET', 'POST'])
     def login():
-        if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
-            if username in users and check_password_hash(users[username], password):
-                session.permanent = True
-                session['username'] = username
-                return redirect(url_for('main_page'))
-            return "Invalid credentials", 401
-        return render_template('login.html')
+        if os.getenv("is-master","False") == "True":
+            if request.method == 'POST':
+                username = request.form['username']
+                password = request.form['password']
+                if username in users and check_password_hash(users[username], password):
+                    session.permanent = True
+                    session['username'] = username
+                    return redirect(url_for('main_page'))
+                return "Invalid credentials", 401
+            return render_template('login.html')
+        return "This instance is not a master and you can't log on to it", 400
 
     @app.route("/logout")
     def logout():
