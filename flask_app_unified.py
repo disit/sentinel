@@ -2691,7 +2691,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     text=True
                 )
                 out=[]
-                if os.getenv('log-previous-container-if-kubernetes') !=None::
+                if os.getenv('log-previous-container-if-kubernetes') !=None:
                     process_previous = subprocess.Popen(
             f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                     shell=True,
@@ -2823,7 +2823,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             text=True
                         )
                         out=[]
-                        if os.getenv('log-previous-container-if-kubernetes') !=None::
+                        if os.getenv('log-previous-container-if-kubernetes') !=None:
                             process_previous = subprocess.Popen(
                     f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')} --previous""",
                             shell=True,
