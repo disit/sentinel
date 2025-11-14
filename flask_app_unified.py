@@ -50,11 +50,16 @@ def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
     return tuple(int(x) for x in oid_str.split('.'))
 
+def print_debug_log(log_str):
+    if os.getenv("debug","False") == "True":
+        print(f"{datetime.now()} DEBUG: {log_str}")
+
 async def safe_snmp_walk(host_data):
     """
     Walk only the relevant OIDs for memory, disk, and CPU.
     Returns a dict {oid: value}.
     """
+    print_debug_log("Performing walk for SNMP")
     if host_data['safe']:
         snmpEngine = SnmpEngine()
         transport = await UdpTransportTarget.create((host_data["host"], 161))
@@ -354,10 +359,10 @@ def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, b
                     use_this_reason=because[reason[0]]
                 else:
                     if len(reason) == 0:
-                        print("fuzzy search failed, trying second one")
+                        print_debug_log("fuzzy search failed, trying second one in mixed format error sending")
                         reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
                         if len(reason) == 1:
-                            print("second fuzzy search succeeded")
+                            print_debug_log("second fuzzy search succeeded in mixed format error sending")
                             use_this_reason=because[reason[0]]
                         else:
                             if len(reason) == 0:
@@ -404,10 +409,10 @@ def mixed_format_error_to_send(instance_of_problem, containers, because = None, 
                     use_this_reason=because[reason[0]]
                 else:
                     if len(reason) == 0:
-                        print("fuzzy search failed, trying second one")
+                        print_debug_log("fuzzy search failed, trying second one in mixed format error sending")
                         reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
                         if len(reason) == 1:
-                            print("second fuzzy search succeeded")
+                            print_debug_log("second fuzzy search succeeded in mixed format error sending")
                             use_this_reason=because[reason[0]]
                         else:
                             if len(reason) == 0:
@@ -449,6 +454,7 @@ os.makedirs(KEY_DIR, exist_ok=True)
 
 def parse_top(data):
     # Initialize dictionaries to hold parsed data
+    print_debug_log("Parsing a top")
     parsed_data = {
         'system_info': {},
         'cpu_usage': {},
@@ -551,6 +557,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     
 
 def filter_out_muted_containers_for_telegram(containers):
+    print_debug_log("Filtering out muted cotnainers")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -571,6 +578,7 @@ def filter_out_muted_containers_for_telegram(containers):
     return ", ".join(new_elements)
 
 def filter_out_muted_failed_are_alive_for_telegram(tests):
+    print_debug_log("Filtering out failed are alive containers")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -603,6 +611,7 @@ def filter_out_muted_failed_are_alive_for_telegram(tests):
     return ", ".join([a["container"] for a in new_elements])
 
 def filter_out_wrong_status_containers_for_telegram(containers):
+    print_debug_log("Filtering out wrong status containers")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -629,6 +638,7 @@ def filter_out_wrong_status_containers_for_telegram(containers):
     return ", ".join([a["Name"] for a in new_elements])
 
 def isalive():
+    print_debug_log("Sending 'is alive'")
     send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is alive", os.getenv("platform-url","unseturl")+" is alive")
     send_telegram(int(os.getenv("telegram-channel","0")), os.getenv("platform-url","unseturl")+" is alive")
     return
@@ -651,6 +661,7 @@ DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdat
     
         
 def populate_tops_entries():
+    print_debug_log("Populating top entries")
     try:
         # Fetch user from DB
         conn = mysql.connector.connect(**db_conn_info)
@@ -709,6 +720,7 @@ def populate_tops_entries():
 
 
 async def auto_run_tests():
+    print_debug_log("Automatically running tests")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -733,6 +745,7 @@ async def auto_run_tests():
         print("Something went wrong during tests running because of:",traceback.format_exc())
 
 async def run_shell_command(name, command):
+    print_debug_log(f"Running this command: {command}")
     try:
         #print("run_shell_command: start "+name+" cmd:"+command)
         start = time.time()
@@ -767,7 +780,8 @@ async def run_shell_command(name, command):
         return {"container":name, "result": f"Command {command} had an error:\n{traceback.format_exc()}", "command": command}
 
 
-def auto_alert_status(): #FIXME kubernetes master ignores all other sentinels!
+def auto_alert_status():
+    print_debug_log("Starting auto alert status")
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return 
     if "False" == os.getenv("running-as-kubernetes","False"):
@@ -888,6 +902,7 @@ def auto_alert_status(): #FIXME kubernetes master ignores all other sentinels!
             total_answer=[]
             try:
                 for r in results:
+                    print_debug_log(f"Asking data from {r[0]}")
                     obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                     try:
                         total_answer = total_answer + json.loads(obtained)
@@ -1082,143 +1097,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             return
     return
     # end mixed dealing with docker/kubernetes
-    components = [a[0].replace("*","") for a in results]
-    #components_original = [[a[0],a[2]] for a in results]
-    components_original = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results]
-    containers_which_should_be_running_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and not ("running" in c["State"])]
     
-    containers_which_should_be_exited_and_are_not = [c for c in containers_merged if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
-    if "False" == os.getenv("running-as-kubernetes","False"):
-        containers_which_are_running_but_are_not_healthy = [c for c in containers_merged if any(c["Names"].startswith(value) for value in components) and "unhealthy" in c["Status"]]
-    else:
-        containers_which_are_running_but_are_not_healthy=[]
-        for c_m in containers_merged:
-            if any(c_m["Names"].startswith(value) for value in components):
-                if "restarts" in c_m["State"]:
-                    try:
-                        if int(c_m["State"].strip().split("restarts:")[-1]) > 4:
-                            since = sum([int(b[0])*b[1] for b in zip(re.findall("(\d+)", c_m["RunningFor"]),[86400,3600,60,1])])
-                            if since>600 or since==0:
-                                containers_which_are_running_but_are_not_healthy.append(c_m)
-                    except Exception:
-                        containers_which_are_running_but_are_not_healthy.append(c_m)
-    problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
-    #containers_which_are_fine = list(set([n["Names"] for n in containers_merged]) - set([n["Names"] for n in problematic_containers]))
-    names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    if "False" == os.getenv("running-as-kubernetes","False"): #todo troubleshoot here
-        print(containers_merged)
-        containers_which_are_not_expected = list(set(tuple(item) for item in components_original)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged)))
-        containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
-    else:
-        missing_containers = dict(components_original)
-        containers_which_are_not_expected = [a for a in missing_containers if not a[0].endswith("*")]
-        og_conts = copy.deepcopy(containers_which_are_not_expected)
-        for c in containers_merged:
-            for value,_ in list(missing_containers.items()):
-                if '-'.join(c["Names"].split('-')[:-2]).startswith(value):
-                    try:
-                        og_conts.remove(value)
-                    except ValueError:
-                        pass
-        containers_which_are_not_expected = og_conts
-    if "False" == os.getenv("running-as-kubernetes","False"):
-        top = get_top()
-        load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
-        load_issues=""
-        for average, timing in zip(load_averages, [1, 5, 15]):
-            if float(average) > int(os.getenv("load-threshold",1000)):
-                load_issues += "Load threshold above "+str(int(os.getenv("load-threshold",1000))) + " with " + str(average) + "during the last " + str(timing) + " minute(s).\n"
-        memory_issues = ""
-        if float(top["memory_usage"]["used"])/float(top["memory_usage"]["total"]) > int(os.getenv("memory-threshold",1000)):
-            memory_issues = "Memory usage above " + str(int(os.getenv("memory-threshold",1000))) + " with " + str(top["memory_usage"]["used"]) + " " + top["memory_measuring_unit"] + " out of " + top["memory_usage"]["total"] + " " + top["memory_measuring_unit"] + " currently in use\n"
-    else:
-        load_issues = ""
-        memory_issues = ""
-    cron_results = []
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
-SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
-            cursor.execute(query)
-            conn.commit()
-            cron_results = cursor.fetchall()
-    except Exception:
-        pass
-    populate_tops_entries()
-    top_results = []
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY host ORDER BY sampled_at DESC) AS row_num FROM host_data) SELECT host.host as host, sampled_at, data, errors, threshold_cpu, threshold_mem FROM RankedEntries join host on host.host=RankedEntries.host WHERE row_num = 1;'''
-            cursor.execute(query)
-            conn.commit()
-            top_results = cursor.fetchall()
-    except Exception:
-        pass
-    problematic_tops_cpu = []
-    problematic_tops_ram = []
-    
-    top_errors = []
-    for top_r in top_results:
-        try:
-            if len(top_r["error"]) > 0:
-                top_errors.append(top_r["error"])
-                continue
-            regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
-            matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
-            for _, match in enumerate(matches, start=1):
-                for groupNum in range(0, len(match.groups())):
-                    if (float(match.group(groupNum + 1).replace(",","."))>top_r["threshold_cpu"]):
-                        problematic_tops_cpu.append(top_r)
-            if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
-                problematic_tops_ram.append(top_r)
-        except:
-            top_errors.append(top_r)
-                    
-    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
-        try:
-            issues = ["","","","","","","","",""]
-            if len(names_of_problematic_containers) > 0:
-                issues[0]=problematic_containers
-            if len(is_alive_with_ports) > 0:
-                issues[1]=is_alive_with_ports
-            if len(containers_which_are_not_expected) > 0:
-                if "False" == os.getenv("running-as-kubernetes","False"):
-                    issues[2]=[a[0] for a in containers_which_are_not_expected]
-                else:
-                    issues[2]=containers_which_are_not_expected
-            if len(load_issues)>0:
-                issues[3]=load_issues
-            if len(memory_issues)>0:
-                issues[4]=memory_issues
-            if len(cron_results)>0:
-                issues[5]=cron_results
-            if len(problematic_tops_cpu)>0:
-                issues[6]=problematic_tops_cpu
-            if len(problematic_tops_ram)>0:
-                issues[7]=problematic_tops_ram
-            if len(top_errors)>0:
-                issues[8]=top_errors
-            send_advanced_alerts(issues)
-        except Exception:
-            print(traceback.format_exc())
-            send_alerts("Couldn't properly send error messages: "+traceback.format_exc())
-            return
-    else:
-        try:
-            with mysql.connector.connect(**db_conn_info) as conn:
-                cursor = conn.cursor(buffered=True)
-                update_healthy_categories_query=f"UPDATE `checker`.`summary_status` SET `status` = %s;"
-                cursor.execute(update_healthy_categories_query, [greendot])
-                conn.commit()
-                return
-        except Exception:
-            print(traceback.format_exc())
-            send_alerts("Couldn't reach database while not needing to send error messages: "+traceback.format_exc())
-            return
         
 def get_top():
+    print_debug_log("Getting a top")
     if os.getenv("running-as-kubernetes", "True") == "True":
         nodes_output = subprocess.run(
             ["kubectl", "get", "nodes", "-o", "json"],
@@ -1333,13 +1215,15 @@ def get_top():
     return parsed_data
 
 def send_alerts(message):
+    print_debug_log("Sending alerts")
     try:
         send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is in trouble!", message)
         send_telegram(int(os.getenv("telegram-channel","0")), message)
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
-def update_container_state_db(): #FIXME kubernetes master ignores all other sentinels!
+def update_container_state_db():
+    print_debug_log("Populating database with container data")
     if os.getenv("is-master","False") == "False": #slaves don't write to db
         return 
     if "False" == os.getenv("running-as-kubernetes","False"):
@@ -1363,7 +1247,7 @@ def update_container_state_db(): #FIXME kubernetes master ignores all other sent
                 total_answer=[]
                 try:
                     for r in results:
-                        print("asking",r[0])
+                        print_debug_log(f"Getting data from {r[0]}")
                         if os.getenv("platform-url","") == r[0]:
                             continue # don't take yourself
                         obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
@@ -1486,7 +1370,33 @@ def update_container_state_db(): #FIXME kubernetes master ignores all other sent
                 conversion["Namespace"] = item["metadata"]["namespace"]
                 
                 conversions.append(conversion)
-            
+        if os.getenv("is-multi","False") == "True":
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT hostname FROM checker.ip_table;'''
+                cursor.execute(query)
+                conn.commit()
+                results = cursor.fetchall()
+                total_answer=[]
+                try:
+                    for r in results:
+                        print_debug_log(f"Getting data from {r[0]}")
+                        if os.getenv("platform-url","") == r[0]:
+                            continue # don't take yourself
+                        obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                        try:
+                            total_answer = total_answer + json.loads(obtained)
+                        except:
+                            try:
+                                obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                                total_answer = total_answer + json.loads(obtained)
+                            except:
+                                print(traceback.format_exc())
+                except requests.exceptions.ConnectionError:
+                    print(traceback.format_exc())
+            conversions = conversions + total_answer
+        else:
+            print("NOT updating container data as multi...")
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
@@ -1503,6 +1413,7 @@ def queued_running(command):
     return answer
     
 def runcronjobs():
+    print_debug_log("Running cronjobs")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -1528,6 +1439,7 @@ def runcronjobs():
 
 
 def send_advanced_alerts(message):
+    print_debug_log("Preparing the content of an alert")
     try:
         text_for_email = ""
         for a in range(len(message)):
@@ -1711,6 +1623,7 @@ def create_app():
         
     @app.route("/add_container", methods=["POST"])
     def add_container():
+        print_debug_log("Adding container")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1733,6 +1646,7 @@ def create_app():
     
     @app.route("/edit_container", methods=["POST"])
     def edit_container(): #add position if only if docker
+        print_debug_log("Editing container")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1763,6 +1677,7 @@ def create_app():
         
     @app.route("/delete_container", methods=["POST"])
     def delete_container():
+        print_debug_log("Deleting container")
         if 'username' in session:
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
@@ -1806,6 +1721,7 @@ def create_app():
         
     @app.route("/add_cronjob", methods=["POST"])
     def add_cronjob():
+        print_debug_log("Adding cronjob")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1829,7 +1745,8 @@ def create_app():
         return redirect(url_for('login'))
     
     @app.route("/edit_cronjob", methods=["POST"])
-    def edit_cronjob(): 
+    def edit_cronjob():
+        print_debug_log("Editing cronjob")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1852,6 +1769,7 @@ def create_app():
         
     @app.route("/delete_cronjob", methods=["POST"])
     def delete_cronjob():
+        print_debug_log("Deleting cronjob")
         if 'username' in session:
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
@@ -1895,6 +1813,7 @@ def create_app():
         
     @app.route("/add_extra_resource", methods=["POST"])
     def add_extra_resource():
+        print_debug_log("Adding extra resource")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1914,7 +1833,8 @@ def create_app():
         return redirect(url_for('login'))
     
     @app.route("/edit_extra_resource", methods=["POST"])
-    def edit_extra_resource(): 
+    def edit_extra_resource():
+        print_debug_log("Editing extra resource")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1938,6 +1858,7 @@ def create_app():
         
     @app.route("/delete_extra_resource", methods=["POST"])
     def delete_extra_resource():
+        print_debug_log("Deleting extra resource")
         if 'username' in session:
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
@@ -1979,6 +1900,7 @@ def create_app():
         
     @app.route("/add_test", methods=["POST"])
     def add_test():
+        print_debug_log("Adding test")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1998,7 +1920,8 @@ def create_app():
         return redirect(url_for('login'))
     
     @app.route("/edit_test", methods=["POST"])
-    def edit_test(): 
+    def edit_test():
+        print_debug_log("Editing test")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2022,6 +1945,7 @@ def create_app():
         
     @app.route("/delete_test", methods=["POST"])
     def delete_test():
+        print_debug_log("Deleting test")
         if 'username' in session:
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
@@ -2067,6 +1991,7 @@ def create_app():
         
     @app.route("/add_complex_test", methods=["POST"])
     def add_complex_test():
+        print_debug_log("Adding compelx test")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2086,7 +2011,8 @@ def create_app():
         return redirect(url_for('login'))
     
     @app.route("/edit_complex_test", methods=["POST"])
-    def edit_complex_test(): 
+    def edit_complex_test():
+        print_debug_log("Editing complex test")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2110,6 +2036,7 @@ def create_app():
         
     @app.route("/delete_complex_test", methods=["POST"])
     def delete_complex_test():
+        print_debug_log("Deleting complex test")
         if 'username' in session:
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
@@ -2150,6 +2077,7 @@ def create_app():
         
     @app.route("/add_category", methods=["POST"])
     def add_category():
+        print_debug_log("Adding category")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2168,7 +2096,8 @@ def create_app():
         return redirect(url_for('login'))
     
     @app.route("/edit_category", methods=["POST"])
-    def edit_category(): 
+    def edit_category():
+        print_debug_log("Editing category")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2191,6 +2120,7 @@ def create_app():
         
     @app.route("/delete_category", methods=["POST"])
     def delete_category():
+        print_debug_log("Deleting category")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2219,20 +2149,19 @@ def create_app():
                 username = request.form['username']
                 password = request.form['password']
                 if username in users and check_password_hash(users[username], password):
+                    print_debug_log(f"{username} logged in")
                     session.permanent = True
                     session['username'] = username
                     return redirect(url_for('main_page'))
+                print_debug_log(f"{username} tried to login and failed due to wrong credentials")
                 return "Invalid credentials", 401
             return render_template('login.html')
         return "This instance is not a master and you can't log on to it", 400
 
-    @app.route("/logout")
-    def logout():
-        session.clear()
-        return redirect(url_for('login'))
 
     @app.route("/get_data_from_source", methods=["GET"])
     def get_additional_data(): # this should call the db, not directly the webpage
+        print_debug_log("Making a call to an extra resource")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2241,7 +2170,7 @@ def create_app():
                     cursor.execute(query, (request.form.to_dict()['id'],))
                     conn.commit()
                     try:
-                        result = cursor.fetchone()
+                        _ = cursor.fetchone()
                     except Exception:
                         return "An unauthorized url was attempted to use", 400
                     response = requests.get(request.args.to_dict()['url_of_resource'])
@@ -2253,6 +2182,7 @@ def create_app():
     
     @app.route("/get_complex_test_buttons")
     def get_complex_test_buttons():
+        print_debug_log("Getting complex tests")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2285,6 +2215,7 @@ def create_app():
         
     @app.route("/read_containers", methods=['POST'])
     def check():
+        print_debug_log("Reading containers")
         if os.getenv("is-multi","False") == "True":
             try:
                 jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
@@ -2306,6 +2237,7 @@ def create_app():
     
     @app.route("/read_containers_db", methods=['GET'])
     def check_container_db():
+        print_debug_log("Reading container's database")
         if 'username' in session:
             if not os.getenv("is-master","False") == "True":
                 return render_template("error_showing.html", r = "This Snap4Sentinel instance is not the master of its cluster"), 403
@@ -2350,6 +2282,7 @@ def create_app():
         
     @app.route("/run_test", methods=['POST'])
     def run_test():
+        print_debug_log("Running test")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2388,6 +2321,7 @@ def create_app():
         
     @app.route("/run_test_complex", methods=['POST'])
     def run_test_complex():
+        print_debug_log("Running complex test")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2422,6 +2356,7 @@ def create_app():
         
     @app.route("/test_all_ports", methods=['GET'])
     async def test_all_ports():
+        print_debug_log("Testing all ports")
         if 'username' in session:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2438,11 +2373,14 @@ def create_app():
             
     @app.route("/deauthenticate", methods=['POST','GET'])
     def deauthenticate():
+        # FIXME there is this and logout??
+        print_debug_log("Deautheticated")
         session.clear()
         return "You have been deauthenticated", 401
         
     @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
+        print_debug_log("Rebooting container")
         if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
             try:
                 jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
@@ -2531,6 +2469,7 @@ def create_app():
             
     @app.route("/get_muted_components", methods=['GET'])
     def get_muted_components():
+        print_debug_log("Getting muted containers")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2551,6 +2490,7 @@ def create_app():
             
     @app.route("/mute_component_by_hours", methods=['POST'])
     def mute_component_by_hours():
+        print_debug_log("Getting muted containers by hout")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2567,6 +2507,7 @@ def create_app():
     
     @app.route("/cronjobs", methods=['POST', 'GET'])
     def get_cron_jobs():
+        print_debug_log("Getting cronjob results")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2584,6 +2525,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         
     @app.route("/tests_results", methods=['POST'])
     def get_tests():
+        print_debug_log("Getting tests results")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2621,6 +2563,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             
     @app.route("/get_complex_tests", methods=["GET"])
     def get_complex_tests():
+        print_debug_log("Getting complex test results")
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2641,6 +2584,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     
     @app.route("/container/<podname>", methods=['POST'])
     def get_container_logs(podname):
+        print_debug_log("Getting container logs")
         if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
             try:
                 jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
@@ -2844,11 +2788,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             return r, 200
                 else:
                     try:
-                        '''try:
-                            r = requests.post(request.form.to_dict()['source']+"/sentinel/container/"+request.form.to_dict()['id'], data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
-                            print(f"calling {request.form.to_dict()['source']} for {request.form.to_dict()['id']} resulted in {r.text[:100]}")
-                            return r.text, r.status_code
-                        except:'''
+                        print_debug_log(f"Asking {request.form.to_dict()['source']} for {podname} logs")
                         if "raw" not in request.form.to_dict().keys():
                             r = requests.post(request.form.to_dict()['source']+"/container/"+podname, data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)})
                             return r.text, r.status_code
@@ -2998,6 +2938,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     
     @app.route("/generate_pdf", methods=['GET'])
     async def generate_pdf(): # TODO no multi yet
+        print_debug_log("Generating a pdf")
         if 'username' in session:
             data_stored = []
             data = check_container_db()["result"]

@@ -2,7 +2,7 @@
 	"admin-log-length": "200",
 	"default-log-length": "1000",
 	"requests-timeout": "15000",
-	"is-master": "true",
+	"is-master": "True",
 	"telegram-api-token": "replaceme",
 	"telegram-channel":"123456789",
 	"db-user": "root",
@@ -18,7 +18,8 @@
 	"platform-explanation": "Some information",
 	"load-threshold": "30",
 	"memory_threshold": "1",
-	"send_notifications": "true",
+	"send_notifications": "True",
 	"cluster-secret": "This is a super secret",
-	"is-multi": "true"
+	"is-multi": "True",
+	"debug": "True"
 }
