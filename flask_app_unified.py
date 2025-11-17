@@ -13,38 +13,37 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.'''
-import subprocess
-from threading import Lock
-from flask import Flask, jsonify, render_template, request, send_file, send_from_directory, redirect
-import requests
-import mysql.connector
-import json
-import os
-import copy
-from reportlab.lib.units import inch
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
-import smtplib
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime, timedelta
+from datetime import timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from apscheduler.schedulers.background import BackgroundScheduler
-import random
-import string
-import traceback
-from urllib.parse import urlparse
-from datetime import datetime, timedelta
-import re
-from flask import Flask, render_template, request, redirect, url_for, session
-from werkzeug.security import check_password_hash
-from datetime import timedelta
-import html
-import jwt
-import asyncio
-import time
-import paramiko
+from flask import Flask, jsonify, render_template, request, send_file, send_from_directory, redirect, url_for, session
 from pysnmp.hlapi.v3arch.asyncio import *
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak
+from threading import Lock
+from urllib.parse import urlparse
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import check_password_hash
+import asyncio
+import copy
+import html
+import json
+import jwt
+import mysql.connector
+import os
+import paramiko
+import random
+import re
+import requests
+import smtplib
+import string
+import subprocess
+import time
+import traceback
 
 def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
@@ -1501,7 +1500,7 @@ def send_advanced_alerts(message):
         if len(message[1])>0:
             text_for_telegram+= 'These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1]))+"\n"
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
-            text_for_telegram+= f"These containers weren't found in {container_source}: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
+            text_for_telegram+= f"These containers weren't found: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
         if len(message[3])>0:
             text_for_telegram+= message[3] +"\n"
         if len(message[4])>0:
