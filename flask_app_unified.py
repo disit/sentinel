@@ -1426,7 +1426,7 @@ def runcronjobs():
             results = cursor.fetchall()
             for r in list(results):
                 print(f"Running {r[1]} cronjob")
-                command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="cp437", timeout=10)
+                command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=10)
                 if len(command_ran.stderr) > 0:
                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
@@ -2300,7 +2300,7 @@ def create_app():
                     total_result = ""
                     for r in list(results):
                         try:
-                            command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="cp437")
+                            command_ran = subprocess.run(r[0], shell=True, capture_output=True, text=True, encoding="utf8")
                             total_result += "Running " + r[0] + " with result " + command_ran.stdout + "\nWith errors: " + command_ran.stderr
                             #new stuff
                             new_output = {"container":request.form.to_dict()['container'],"command":r[0],"result":command_ran.stdout,"errors":command_ran.stderr}
@@ -2338,7 +2338,7 @@ def create_app():
                         arguments_test = " "
                         for key, value in form_dict.items():
                             arguments_test+='-'+key+' "'+value+'" '
-                        command_ran = subprocess.run(r[0]+arguments_test, shell=True, capture_output=True, text=True, encoding="cp437")
+                        command_ran = subprocess.run(r[0]+arguments_test, shell=True, capture_output=True, text=True, encoding="utf8")
                         if len(command_ran.stderr) > 0:
                             string_used = '<p style="color:#FF0000";>'+command_ran.stderr+'</p> '+command_ran.stdout
                         else:
