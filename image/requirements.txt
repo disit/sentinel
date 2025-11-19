@@ -6,4 +6,6 @@ paramiko
 pysnmp
 reportlab
 requests
+starlette
+uvicorn
 waitress
