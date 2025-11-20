@@ -20,4 +20,4 @@ RUN pip install -r image/requirements.txt
 
 COPY /. /app
 
-CMD ["waitress-serve", "--port", "9080", "--call", "flask_app_unified:create_app", "--threads=30"]
+CMD ["waitress-serve", "--port", "9080", "--threads=30", "--call", "flask_app_unified:create_app"]

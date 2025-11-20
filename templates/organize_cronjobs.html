@@ -243,6 +243,7 @@
 		}
 	});
 	$('#saveCronJobChangesButton').on('click', function() {
+	var id = $('CronJobEditId').val();
 	var password = $('#passwordInputEdit').val();
 	var category = $('#category-selection-edit').val();
 	var command = $('#CommandEdit').val();
@@ -252,7 +253,7 @@
 		try {
 			$.ajax({
 				url: './edit_cronjob',
-				data: {psw: password, command: command, name: name, category: category, where_to_run:where},
+				data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id},
 				type: 'POST',
 				success: function(response) {
 					alert("Cronjob was edited!");
