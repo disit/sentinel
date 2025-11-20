@@ -1244,8 +1244,8 @@ def update_container_state_db():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
-                try:
-                    for r in results:
+                for r in results:
+                    try:
                         print_debug_log(f"Getting data from {r[0]}")
                         if os.getenv("platform-url","") == r[0]:
                             continue # don't take yourself
@@ -1258,8 +1258,8 @@ def update_container_state_db():
                                 total_answer = total_answer + json.loads(obtained)
                             except:
                                 print(traceback.format_exc())
-                except requests.exceptions.ConnectionError:
-                    print(traceback.format_exc())
+                    except requests.exceptions.ConnectionError:
+                        print(traceback.format_exc())
             containers_merged = containers_merged + total_answer
         else:
             print("NOT updating container data as multi...")
@@ -1377,8 +1377,8 @@ def update_container_state_db():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
-                try:
-                    for r in results:
+                for r in results:
+                    try:
                         print_debug_log(f"Getting data from {r[0]}")
                         if os.getenv("platform-url","") == r[0]:
                             continue # don't take yourself
@@ -1391,8 +1391,8 @@ def update_container_state_db():
                                 total_answer = total_answer + json.loads(obtained)
                             except:
                                 print(traceback.format_exc())
-                except requests.exceptions.ConnectionError:
-                    print(traceback.format_exc())
+                    except requests.exceptions.ConnectionError:
+                        print(traceback.format_exc())
             conversions = conversions + total_answer
         else:
             print("NOT updating container data as multi...")

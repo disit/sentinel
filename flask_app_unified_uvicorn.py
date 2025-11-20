@@ -17,7 +17,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from flask import Flask, jsonify, render_template, request, send_file, send_from_directory, redirect, url_for, session
+from flask import Flask, jsonify, render_template, send_file, send_from_directory, redirect, url_for
 from pysnmp.hlapi.v3arch.asyncio import *
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
@@ -27,12 +27,11 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import Response, FileResponse, JSONResponse, RedirectResponse
+from starlette.responses import Response, FileResponse, RedirectResponse
 from starlette.routing import Route
 from starlette.templating import Jinja2Templates
 from threading import Lock
 from urllib.parse import urlparse
-from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash
 import asyncio
 import copy
@@ -50,7 +49,6 @@ import string
 import subprocess
 import time
 import traceback
-import uvicorn
 
 def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
@@ -786,7 +784,7 @@ async def run_shell_command(name, command):
         return {"container":name, "result": f"Command {command} had an error:\n{traceback.format_exc()}", "command": command}
 
 
-def auto_alert_status():
+async def auto_alert_status():
     print_debug_log("Starting auto alert status")
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return 
@@ -963,7 +961,7 @@ def auto_alert_status():
     except Exception:
         send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
         return
-    is_alive_with_ports = asyncio.run(auto_run_tests()) # check namespace here if k8s
+    is_alive_with_ports = await auto_run_tests() # check namespace here if k8s
     is_alive_with_ports = [a for a in is_alive_with_ports if "Failure" in a["result"]] # only keep those who failed
     # begin mixed dealing with docker/kubernetes
     containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
@@ -1105,7 +1103,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     # end mixed dealing with docker/kubernetes
     
         
-def get_top():
+def get_top(request):
     print_debug_log("Getting a top")
     if os.getenv("running-as-kubernetes", "True") == "True":
         nodes_output = subprocess.run(
@@ -1148,7 +1146,8 @@ def get_top():
             }
 
             node_info.append(node_data)
-        return render_template("k8s-top.html", json_data=json.dumps(node_info)), 200
+        return templates.TemplateResponse("k8s-top.html", {"request": request, "json_data": json.dumps(node_info)}, status_code=200)
+        
     else:
         process = subprocess.Popen(['top', '-b', '-n', '1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout, _ = process.communicate()
@@ -1548,22 +1547,10 @@ def send_advanced_alerts(message):
         print("Error sending alerts:",traceback.format_exc())
         
 update_container_state_db() #on start, populate immediately
-scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error-notification-frequency","5")))
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
-scheduler.add_job(isalive, 'cron', hour=8, minute=0)
-scheduler.add_job(isalive, 'cron', hour=20, minute=0)
-scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
-scheduler.add_job(clean_old_db_entries, 'cron',week=1)
-scheduler.start()
-auto_alert_status()
+
 
 templates = Jinja2Templates(directory="templates")
-app = Starlette(
-    # Flask: app.config["application-root"]
-    # Starlette: ASGI root_path
-    root_path=os.getenv("application-root", "/")
-)
+app = Starlette()
 
 # Sessions: secret + expiration
 app.add_middleware(
@@ -1571,22 +1558,33 @@ app.add_middleware(
     secret_key="\x8a\x17\x93kT\xc0\x0b6;\x93\xfdp\x8bLl\xe6u\xa9\xf5x",
     max_age=15 * 60  # 15 minutes
 )
+prefix = os.getenv("application-root", "/")
 
-
+@app.on_event("startup")
+async def startup():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error-notification-frequency","5")))
+    scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
+    scheduler.add_job(isalive, 'cron', hour=8, minute=0)
+    scheduler.add_job(isalive, 'cron', hour=20, minute=0)
+    scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
+    scheduler.add_job(clean_old_db_entries, 'cron',week=1)
+    scheduler.start()
+    await auto_alert_status()
 def main_page(request):
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
-            if 'username' in session:
+            if 'username' in request.session.keys():
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join categories on categories.idcategories = complex_tests.category_id;'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
-                if session['username'] != "admin":
+                if request.session.keys()['username'] != "admin":
                     return templates.TemplateResponse(
                     "checker-k8.html",
-                    {"request": request, "extra": results, "categories": get_container_categories(), "extra_data": get_extra_data(), "timeout": int(os.getenv("requests-timeout","15000")), "user": session['username'], "multi": os.getenv("is-multi","False")},
+                    {"request": request, "extra": results, "categories": get_container_categories(), "extra_data": get_extra_data(), "timeout": int(os.getenv("requests-timeout","15000")), "user": request.session.keys()['username'], "multi": os.getenv("is-multi","False")},
                     status_code=200
                 )
                 else:
@@ -1596,37 +1594,37 @@ def main_page(request):
                     results_log = cursor.fetchall()
                     return templates.TemplateResponse(
                     "checker-admin-k8.html",
-                    {"request": request, "extra": results, "categories": get_container_categories(), "extra_data": get_extra_data(), "admin_log": results_log, "timeout": int(os.getenv("requests-timeout","15000")), "user": session['username'], "platform": os.getenv("platform-url","unseturl"), "multi": os.getenv("is-multi","False")},
+                    {"request": request, "extra": results, "categories": get_container_categories(), "extra_data": get_extra_data(), "admin_log": results_log, "timeout": int(os.getenv("requests-timeout","15000")), "user": request.session.keys()['username'], "platform": os.getenv("platform-url","unseturl"), "multi": os.getenv("is-multi","False")},
                     status_code=200
                     )
             return RedirectResponse(url=request.url_for("login"), status_code=302)
     except Exception:
         print("Something went wrong because of",traceback.format_exc())
-        return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+        return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
 
 
 
 def get_local_top(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         return get_top()
-    return templates.TemplateResponse("error_showing.html",{"r":"You are not authenticated"},status_code=403)
+    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You are not authenticated"},status_code=403)
 
 
 
 def get_top_single(request):
   #TODO doesn't do multi yet
-    if 'username' in session:
+    if 'username' in request.session.keys():
         return get_local_top()
-    return templates.TemplateResponse("error_showing.html",{"r":"You are not authenticated"},status_code=403)
+    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You are not authenticated"},status_code=403)
     
 
 
 def organize_containers(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 query = '''SELECT component, category, `references`, position, cast(kind as char) as kind FROM checker.component_to_category;'''
@@ -1637,21 +1635,21 @@ def organize_containers(request):
                 cursor.execute(query2)
                 conn.commit()
                 results_2 = cursor.fetchall()
-                return templates.TemplateResponse("organize_containers_unified.html",{"containers": results, "categories":results_2, "timeout": int(os.getenv("requests-timeout","15000"))})
+                return templates.TemplateResponse("organize_containers_unified.html",{"request": request, "containers": results, "categories":results_2, "timeout": int(os.getenv("requests-timeout","15000"))})
                 
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def add_container(request):
     print_debug_log("Adding container")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`) VALUES (%s, %s, %s, %s, %s);'''
@@ -1670,11 +1668,11 @@ def add_container(request):
 
 def edit_container(request):
     print_debug_log("Editing container")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 if request.form.to_dict()['kind'] == "Kubernetes":
@@ -1701,10 +1699,10 @@ def edit_container(request):
 
 def delete_container(request):
     print_debug_log("Deleting container")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         with mysql.connector.connect(**db_conn_info) as conn:
-            if session['username']!="admin":
-                return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+            if request.session.keys()['username']!="admin":
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
             cursor = conn.cursor(buffered=True)
             if not check_password_hash(users[username], request.form.to_dict()['psw']):
                 return "An incorrect password was provided", 400
@@ -1719,13 +1717,13 @@ def delete_container(request):
 
 
 def organize_cronjobs(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT idcronjobs, name, command, category, where_to_run FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master' FROM checker.cronjobs where where_to_run is null;'''
                 query2 = '''SELECT * from categories;'''
@@ -1735,23 +1733,23 @@ def organize_cronjobs(request):
                 cursor.execute(query2)
                 conn.commit()
                 results_2 = cursor.fetchall()
-                return templates.TemplateResponse("organize_cronjobs.html",{"cronjobs":results, "categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
+                return templates.TemplateResponse("organize_cronjobs.html",{"request": request, "cronjobs":results, "categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
                 
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def add_cronjob(request):
     print_debug_log("Adding cronjob")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 if request.form.to_dict()['where_to_run'] != "":
                     query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, %s);'''
@@ -1770,13 +1768,13 @@ def add_cronjob(request):
 
 def edit_cronjob(request):
     print_debug_log("Editing cronjob")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s WHERE (`idcronjobs` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],request.form.to_dict()['id'],)) 
@@ -1793,12 +1791,12 @@ def edit_cronjob(request):
 
 def delete_cronjob(request):
     print_debug_log("Deleting cronjob")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         with mysql.connector.connect(**db_conn_info) as conn:
-            if session['username']!="admin":
-                return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+            if request.session.keys()['username']!="admin":
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
             if os.getenv('unsafe-mode') != "True":
-                return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             cursor = conn.cursor(buffered=True)
             if not check_password_hash(users[username], request.form.to_dict()['psw']):
                 return "An incorrect password was provided", 400
@@ -1811,13 +1809,13 @@ def delete_cronjob(request):
 
 
 def organize_extra_resources(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT `categories`.category as name_category, `extra_resources`.id_category as id_category, `extra_resources`.resource_address as resource_address, `extra_resources`.resource_information as resource_information, `extra_resources`.resource_description as resource_description FROM checker.extra_resources join categories on id_category=id_category;'''
                 query2 = '''SELECT * from categories;'''
@@ -1827,23 +1825,23 @@ def organize_extra_resources(request):
                 cursor.execute(query2)
                 conn.commit()
                 results_2 = cursor.fetchall()
-                return templates.TemplateResponse("organize_extra_resources.html",{"extra_resources":results, "categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
+                return templates.TemplateResponse("organize_extra_resources.html",{"request": request, "extra_resources":results, "categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
                 
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def add_extra_resource(request):
     print_debug_log("Adding extra resource")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''INSERT INTO `checker`.`extra_resources` ( `resource_address`, `resource_information`, `resource_description`) VALUES (%s, %s, %s);'''
@@ -1852,19 +1850,19 @@ def add_extra_resource(request):
                 return "ok", 201
         except Exception:
             print("Something went wrong during the addition of a new extra resource because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
 
 def edit_extra_resource(request):
     print_debug_log("Editing extra resource")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''UPDATE `checker`.`extra_resources` SET `resource_address` = %s, `resource_information` = %s, `resource_description` = %s WHERE (`id_category` = %s) and (`resource_address` = %s);'''
@@ -1876,18 +1874,18 @@ def edit_extra_resource(request):
                     return "Somehow request did not result in database changes", 400
         except Exception:
             print("Something went wrong during the editing of a new extra resource because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def delete_extra_resource(request):
     print_debug_log("Deleting extra resource")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         with mysql.connector.connect(**db_conn_info) as conn:
-            if session['username']!="admin":
-                return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+            if request.session.keys()['username']!="admin":
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
             if os.getenv('unsafe-mode') != "True":
-                return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
             cursor = conn.cursor(buffered=True)
             if not check_password_hash(users[username], request.form.to_dict()['psw']):
@@ -1901,36 +1899,36 @@ def delete_extra_resource(request):
 
 
 def organize_tests(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT * FROM checker.tests_table;'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
-                return templates.TemplateResponse("organize_tests.html",{"tests":results, "timeout":int(os.getenv("requests-timeout","15000"))})
+                return templates.TemplateResponse("organize_tests.html",{"request": request, "tests":results, "timeout":int(os.getenv("requests-timeout","15000"))})
                 
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def add_test(request):
     print_debug_log("Adding test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''INSERT INTO `checker`.`tests_table` (`container_name`, `command`, `command_explained`) VALUES (%s, %s, %s);'''
@@ -1945,13 +1943,13 @@ def add_test(request):
 
 def edit_test(request):
     print_debug_log("Editing test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''UPDATE `checker`.`tests_table` SET `container_name` = %s, `command` = %s, `command_explained` = %s WHERE (`id` = %s);'''
@@ -1969,12 +1967,12 @@ def edit_test(request):
 
 def delete_test(request):
     print_debug_log("Deleting test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         with mysql.connector.connect(**db_conn_info) as conn:
-            if session['username']!="admin":
-                return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+            if request.session.keys()['username']!="admin":
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
             if os.getenv('unsafe-mode') != "True":
-                return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
             cursor = conn.cursor(buffered=True)
             if not check_password_hash(users[username], request.form.to_dict()['psw']):
@@ -1988,13 +1986,13 @@ def delete_test(request):
 
 
 def organize_complex_tests(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT * FROM checker.complex_tests;'''
@@ -2005,23 +2003,23 @@ def organize_complex_tests(request):
                 cursor.execute(query2)
                 conn.commit()
                 results_2 = cursor.fetchall()
-                return templates.TemplateResponse("organize_complex_tests.html",{"complex_tests":results, "categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
+                return templates.TemplateResponse("organize_complex_tests.html",{"request": request, "complex_tests":results, "categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
                 
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def add_complex_test(request):
     print_debug_log("Adding compelx test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
@@ -2036,13 +2034,13 @@ def add_complex_test(request):
 
 def edit_complex_test(request):
     print_debug_log("Editing complex test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
                 cursor = conn.cursor(buffered=True)
                 query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
@@ -2060,12 +2058,12 @@ def edit_complex_test(request):
 
 def delete_complex_test(request):
     print_debug_log("Deleting complex test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         with mysql.connector.connect(**db_conn_info) as conn:
-            if session['username']!="admin":
-                return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+            if request.session.keys()['username']!="admin":
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
             if os.getenv('unsafe-mode') != "True":
-                return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
             
             cursor = conn.cursor(buffered=True)
             if not check_password_hash(users[username], request.form.to_dict()['psw']):
@@ -2077,35 +2075,35 @@ def delete_complex_test(request):
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
 def organize_categories(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 query2 = '''SELECT * from categories;'''
                 cursor.execute(query2)
                 conn.commit()
                 results_2 = cursor.fetchall()
-                return templates.TemplateResponse("organize_categories.html",{"categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
+                return templates.TemplateResponse("organize_categories.html",{"request": request, "categories":results_2,"timeout":int(os.getenv("requests-timeout","15000"))})
                 
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def add_category(request):
     print_debug_log("Adding category")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 query = '''INSERT INTO `checker`.`categories` (`category`) VALUES (%s);'''
                 cursor.execute(query, (request.form.to_dict()['category'],))
@@ -2119,13 +2117,13 @@ def add_category(request):
 
 def edit_category(request):
     print_debug_log("Editing category")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 query = '''UPDATE `checker`.`categories` SET `category` = %s (`idcategories` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
@@ -2142,13 +2140,13 @@ def edit_category(request):
 
 def delete_category(request):
     print_debug_log("Deleting category")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
-                if session['username']!="admin":
-                    return templates.TemplateResponse("error_showing.html",{"r":"You do not have the privileges to access this webpage."},status_code=401)
+                if request.session.keys()['username']!="admin":
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"You do not have the privileges to access this webpage."},status_code=401)
                 if os.getenv('unsafe-mode') != "True":
-                    return templates.TemplateResponse("error_showing.html",{"r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"},status_code=401)
                 cursor = conn.cursor(buffered=True)
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
@@ -2171,19 +2169,18 @@ def login(request):
             password = request.form['password']
             if username in users and check_password_hash(users[username], password):
                 print_debug_log(f"{username} logged in")
-                session.permanent = True
-                session['username'] = username
-                return redirect(url_for('main_page'))
+                request.request.session.keys()['username'] = username
+                return RedirectResponse(url=request.url_for("main_page"))
             print_debug_log(f"{username} tried to login and failed due to wrong credentials")
             return "Invalid credentials", 401
-        return render_template('login.html')
+        return templates.TemplateResponse("login.html", {"request": request}, status_code=200)
     return "This instance is not a master and you can't log on to it", 400
 
 
 
 def get_additional_data(request):
     print_debug_log("Making a call to an extra resource")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2198,13 +2195,13 @@ def get_additional_data(request):
                 response.raise_for_status()
                 return response.text
         except Exception:
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
 
 def get_complex_test_buttons(request):
     print_debug_log("Getting complex tests")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2215,12 +2212,12 @@ def get_complex_test_buttons(request):
                 results = cursor.fetchall()
                 return results
         except Exception:
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
 def make_category_green(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         if request.method == "POST":
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -2231,7 +2228,7 @@ def make_category_green(request):
                     return "👌"
             except Exception:
                 send_alerts("Can't reach db due to",traceback.format_exc())
-                return templates.TemplateResponse("error_showing.html",{"r": "There was a problem: "+traceback.format_exc()},status_code=500)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r": "There was a problem: "+traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 
@@ -2249,7 +2246,7 @@ def check(request):
             return {'error': 'Invalid token'}, 401
         except Exception:
             print(f"Something failed:", traceback.format_exc())
-    elif 'username' in session:
+    elif 'username' in request.session.keys():
         return get_container_data()
     return RedirectResponse(url=request.url_for("login"), status_code=302)
         
@@ -2259,9 +2256,9 @@ def send_request(url, headers):
 
 def check_container_db(request):
     print_debug_log("Reading container's database")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         if not os.getenv("is-master","False") == "True":
-            return templates.TemplateResponse("error_showing.html",{"r":"This Snap4Sentinel instance is not the master of its cluster"},status_code=403)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":"This Snap4Sentinel instance is not the master of its cluster"},status_code=403)
         with mysql.connector.connect(**db_conn_info) as conn:
             try:
                 cursor = conn.cursor(buffered=True)
@@ -2286,7 +2283,7 @@ def get_container_categories(request):
             return results
     except Exception:
         print("Something went wrong because of:",traceback.format_exc())
-        return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+        return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
 
 def get_extra_data(request):
     try:
@@ -2304,7 +2301,7 @@ def get_extra_data(request):
 
 def run_test(request):
     print_debug_log("Running test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2328,7 +2325,7 @@ def run_test(request):
                         query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
                         cursor.execute(query_1,(f"{command_ran.stdout}\n{command_ran.stderr}", container,r[0],))
                         conn.commit()
-                        log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, which_test="is alive " + str(r[2]),user_op=session['username'])
+                        log_to_db('test_ran', "Executing the is alive test on "+request.form.to_dict()['container']+" resulted in: "+command_ran.stdout, which_test="is alive " + str(r[2]),user_op=request.session.keys()['username'])
                     except Exception:
                         return f"Test of {request.form.to_dict()['container']} had a runtime error with the cause: {traceback.format_exc()}", 500
                 if len(results) == 0:
@@ -2336,14 +2333,14 @@ def run_test(request):
                 return new_output
         except Exception:
             print("Something went wrong during tests running because of:",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
     
 
 def run_test_complex(request):
     print_debug_log("Running complex test")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2368,17 +2365,17 @@ def run_test_complex(request):
                     query_1 = 'insert into tests_results (datetime, result, container, command) values (now(), %s, %s, %s);'
                     cursor.execute(query_1,(string_used, test_name,r[0],))
                     conn.commit()
-                    log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, which_test="advanced test - "+str(r[1]),user_op=session['username'])
+                    log_to_db('test_ran', "Executing the complex test " + test_name + " resulted in: " +string_used, which_test="advanced test - "+str(r[1]),user_op=request.session.keys()['username'])
                 return total_result
         except Exception:
             print("Something went wrong during tests running because of",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)        
     
 
 async def test_all_ports(request):
     print_debug_log("Testing all ports")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             # to run malicious code, malicious code must be present in the db or the machine in the first place
@@ -2396,13 +2393,13 @@ async def test_all_ports(request):
 def deauthenticate(request):
     # FIXME there is this and logout??
     print_debug_log("Deautheticated")
-    session.clear()
+    request.session.keys().clear()
     return "You have been deauthenticated", 401
     
 
 def reboot_container(request):
     print_debug_log("Rebooting container")
-    if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
+    if 'username' not in request.session.keys() and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
         try:
             jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
         except:
@@ -2421,16 +2418,16 @@ def reboot_container(request):
             og_result = queued_running('docker restart '+request.form.to_dict()['id'])
             result = og_result.stdout
             if len(og_result.stderr)>0:
-                log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, user_op=session['username'])
+                log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, user_op=request.session.keys()['username'])
                 return result, 500
             else:
-                log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=session['username'])
+                log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=request.session.keys()['username'])
                 return result
         else:
             try:
                 result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                 #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
-                log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=session['username'])
+                log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=request.session.keys()['username'])
                 return result.stdout
             except Exception:
                 return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
@@ -2442,16 +2439,16 @@ def reboot_container(request):
                     og_result = queued_running('docker restart '+request.form.to_dict()['id'])
                     result = og_result.stdout
                     if len(og_result.stderr)>0:
-                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, user_op=session['username'])
+                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result+' with errors: '+og_result.stderr, user_op=request.session.keys()['username'])
                         return result, 500
                     else:
-                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=session['username'])
+                        log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=request.session.keys()['username'])
                         return result
                 else:
                     try:
                         result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                         #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
-                        log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=session['username'])
+                        log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=request.session.keys()['username'])
                         return result.stdout
                     except Exception:
                         return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
@@ -2491,7 +2488,7 @@ def reboot_container(request):
 
 def get_muted_components(request):
     print_debug_log("Getting muted containers")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2512,7 +2509,7 @@ def get_muted_components(request):
 
 def mute_component_by_hours(request):
     print_debug_log("Getting muted containers by hout")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2529,7 +2526,7 @@ def mute_component_by_hours(request):
 
 def get_cron_jobs(request):
     print_debug_log("Getting cronjob results")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2547,7 +2544,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
 def get_tests(request):
     print_debug_log("Getting tests results")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2562,7 +2559,7 @@ def get_tests(request):
                 return results
         except Exception:
             print("Something went wrong because of:",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
     
 # this is only called serverside
@@ -2570,7 +2567,7 @@ def log_to_db(table, log, which_test="", user_op=""):
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             try:
-                user = session['username']
+                user = request.session.keys()['username']
             except KeyError:
                 user = user_op
             cursor = conn.cursor(buffered=True)
@@ -2585,7 +2582,7 @@ def log_to_db(table, log, which_test="", user_op=""):
 
 def get_complex_tests(request):
     print_debug_log("Getting complex test results")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2595,19 +2592,19 @@ def get_complex_tests(request):
                     SELECT * FROM RankedEntries WHERE row_num = 1;'''
                 cursor.execute(query)
                 conn.commit()
-                log_to_db('getting_tests', 'Tests results were read', user_op=session['username'])
+                log_to_db('getting_tests', 'Tests results were read', user_op=request.session.keys()['username'])
                 results = cursor.fetchall()
                 return results
         except Exception:
             print("Something went wrong because of:",traceback.format_exc())
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
 
 def get_container_logs(podname):
     podname = request.path_params["podname"]
     print_debug_log("Getting container logs")
-    if 'username' not in session and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
+    if 'username' not in request.session.keys() and os.getenv("is-master","False") == "True": # if we aren't logged in and this is a master, it could be that we are talking to a master as a master, in which case we should have a token
         try:
             jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
         except:
@@ -2629,7 +2626,7 @@ def get_container_logs(podname):
             process.stdout.close()
             r = '<br>'.join(out)
             if "raw" not in request.form.to_dict().keys():
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                return templates.TemplateResponse("log_show.html", {"request": request, "container_id": podname,"r": r, "container_name": podname}, status_code=200)
             else:
                 r = r.replace("<br>","\n")
                 return r, 200
@@ -2647,7 +2644,7 @@ def get_container_logs(podname):
             except IndexError:
                 pass
             if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
-                return templates.TemplateResponse("error_showing.html",{"r":f"{podname} wasn't found among the containers"},status_code=500)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":f"{podname} wasn't found among the containers"},status_code=500)
             process = subprocess.Popen(
         f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
                 shell=True,
@@ -2672,7 +2669,8 @@ def get_container_logs(podname):
             process.stdout.close()
             r = '<br>'.join(out)
             if "raw" not in request.form.to_dict().keys():
-                return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                return templates.TemplateResponse("log_show.html", {"request": request, "container_id": podname,"r": r, "container_name": podname}, status_code=200)
+                
             else:
                 r = r.replace("<br>","\n")
                 return r, 200
@@ -2694,7 +2692,8 @@ def get_container_logs(podname):
                 process.stdout.close()
                 r = '<br>'.join(out)
                 if "raw" not in request.form.to_dict().keys():
-                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                    return templates.TemplateResponse("log_show.html", {"request": request, "container_id": podname,"r": r, "container_name": podname}, status_code=200)
+                    
                 else:
                     r = r.replace("<br>","\n")
                     return r, 200
@@ -2712,7 +2711,7 @@ def get_container_logs(podname):
                 except IndexError:
                     pass
                 if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
-                    return templates.TemplateResponse("error_showing.html",{"r":f"{podname} wasn't found among the containers"},status_code=500)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":f"{podname} wasn't found among the containers"},status_code=500)
                 process = subprocess.Popen(
             f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
                     shell=True,
@@ -2737,7 +2736,7 @@ def get_container_logs(podname):
                 process.stdout.close()
                 r = '<br>'.join(out)
                 if "raw" not in request.form.to_dict().keys():
-                    return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                    return templates.TemplateResponse("log_show.html", {"request": request, "container_id": podname,"r": r, "container_name": podname}, status_code=200)
                 else:
                     r = r.replace("<br>","\n")
                     return r, 200
@@ -2761,7 +2760,7 @@ def get_container_logs(podname):
                     process.stdout.close()
                     r = '<br>'.join(out)
                     if "raw" not in request.form.to_dict().keys():
-                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                        return templates.TemplateResponse("log_show.html", {"request": request, "container_id": podname,"r": r, "container_name": podname}, status_code=200)
                     else:
                         r = r.replace("<br>","\n")
                         return r, 200
@@ -2779,7 +2778,7 @@ def get_container_logs(podname):
                     except IndexError:
                         pass
                     if namespace not in string_of_list_to_list(os.getenv("namespaces","['default']")):
-                        return templates.TemplateResponse("error_showing.html",{"r":f"{podname} wasn't found among the containers"},status_code=500)
+                        return templates.TemplateResponse("error_showing.html",{"request": request, "r":f"{podname} wasn't found among the containers"},status_code=500)
                     process = subprocess.Popen(
                 f"""kubectl logs -n $(kubectl get pods --all-namespaces --no-headers | awk '$2 ~ /{podname}/ {{ print $1; exit }}') {podname} --tail {os.getenv('default-log-length')}""",
                         shell=True,
@@ -2804,7 +2803,7 @@ def get_container_logs(podname):
                     process.stdout.close()
                     r = '<br>'.join(out)
                     if "raw" not in request.form.to_dict().keys():
-                        return render_template('log_show.html', container_id = podname, r = r, container_name=podname)
+                        return templates.TemplateResponse("log_show.html", {"request": request, "container_id": podname,"r": r, "container_name": podname}, status_code=200)
                     else:
                         r = r.replace("<br>","\n")
                         return r, 200
@@ -2826,7 +2825,7 @@ def get_container_logs(podname):
 
 def get_container_logs_advanced(request):
     container_name = request.path_params["container_name"]
-    if 'username' in session: # probably unneeded
+    if 'username' in request.session.keys(): # probably unneeded
         try:
             r = get_container_logs(container_name)
             return r.text
@@ -2836,7 +2835,7 @@ def get_container_logs_advanced(request):
 
 
 def get_summary_status(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -2962,7 +2961,7 @@ def get_container_data(do_not_jsonify=False):
 
 async def generate_pdf(request):
     print_debug_log("Generating a pdf")
-    if 'username' in session:
+    if 'username' in request.session.keys():
         data_stored = []
         data = check_container_db()["result"]
         containers = {}
@@ -2999,7 +2998,7 @@ async def generate_pdf(request):
                     SELECT * FROM RankedEntries WHERE row_num = 1;'''
                 cursor.execute(query)
                 conn.commit()
-                log_to_db('getting_tests', 'Tests results were read', user_op=session['username'])
+                log_to_db('getting_tests', 'Tests results were read', user_op=request.session.keys()['username'])
                 results = cursor.fetchall()
                 tests_out = results
         except Exception:
@@ -3012,7 +3011,7 @@ async def generate_pdf(request):
 SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
                 cursor.execute(query)
                 conn.commit()
-                log_to_db('getting_tests', 'Cronjobs results were read', user_op=session['username'])
+                log_to_db('getting_tests', 'Cronjobs results were read', user_op=request.session.keys()['username'])
                 results = cursor.fetchall()
                 cronjobs_out = results
         except Exception:
@@ -3088,19 +3087,19 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     
 
 def redirect_to_download(request):
-    if 'username' in session:
-        return redirect('/downloads/')
+    if 'username' in request.session.keys():
+        return RedirectResponse(url=request.url_for("downloads"))
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
 
 
 def list_files(request):
     subpath = request.path_params["subpath"]
-    if 'username' in session:
+    if 'username' in request.session.keys():
         # Determine the full path relative to the base directory
         full_path = os.path.join(os.path.join(os.getcwd(), "data/"), subpath)
         if ".." in subpath:
-            return templates.TemplateResponse("error_showing.html",{"r":"Issues during the retrieving of the resource: illegal path"},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Issues during the retrieving of the resource: illegal path"},status_code=500)
         # If it's a directory, list contents
         if os.path.isdir(full_path):
             try:
@@ -3111,34 +3110,34 @@ def list_files(request):
                         a['data'].append('dir')
                     else:
                         a['data'].append('file')
-                return templates.TemplateResponse("download_files.html",{"files":files_list, "subpath":subpath})
+                return templates.TemplateResponse("download_files.html",{"request": request, "files":files_list, "subpath":subpath})
             except FileNotFoundError:
-                return templates.TemplateResponse("error_showing.html",{"r":"Issues during the retrieving of the folder: "+ traceback.format_exc()},status_code=500)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Issues during the retrieving of the folder: "+ traceback.format_exc()},status_code=500)
         # If it's a file, serve the file
         elif os.path.isfile(full_path):
             directory = os.path.dirname(full_path)
             filename = os.path.basename(full_path)
-            return send_from_directory(directory, filename, as_attachment=True)
+            return FileResponse(directory+filename)
         else:
-            return templates.TemplateResponse("error_showing.html",{"r":"No certification was ever produced"},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":"No certification was ever produced"},status_code=500)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
         
 
 
 def certification(request):
-    if 'username' in session:
-        if session['username'] != "admin":
+    if 'username' in request.session.keys():
+        if request.session.keys()['username'] != "admin":
             try:
                 if jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])['sub'] == "admin": #maybe authenticate with token
                     pass
                 else:
-                    return templates.TemplateResponse("error_showing.html",{"r":"User is not authorized to perform the operation."},status_code=401)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":"User is not authorized to perform the operation."},status_code=401)
             except jwt.ExpiredSignatureError:
                 return {'error': 'Token expired'}, 401
             except jwt.InvalidTokenError:
                 return {'error': 'Invalid token'}, 401
             except Exception:
-                return templates.TemplateResponse("error_showing.html",{"r":"Something bad happened: " + traceback.format_exc()},status_code=401)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"Something bad happened: " + traceback.format_exc()},status_code=401)
             
         try:
             subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -3153,16 +3152,16 @@ def certification(request):
             else:
                 return FileResponse(f'/app/data/{subfolder}/snap4city-certification-{password}.rar')
         except Exception:
-            return templates.TemplateResponse("error_showing.html",{"r":f"Fatal error while generating configuration: {traceback.format_exc()}"},status_code=401)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":f"Fatal error while generating configuration: {traceback.format_exc()}"},status_code=401)
     return RedirectResponse(url=request.url_for("login"), status_code=302)
         
 
 def clustered_certification(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         if not os.getenv("is-multi","True"):
             return "Disabled for non-clustered environments", 500
-        if session['username'] != "admin":
-            return templates.TemplateResponse("error_showing.html",{"r":"User is not authorized to perform the operation"},status_code=401)
+        if request.session.keys()['username'] != "admin":
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":"User is not authorized to perform the operation"},status_code=401)
         try:
             results = None
             with mysql.connector.connect(**db_conn_info) as conn:
@@ -3193,17 +3192,17 @@ def clustered_certification(request):
                         error = True
                         errorText += "Couldn't read file from sentinel located at " + r[0] + " because of error in request: "+ str(obtained.status_code) + '\n'
                 if error:
-                    return templates.TemplateResponse("error_showing.html",{"r":errorText.replace("\n","<br>")},status_code=500)
+                    return templates.TemplateResponse("error_showing.html",{"request": request, "r":errorText.replace("\n","<br>")},status_code=500)
                 else:
                     password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
                     subprocess.run(f'rar a -k -p{password} snap4city-clustered-certification-{password}.rar *snap4city-certification-*.rar; mkdir -p {subfolder}; cp snap4city-clustered-certification-{password}.rar {subfolder}/snap4city-clustered-certification-{password}.rar', shell=True, capture_output=True, text=True, encoding="utf_8").stdout
                     return FileResponse(f'snap4city-clustered-certification-{password}.rar')
         except Exception:
-            return templates.TemplateResponse("error_showing.html",{"r":traceback.format_exc()},status_code=500)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":traceback.format_exc()},status_code=500)
 # hosts stuff        
 
 def hosts_control_panel(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             conn = mysql.connector.connect(**db_conn_info)
             cursor = conn.cursor(dictionary=True)
@@ -3211,14 +3210,14 @@ def hosts_control_panel(request):
             rows = cursor.fetchall()
             cursor.close()
             conn.close()
-            return templates.TemplateResponse("control_panel.html",{"hosts":rows})
+            return templates.TemplateResponse("control_panel.html",{"request": request, "hosts":rows})
         except Exception:
             return f"Error loading hosts: {traceback.format_exc()}"
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
 
 def connect_and_store(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         host = request.form.get('host')
         user = request.form.get('user')
         password = request.form.get('psw')
@@ -3266,7 +3265,7 @@ def connect_and_store(request):
 
 
 def run_command(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         host = request.form.get('host')
 
         try:
@@ -3304,7 +3303,7 @@ def run_command(request):
 
 
 def delete_host(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         host = request.form.get('host')
 
         try:
@@ -3340,7 +3339,7 @@ def delete_host(request):
 
 
 def get_tops(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             # Fetch user from DB
             conn = mysql.connector.connect(**db_conn_info)
@@ -3372,7 +3371,7 @@ def get_tops(request):
                 except:
                     errors.append(traceback.format_exc())
             data_to_send={"result":outs,"error":errors}
-            return templates.TemplateResponse("top-viewer.html",{"data":data_to_send})
+            return templates.TemplateResponse("top-viewer.html",{"request": request, "data":data_to_send})
         except Exception:
             return {"error": traceback.format_exc()}, 500
     return RedirectResponse(url=request.url_for("login"), status_code=302)
@@ -3385,7 +3384,7 @@ def get_tops(request):
 def sentinel_hosts_control_panel(request):
     if not os.getenv("is-multi","False") == "True":
         return "Disabled for non-clustered environments", 500
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             conn = mysql.connector.connect(**db_conn_info)
             cursor = conn.cursor(dictionary=True)
@@ -3393,7 +3392,7 @@ def sentinel_hosts_control_panel(request):
             rows = cursor.fetchall()
             cursor.close()
             conn.close()
-            return templates.TemplateResponse("multi-host-sentinel-manager.html",{"hosts":rows})
+            return templates.TemplateResponse("multi-host-sentinel-manager.html",{"request": request, "hosts":rows})
         except Exception:
             return f"Error loading hosts: {traceback.format_exc()}"
     return RedirectResponse(url=request.url_for("login"), status_code=302)
@@ -3402,7 +3401,7 @@ def sentinel_hosts_control_panel(request):
 def add_sentinel_host(request):
     if not os.getenv("is-multi","False") == "True":
         return "Disabled for non-clustered environments", 500
-    if 'username' in session:
+    if 'username' in request.session.keys():
         hostname = request.form.get('hostname')
         ip = request.form.get(key='ip')
 
@@ -3426,7 +3425,7 @@ def add_sentinel_host(request):
 def delete_sentinel_host(request):
     if not os.getenv("is-multi","False") == "True":
         return "Disabled for non-clustered environments", 500
-    if 'username' in session:
+    if 'username' in request.session.keys():
         hostname = request.form.get('hostname')
 
         try:
@@ -3459,7 +3458,7 @@ def delete_sentinel_host(request):
 # begin snmp stuff
 
 def snmp_control_panel(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         try:
             conn = mysql.connector.connect(**db_conn_info)
             cursor = conn.cursor(dictionary=True)
@@ -3467,14 +3466,14 @@ def snmp_control_panel(request):
             rows = cursor.fetchall()
             cursor.close()
             conn.close()
-            return templates.TemplateResponse("control_panel_snmp.html",{"hosts_snmp":rows})
+            return templates.TemplateResponse("control_panel_snmp.html",{"request": request, "hosts_snmp":rows})
         except Exception:
             return f"Error loading hosts: {traceback.format_exc()}"
     return RedirectResponse(url=request.url_for("login"), status_code=302)
 
 
 def add_snmp(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         user = request.form.get('user', None)
         description = request.form.get('description', None)
         details = request.form.get('details', None)
@@ -3507,7 +3506,7 @@ def add_snmp(request):
 
 
 def delete_snmp_host(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         host = request.form.get('host')
 
         try:
@@ -3535,10 +3534,10 @@ def delete_snmp_host(request):
 
 
 def snmp_info(request):
-    if 'username' in session:
+    if 'username' in request.session.keys():
         host = request.args.get("host", None)
         if host is None:
-            return templates.TemplateResponse("error_showing.html",{"r":"No SNMP host was selected, please ensure to provide it in the body of the request under 'host'"},status_code=400)
+            return templates.TemplateResponse("error_showing.html",{"request": request, "r":"No SNMP host was selected, please ensure to provide it in the body of the request under 'host'"},status_code=400)
         try:
             conn = mysql.connector.connect(**db_conn_info)
             cursor = conn.cursor(dictionary=True)
@@ -3547,10 +3546,10 @@ def snmp_info(request):
             cursor.close()
             conn.close()
             if not row:
-                return templates.TemplateResponse("error_showing.html",{"r":"The provided host wasn't found in the db"},status_code=404)
+                return templates.TemplateResponse("error_showing.html",{"request": request, "r":"The provided host wasn't found in the db"},status_code=404)
             received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],}
             data = asyncio.run(gather_snmp_info(received_data))
-            return templates.TemplateResponse("snmp_shower.html",{"host":host, "data":data})
+            return templates.TemplateResponse("snmp_shower.html",{"request": request, "host":host, "data":data})
         except Exception as e:
             return {"error": str(e)}, 500
     
