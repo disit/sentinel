@@ -79,7 +79,7 @@
 		<div class="modal-content">
 			<div class="modal-header">
 				<h5 class="modal-title" id="editComponentLabel">Edit cronjob</h5>
-				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editCronJobModal').modal('hide')">
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editCronJob').modal('hide')">
 					<span aria-hidden="true">X</span>
 				</button>
 			</div>
@@ -115,7 +115,7 @@
 				</form>
 			</div>
 			<div class="modal-footer">
-				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJobModal').modal('hide')">Cancel</button>
+				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJob').modal('hide')">Cancel</button>
 				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton">Save changes</button>
 			</div>
 		</div>
@@ -128,7 +128,7 @@
 		<div class="modal-content">
 			<div class="modal-header">
 				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting cronjob</h5>
-				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteComponent').modal('hide')">
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteCronJob').modal('hide')">
 					<span aria-hidden="true">X</span>
 				</button>
 			</div>
@@ -145,8 +145,8 @@
 				</form>
 			</div>
 			<div class="modal-footer">
-				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
-				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteCronJobButton" onClick="$('#deleteCronJob').modal('hide')">Delete cronjob</button>
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#deleteCronJob').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteCronJobButton" >Delete cronjob</button>
 			</div>
 		</div>
 	</div>
@@ -243,7 +243,7 @@
 		}
 	});
 	$('#saveCronJobChangesButton').on('click', function() {
-	var id = $('CronJobEditId').val();
+	var id = $('#CronJobEditId').val();
 	var password = $('#passwordInputEdit').val();
 	var category = $('#category-selection-edit').val();
 	var command = $('#CommandEdit').val();

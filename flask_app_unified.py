@@ -1458,7 +1458,9 @@ def send_advanced_alerts(message):
         if len(message[5])>0:
             prepare_text = "<br>These cronjobs failed:"
             for failed_cron in message[5]:
-                prepare_text += f"<br>Cronjob named {failed_cron[3]} assigned to category {failed_cron[5]} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + failed_cron[1] + ' but'} error: {failed_cron[2]} at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
+                stdout_msg=failed_cron[1].replace('\n','<br>')
+                stderr_msg=failed_cron[2].replace('\n','<br>')
+                prepare_text += f"<br>Cronjob named {failed_cron[3]} assigned to category {failed_cron[5]} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + stdout_msg + ' but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
             text_for_email += prepare_text + "<br><br>"
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
