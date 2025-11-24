@@ -1,0 +1,4 @@
+*.yaml
+*.yml
+local_instance/*
+working_sample/*
