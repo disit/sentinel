@@ -5,6 +5,7 @@
 {{ super() }}
 {% endblock %}
 {% block content %}
+<div class="p-3 m-0 border-0 bd-example m-0 border-0">
 <h1>Available SNMP</h1>
 <table border="1" cellpadding="5" id="hosts_table">
 <thead><tr><th>Host</th><th>User</th><th>Description</th><th>CPU</th><th>MEM</th><th>Protocol</th><th>Details</th><th>Delete SNMP</th></tr></thead>
@@ -37,7 +38,7 @@ PrivKey: <input id="PrivKey" type="password" class="form-control" name="PrivKey"
 AuthKey: <input id="AuthKey" type="password" class="form-control" name="AuthKey"><br>
 <button id="button_add" class="form-control" class="btn btn-info">Add SNMP</button>
 </form>
-
+</div>
 
 <script>
 $('#hosts_table').DataTable();
