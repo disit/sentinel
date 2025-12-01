@@ -17,9 +17,10 @@
 	"platform-url": "http://example.org",
 	"platform-explanation": "Some information",
 	"load-threshold": "30",
-	"memory_threshold": "1",
-	"send_notifications": "True",
+	"memory-threshold": "1",
+	"send-notifications": "True",
 	"cluster-secret": "This is a super secret",
 	"is-multi": "True",
-	"debug": "True"
+	"debug": "True",
+	"cron-timeout":"10"
 }

@@ -1425,7 +1425,7 @@ def runcronjobs():
             results = cursor.fetchall()
             for r in list(results):
                 print(f"Running {r[1]} cronjob")
-                command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=10)
+                command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
                 if len(command_ran.stderr) > 0:
                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
