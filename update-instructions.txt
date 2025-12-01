@@ -1,0 +1,6 @@
+1) turn off all sentinel containers besides the db
+2) compare the schema of the old db with the schema of the latest db and make it so the old one matches, including the collations (or fk won't work)
+2.a) some default values of the database may need adjusted values
+3) check for envirnoment variables to be added to the old configuration
+4) delete old containers data (or the first few minutes after sentinel reboot may throw some notifications)
+5) restart pods with newest images
