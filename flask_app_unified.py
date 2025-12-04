@@ -23,7 +23,8 @@ from pysnmp.hlapi.v3arch.asyncio import *
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak, Table, Spacer, TableStyle
+from reportlab.lib import colors
 from threading import Lock
 from urllib.parse import urlparse
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -3010,6 +3011,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     extra_logs.append(Paragraph(f'<b><a name="iot-directory-log"></a>iot-directory-log</b>', styles["Heading1"]))
                     extra_logs.append(Paragraph(log_output.replace("\n","<br></br>"), styles["Normal"]))
                     break  # Stop searching after finding the first occurrence
+            
+           
             for test in tests_out:
                 if not test:
                     break
@@ -3020,6 +3023,70 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     break
                 content.append(Paragraph(f'<a href="#t-{cronjob[3]}" color="blue">Cronjob {cronjob[3]}</a>', styles["Normal"]))
                 cronjobs.append(cronjob)
+                
+            # start host_data
+            hosts_data=[]
+            ok_hosts=False
+            try:
+                # Fetch user from DB
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT user, host FROM host;")
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                for row in rows:
+                    try:
+                        user = row['user']
+                        host = row['host']
+                        private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+
+                        # Connect with key
+                        ssh = paramiko.SSHClient()
+                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                        ssh.connect(host, username=user, key_filename=private_key_path)
+
+                        _, stdout, stderr = ssh.exec_command("top -b -n 1")
+                        output = stdout.read().decode()
+                        error_output = stderr.read().decode()
+
+                        ssh.close()
+                        generated_json=parse_top(output)
+                        generated_json["source"] = host
+                        hosts_data.append({"host":host,"output":generated_json, "text_errors":error_output, "errors":""})
+                    except:
+                        hosts_data.append({"host":host,"output":"", "text_errors":"", "errors":traceback.format_exc()})
+                for i in range(len(rows)):
+                    content.append(Paragraph(f'<a href="#host-{rows[i]["host"]}" color="blue">Host {rows[i]["host"]}</a>', styles["Normal"]))
+                    
+            except:
+                print_debug_log(f"Failed to get host data because of {traceback.format_exc()}\nContinuing with generating pdf...")
+            # end host_data
+            
+            # start snmp
+            snmp_data=[]
+            ok_snmp=False
+            try:
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT * FROM snmp_host;", )
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                if not rows:
+                    pass # no snmp hosts found
+                else:
+                    for row in rows:
+                        received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],}
+                        incomplete_data=asyncio.run(gather_snmp_info(received_data))
+                        incomplete_data["host"]=row["host"]
+                        snmp_data.append(incomplete_data)
+                    for i in range(len(rows)):
+                        content.append(Paragraph(f'<a href="#snmp-{rows[i]["host"]}" color="blue">SNMP {rows[i]["host"]}</a>', styles["Normal"]))
+                    ok_snmp=True
+            except:
+                print_debug_log(f"Failed to get snmp data because of {traceback.format_exc()}\nContinuing with generating pdf...")
+            # end snmp
             content.append(PageBreak())
             
             
@@ -3056,6 +3123,193 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     content.append(Paragraph(f'<br><b><a name="c-{cronjob[3]}-errors"></a>Errors</b>', styles["Heading2"]))
                     content.append(Paragraph(html.escape(cronjob[2]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
                 content.append(PageBreak())
+            try:
+                if ok_hosts:
+                    for host_data_element in hosts_data:
+                        content.append(Paragraph(f'<b><a name="host-{host_data_element["host"]}"></a>{host_data_element} data</b>', styles["Heading1"]))
+                        if host_data_element["output"]=="": # something failed code-wise
+                            content.append(Paragraph(html.escape(host_data_element["errors"]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
+                        else:
+                            # --- System Info ---
+                            si = host_data_element["system_info"]
+
+                            content.append(Paragraph("System Information", styles["Heading2"]))
+                            content.append(Paragraph(f"Time: {si['time']}", styles["Normal"]))
+                            content.append(Paragraph(f"Uptime: {si['up_time']}", styles["Normal"]))
+                            content.append(Paragraph(f"Users: {si['users']}", styles["Normal"]))
+                            content.append(Paragraph(f"Load Avg: {si['load_average']}", styles["Normal"]))
+                            content.append(Spacer(1, 12))
+
+                            # --- CPU Usage ---
+                            cpu = host_data_element["cpu_usage"]
+
+                            content.append(Paragraph("CPU Usage", styles["Heading2"]))
+
+                            cpu_table_data = [
+                                ["us", cpu["us"], "sy", cpu["sy"]],
+                                ["ni", cpu["ni"], "id", cpu["id"]],
+                                ["wa", cpu["wa"], "hi", cpu["hi"]],
+                                ["si", cpu["si"], "st", cpu["st"]],
+                            ]
+
+                            cpu_table = Table(cpu_table_data, hAlign="LEFT")
+                            cpu_table.setStyle(TableStyle([
+                                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                                ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+                                ("FONTNAME", (0,0), (-1,-1), "Helvetica"),
+                            ]))
+                            content.append(cpu_table)
+                            content.append(Spacer(1, 12))
+
+                            # --- Memory Usage ---
+                            mem = host_data_element["memory_usage"]
+                            unit = host_data_element["memory_measuring_unit"]
+
+                            content.append(Paragraph("Memory Usage", styles["Heading2"]))
+
+                            memory_table = Table([
+                                ["Total", f"{mem['total']} {unit}"],
+                                ["Used", f"{mem['used']} {unit}"],
+                                ["Free", f"{mem['free']} {unit}"],
+                                ["Buffers/Cache", f"{mem['buff_cache']} {unit}"]
+                            ], hAlign="LEFT")
+
+                            memory_table.setStyle(TableStyle([
+                                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                                ("GRID", (0,0), (-1,-1), 0.5, colors.grey)
+                            ]))
+
+                            content.append(memory_table)
+                            content.append(Spacer(1, 20))
+
+                            # --- Process List ---
+                            content.append(Paragraph("Processes", styles["Heading2"]))
+
+                            proc_rows = [["PID","USER","PR","NI","VIRT","RES","SHR","S","CPU","MEM","TIME","COMMAND"]]
+                            for p in host_data_element["processes"]:
+                                proc_rows.append([
+                                    p["pid"], p["user"], p["pr"], p["ni"], p["virt"],
+                                    p["res"], p["shr"], p["s"], p["cpu"], p["mem"],
+                                    p["time"], p["command"]
+                                ])
+
+                            proc_table = Table(proc_rows, repeatRows=1)
+
+                            proc_table.setStyle(TableStyle([
+                                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                                ("GRID", (0,0), (-1,-1), 0.25, colors.darkgrey),
+                                ("FONTSIZE", (0,0), (-1,-1), 7),
+                                ("VALIGN", (0,0), (-1,-1), "TOP"),
+                                ("FONTNAME", (0,0), (-1,-1), "Helvetica")
+                            ]))
+
+                            content.append(proc_table)
+                            content.append(PageBreak())
+                            if host_data_element["text_errors"] != "":
+                                content.append(Paragraph(f'<b><a name="host-errors-{host_data_element["host"]}"></a>{host_data_element} errors</b>', styles["Heading2"]))
+                                content.append(Paragraph(html.escape(host_data_element["text_errors"]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
+                    content.append(PageBreak())
+                if ok_snmp:
+                    for snmp_data_element in snmp_data:
+                        content.append(Paragraph(f'<a name="snmp-{snmp_data_element[i]["host"]}">{snmp_data_element[i]}</a>', styles["Heading1"]))
+                        # --- MEMORY ---
+                        content.append(Paragraph("Memory", styles["Heading2"]))
+                        mem_rows = [["Description", "Used (MB)", "Total (MB)"]]
+
+                        for m in snmp_data.get("memory", []):
+                            mem_rows.append([
+                                m["description"],
+                                str(m["used_MB"]),
+                                str(m["total_MB"])
+                            ])
+
+                        mem_table = Table(mem_rows, repeatRows=1)
+                        mem_table.setStyle(TableStyle([
+                            ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                            ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+                            ("FONTSIZE", (0,0), (-1,-1), 9)
+                        ]))
+
+                        content.append(mem_table)
+                        content.append(Spacer(1, 16))
+
+
+                        # --- DISKS ---
+                        content.append(Paragraph("Disks", styles["Heading2"]))
+                        disk_rows = [["Description", "Used (MB)", "Total (MB)"]]
+
+                        for d in snmp_data.get("disks", []):
+                            disk_rows.append([
+                                d["description"],
+                                str(d["used_MB"]),
+                                str(d["total_MB"])
+                            ])
+
+                        disk_table = Table(disk_rows, repeatRows=1)
+                        disk_table.setStyle(TableStyle([
+                            ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                            ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+                            ("FONTSIZE", (0,0), (-1,-1), 9)
+                        ]))
+
+                        content.append(disk_table)
+                        content.append(Spacer(1, 16))
+
+
+                        # --- CPU ---
+                        content.append(Paragraph("CPU", styles["Heading2"]))
+                        cpu = snmp_data.get("cpu", {})
+
+                        if "error" in cpu:
+                            content.append(Paragraph(f"<b>Error:</b> {cpu['error']}", styles["Normal"]))
+                        else:
+                            # Per-core loads
+                            core_rows = [["Core", "Load (%)"]]
+                            for i, load in enumerate(cpu.get("per_core", [])):
+                                core_rows.append([f"Core {i}", str(load)])
+
+                            core_table = Table(core_rows, repeatRows=1)
+                            core_table.setStyle(TableStyle([
+                                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                                ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+                                ("FONTSIZE", (0,0), (-1,-1), 9)
+                            ]))
+
+                            content.append(Paragraph(f"Average Load: <b>{cpu.get('average', 0)}%</b>", styles["Normal"]))
+                            content.append(Spacer(1, 8))
+                            content.append(core_table)
+
+                        content.append(Spacer(1, 16))
+
+
+                        # --- LOAD AVERAGE ---
+                        loads = snmp_data.get("load_avg", {})
+                        content.append(Paragraph("Load Averages", styles["Heading2"]))
+
+                        load_table = Table([
+                            ["1 min", "5 min", "15 min"],
+                            [
+                                str(loads.get("1", "N/A")),
+                                str(loads.get("5", "N/A")),
+                                str(loads.get("15", "N/A"))
+                            ]
+                        ])
+
+                        load_table.setStyle(TableStyle([
+                            ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                            ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+                            ("FONTSIZE", (0,0), (-1,-1), 9)
+                        ]))
+
+                        content.append(load_table)
+                    content.append(PageBreak())
+            except:
+                print_debug_log("Something happened while generating snmp/host data: "+traceback.format_exc())
             # Add content to the PDF document
             doc.build(content)
             # Send the PDF file as a response
@@ -3520,7 +3774,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
-                cursor.execute("SELECT * FROM host WHERE host=%s", (host,))
+                cursor.execute("SELECT * FROM snmp_host WHERE host=%s", (host,))
                 row = cursor.fetchone()
                 cursor.close()
                 conn.close()
