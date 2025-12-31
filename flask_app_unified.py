@@ -652,7 +652,11 @@ def clean_old_db_entries():
 DELETE FROM host_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
 DELETE FROM snmp_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
 DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;'''
-            cursor.execute(query,)
+
+            results=cursor.execute(query, multi=True) # multi for cursor reasons
+            for result in results:
+                if result.with_rows:
+                    result.fetchall() # sometimes multiple statements cause something to fail, this is an extra safety
             conn.commit()
             print("Weekly deletion of old logs was successful")
     except:
