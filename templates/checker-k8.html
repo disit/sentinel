@@ -493,7 +493,12 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		if (log_destination==="") { 
 			log_destination = "see_logs"; 
 		}
+		try {
 		document.getElementById(log_destination).innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+		}
+		catch (exception_var) {
+			console.log("Failed to write to category log due to: "+exception_var)
+		}
 		logs_for_categories[log_destination] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
 		if (log_destination!="see_logs") { 
 			document.getElementById("see_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
@@ -822,7 +827,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			let category = 'Unknown';
 			for (const key in lookupTable) {
 				if (name.startsWith(key.replace('*', ''))) {
-					if (item.Namespace == lookupTable[key][2]) {
+					if (item.Namespace.includes(lookupTable[key][2])) {
 						category = lookupTable[key][0];
 						break;
 					}
