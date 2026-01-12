@@ -22,5 +22,6 @@
 	"cluster-secret": "This is a super secret",
 	"is-multi": "True",
 	"debug": "True",
-	"cron-timeout":"10"
+	"cron-timeout":"10",
+	"cron-frequency-minutes":"5"
 }

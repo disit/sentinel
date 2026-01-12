@@ -305,7 +305,7 @@ class Snap4SentinelTelegramBot:
             payload["chat_id"] = chat_id
         if not isinstance(message, str):
             return False, "Message wasn't text"
-        payload["text"] = message
+        payload["text"] = os.getenv("platform-url","unseturl")+" is in trouble!\n" + message
         payload["parse_mode"] = "HTML"
         response = requests.post(url, json=payload)
         if response.status_code == 200:
@@ -1429,15 +1429,19 @@ def runcronjobs():
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
-            for r in list(results): #timeout won't print to db! FIXME
+            for r in list(results): 
                 print(f"Running {r[1]} cronjob")
-                command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
-                if len(command_ran.stderr) > 0:
+                try:
+                    command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
+                    if len(command_ran.stderr) > 0:
+                        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                        cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
+                    else:
+                        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+                        cursor.execute(query, (command_ran.stdout.strip(),r[0],))
+                except subprocess.TimeoutExpired:
                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
-                    cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
-                else:
-                    query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
-                    cursor.execute(query, (command_ran.stdout.strip(),r[0],))
+                    cursor.execute(query, ("",r[0],"Internal timeout of "+os.getenv("cron-timeout","10")+"s exceeded.",))
                 conn.commit()
     except Exception:
         print("Something went wrong during cronjobs running because of:",traceback.format_exc())
@@ -1539,7 +1543,7 @@ def send_advanced_alerts(message):
                     f"Cronjob named <b>{cron_name}</b> assigned to category <b>{category}</b> "
                     f"with code <pre><code class=\"language-bash\">{bash_code}</code></pre>"
                     f"gave {result_text}"
-                    f"Error: <code>{escaped_err}</code> at {timestamp}"
+                    f"Error: <code>{escaped_err}</code> at {timestamp}\n"
                 )
                 text_for_telegram += prepare_text + "\n\n"
             ##
@@ -1584,7 +1588,7 @@ scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("
 scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
-scheduler.add_job(runcronjobs, trigger='interval', minutes=5)
+scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
 scheduler.add_job(clean_old_db_entries, 'cron',week=1)
 scheduler.start()
 auto_alert_status()

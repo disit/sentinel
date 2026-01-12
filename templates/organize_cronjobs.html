@@ -21,7 +21,7 @@
     <tr>
 	  <td>{{item[0]}}</td>
 	  <td>{{item[1]}}</td>
-	  <td>{{item[2]}}</td>
+	  <td>{{category[item[2]-1][1]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td>{{item[4]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
@@ -68,6 +68,8 @@
 								<ul>
 									<pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
 									<pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
+									<pre><code>CODE=$(curl -sLI -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
+									
 								</ul>
 							</div>
 						</div>
@@ -129,6 +131,8 @@
 								<ul>
 									<pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
 									<pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
+									<pre><code>CODE=$(curl -sLI -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
+									
 								</ul>
 							</div>
 						</div>
@@ -176,6 +180,22 @@
 	</div>
 </div>
 <script>
+
+	const formModal = document.getElementById('editCronJob');
+
+	formModal.addEventListener('show.bs.modal', event => {
+		// Button that triggered the modal
+		const button = event.relatedTarget;
+		
+		// Extract info from data-bs-* attributes
+		const categoryValue = button.getAttribute('data-category');
+		
+		// Update the modal's select content.
+		const modalSelect = formModal.querySelector('#category-selection-edit');
+		
+		// This line does the magic:
+		modalSelect.value = categoryValue;
+	});
 
 	$('.open-modal-m').on('click', function() {
 		var id = $(this).data('component');
