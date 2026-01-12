@@ -306,6 +306,7 @@ class Snap4SentinelTelegramBot:
         if not isinstance(message, str):
             return False, "Message wasn't text"
         payload["text"] = message
+        payload["parse_mode"] = "HTML"
         response = requests.post(url, json=payload)
         if response.status_code == 200:
             return True, "Message was sent"
@@ -1428,7 +1429,7 @@ def runcronjobs():
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
-            for r in list(results):
+            for r in list(results): #timeout won't print to db! FIXME
                 print(f"Running {r[1]} cronjob")
                 command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
                 if len(command_ran.stderr) > 0:
@@ -1513,7 +1514,37 @@ def send_advanced_alerts(message):
         if len(message[4])>0:
             text_for_telegram+= message[4] +"\n"
         if len(message[5])>0:
-            text_for_telegram+= str(message[5])
+            ## telegram hates some chars with html escaping
+            prepare_text = "These cronjobs failed:\n"
+            for failed_cron in message[5]:
+                cron_name = failed_cron[3]
+                category = failed_cron[5]
+                bash_code = failed_cron[4]
+                raw_result = failed_cron[1]
+                raw_error = failed_cron[2]
+                timestamp = failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')
+
+                # Handle the result logic and escaping outside the f-string
+                if len(raw_result) < 1:
+                    result_text = "no result.\n"
+                else:
+                    escaped_res = raw_result.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    result_text = f"result of: <code>{escaped_res}</code>\n"
+
+                # Escape the error text
+                escaped_err = raw_error.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+                # 2. Build the final string (much cleaner now!)
+                prepare_text += (
+                    f"Cronjob named <b>{cron_name}</b> assigned to category <b>{category}</b> "
+                    f"with code <pre><code class=\"language-bash\">{bash_code}</code></pre>"
+                    f"gave {result_text}"
+                    f"Error: <code>{escaped_err}</code> at {timestamp}"
+                )
+                text_for_telegram += prepare_text + "\n\n"
+            ##
+            
+            
         if len(message[6])>0:
             prepare_text_top_cpu = "\nThese hosts are overloaded on cpu:"
             for overloaded_cpu_top in message[6]:

@@ -230,6 +230,92 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		}
 	};
 
+function makeCronJobTable(data) {
+	const container = document.getElementById('cronJobTable');
+    container.innerHTML = ''; // Destroy existing content
+
+    // 1. Create Search Bar
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search table...';
+    searchInput.className = 'table-search';
+    searchInput.onkeyup = function() { filterTable(this.value); };
+    container.appendChild(searchInput);
+
+    // 2. Map the data into a standard object array for easier handling
+    const processedData = data.map(row => ({
+        name: row[3] || "",
+        category: row[5] || "",
+        command: row[4] || "",
+        update: row[0] || "",
+        status: (!row[2] || row[2].trim() === "") ? "ok" : "ko"
+    }));
+
+    // 3. Build Table
+    const table = document.createElement('table');
+    table.id = 'main-table';
+    table.className = 'custom-table';
+    
+    const headers = ['Name', 'Category', 'Command', 'Last Update', 'Status'];
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+
+    headers.forEach((text, index) => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        th.onclick = () => sortTable(index); // Attach sorting
+        headerRow.appendChild(th);
+    });
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    table.appendChild(tbody);
+    container.appendChild(table);
+
+    // 4. Function to render body rows
+    function renderRows(rowsToRender) {
+        tbody.innerHTML = '';
+        rowsToRender.forEach(item => {
+            const tr = document.createElement('tr');
+            Object.values(item).forEach(val => {
+                const td = document.createElement('td');
+                td.textContent = val;
+                if (val === "ok") td.style.color = "green";
+                if (val === "ko") td.style.color = "red";
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 5. Sorting Logic
+    let sortAsc = true;
+    window.sortTable = function(columnIndex) {
+        const keys = Object.keys(processedData[0]);
+        const key = keys[columnIndex];
+        processedData.sort((a, b) => {
+            return sortAsc 
+                ? a[key].toString().localeCompare(b[key].toString())
+                : b[key].toString().localeCompare(a[key].toString());
+        });
+        sortAsc = !sortAsc;
+        renderRows(processedData);
+    };
+
+    // 6. Filter Logic
+    window.filterTable = function(query) {
+        const filtered = processedData.filter(row => 
+            Object.values(row).some(val => 
+                val.toString().toLowerCase().includes(query.toLowerCase())
+            )
+        );
+        renderRows(filtered);
+    };
+
+    renderRows(processedData); // Initial render
+}
+
 	
 	function getcontainersdb(){
 		try {
@@ -295,6 +381,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			url: "./cronjobs", 
 			type: "GET", 
 			success: function(data, textStatus, jqXHR) {
+				makeCronJobTable(data);
 				data.forEach(el => {
 					let cronjobmsg = "";
 					try {
@@ -306,6 +393,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 						else {
 							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1].replaceAll('\n','<br>') + " with no errors.";
 						}
+						logging_cronjobs(cronjobmsg);
 						logging(cronjobmsg,el[5]+"-logs");
 					}
 					catch (exception_var) {
@@ -503,6 +591,15 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		if (log_destination!="see_logs") { 
 			document.getElementById("see_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
 			logs_for_categories["see_logs"] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		}
+	};
+
+	function logging_cronjobs(logging_str) {
+		try {
+			document.getElementById("cronjob_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+		}
+		catch (exception_var) {
+			console.log("Failed to write to cronjob logs due to: "+exception_var)
 		}
 	};
 	
@@ -1213,7 +1310,7 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 
 	
 </nav>
-<div id="output" class="main" style="width: fit-content;min-width: fit-content;">
+<div id="output" class="main" style="min-width: fit-content;">
 	<br>
 
 <div id="table-container">
@@ -1295,8 +1392,15 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		</div>
 	</div>
 </div>
+<div id="cronJobTable">
+</div>
+
+<div id="cronjob_logs_did" class="ui-widget-content">
+	<p>Cronjob Console Log</p>
+	<p class="ui-widget-header" id="cronjob_logs" style="white-space: pre-line;"></p>
+</div>
 <div id="notDraggable" class="ui-widget-content">
-	<p>Console Log</p>
+	<p>Master Console Log</p>
 	<p class="ui-widget-header" id="see_logs" style="white-space: pre-line;"></p>
 </div>
 {% block additional_content_admin_log %}{% endblock %}
@@ -1348,5 +1452,23 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 			margin-right: 10px;
 	}
 	.button-cat {margin-right: 5px; margin-left: 5px}
+
+	#this-div { margin-top: 20px; font-family: sans-serif; }
+	/* Table Styling */
+	.custom-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+	.custom-table th, .custom-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+
+	/* Alternate Row Colors */
+	.custom-table tbody tr:nth-child(even) { background-color: #f2f2f2; }
+	.custom-table tbody tr:hover { background-color: #e9e9e9; }
+
+	/* Header & Sorting UI */
+	.custom-table th { background-color: #3c62d4; color: white; cursor: pointer; position: relative; }
+	.custom-table th::after { content: ' ↕'; font-size: 0.8em; opacity: 0.5; }
+
+	/* Search Bar */
+	.table-search { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+	
+	/* end styles for cronjob table */
 </style>
 {% endblock %}

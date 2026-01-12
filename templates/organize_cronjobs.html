@@ -59,6 +59,18 @@
 					<div class="form-group">
 						<label for="CommandAdd">Command</label>
 						<input type="text" class="form-control" id="CommandAdd" placeholder="Insert a bash command" required>
+						<p class="d-inline-flex gap-1">
+							<a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseAdd" role="button" aria-expanded="false" aria-controls="collapseAdd">Show More</a>
+						</p>				
+						<div class="collapse" id="collapseAdd">
+							<div class="card card-body">
+								<h3>Network Port & Service Monitoring Examples</h3>
+								<ul>
+									<pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
+									<pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
+								</ul>
+							</div>
+						</div>
 					</div>
 					<div class="form-group">
 						<label for="WhereToRunAdd">Where to run</label>
@@ -107,6 +119,19 @@
 					<div class="form-group">
 						<label for="CommandEdit">Command</label>
 						<input type="text" class="form-control" id="CommandEdit" placeholder="Insert a bash command" required>
+						<p class="d-inline-flex gap-1">
+							<a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseEdit" role="button" aria-expanded="false" aria-controls="collapseEdit">Show More</a>
+						</p>
+										
+						<div class="collapse" id="collapseEdit">
+							<div class="card card-body">
+								<h3>Network Port & Service Monitoring Examples</h3>
+								<ul>
+									<pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
+									<pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
+								</ul>
+							</div>
+						</div>
 					</div>
 					<div class="form-group">
 						<label for="WhereToRunEdit">Where to run</label>
@@ -121,7 +146,6 @@
 		</div>
 	</div>
 </div>
-
 
 <div class="modal fade" id="deleteCronJob" tabindex="-1" role="dialog" aria-labelledby="deleteCronJobLabel">
 	<div class="modal-dialog" role="document">
