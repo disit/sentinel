@@ -45,6 +45,7 @@ import string
 import subprocess
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
@@ -1490,7 +1491,9 @@ def queued_running(command):
         answer = subprocess.run(command, shell=True, capture_output=True, text=True, encoding="utf_8")
     print("Unlocked executor")
     return answer
-    
+
+
+
 def runcronjobs():
     print_debug_log("Running cronjobs")
     try:
@@ -1523,6 +1526,52 @@ def runcronjobs():
                 conn.commit()
     except Exception:
         print("Something went wrong during cronjobs running because of:",traceback.format_exc())
+
+
+connection_pool = mysql.connector.pooling.MySQLConnectionPool(pool_name="cronjobs_db_input_pool",pool_size=10,**db_conn_info)
+def runcronjobs_parallel():
+    print_debug_log("Running cronjobs")
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            # to run malicious code, malicious code must be present in the db or the machine in the first place
+            query = f'SELECT * FROM cronjobs where `where_to_run`="{os.getenv("platform-url","")}"'
+            if os.getenv("is-master","False") == "True": # the master will run the unassigned ones
+                query+="or `where_to_run` is Null"
+            cursor.execute(query)
+            conn.commit()
+            results = cursor.fetchall()
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                executor.map(task_wrapper, results)
+                
+    except Exception:
+        print("Something went wrong during cronjobs running because of:",traceback.format_exc())
+
+def task_wrapper(r):
+    conn = connection_pool.get_connection()
+    cursor = conn.cursor()
+    print(f"Running {r[1]} parallel cronjob")
+    try:
+        if int(r[5]) == 1:
+            query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+            cursor.execute(query, ("This cronjob is disabled",r[0],))
+        else:
+            command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
+            if len(command_ran.stderr) > 0:
+                query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
+            else:
+                query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+                cursor.execute(query, (command_ran.stdout.strip(),r[0],))
+    except subprocess.TimeoutExpired:
+        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+        cursor.execute(query, ("",r[0],"Internal timeout of "+os.getenv("cron-timeout","10")+"s exceeded.",))
+    except Exception as E:
+        print_debug_log("Something went wrong in parallel cronjobs running: "+str(E))
+    finally:
+        conn.commit()
+        cursor.close()
+        conn.close()
 
 
 def send_advanced_alerts(message):
