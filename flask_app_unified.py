@@ -297,6 +297,30 @@ class Snap4SentinelTelegramBot:
         if not self._actually_send:
             return True, "Did not send but was told not to"
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
+        payload = {}
+        if chat_id is None:
+            if self._chat_id is None:
+                return False, "Chat id was not set"
+            else:
+                payload["chat_id"] = self._chat_id
+        else:
+            payload["chat_id"] = chat_id
+        if not isinstance(message, str):
+            return False, "Message wasn't text"
+        payload["text"] = os.getenv("platform-url","unseturl")+" is in trouble!\n" + message
+        payload["parse_mode"] = "HTML"
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            return True, "Message was sent"
+        else:
+            return False, f"Failed to send message: {response.text}"
+      
+    
+    def send_message_new(self, message, chat_id=None):
+        print_debug_log("Sending telegram message")
+        if not self._actually_send:
+            return True, "Did not send but was told not to"
+        url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         if chat_id is None or self._chat_id is None:
             return False, "Chat id was not set"
         if not isinstance(message, str):
