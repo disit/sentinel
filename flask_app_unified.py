@@ -292,6 +292,7 @@ class Snap4SentinelTelegramBot:
             return True
 
     def send_message(self, message, chat_id=None):
+        print_debug_log("Sending telegram message")
         if not self._actually_send:
             return True, "Did not send but was told not to"
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
@@ -528,7 +529,11 @@ def parse_top(data):
 def send_telegram(chat_id, message):
     if isinstance(message, list):
         message[2]=filter_out_muted_containers_for_telegram(message[2])
-    bot_2.send_message(message, chat_id)
+    a,b = bot_2.send_message(message, chat_id)
+    if a:
+        print_debug_log("Telegram message was sent")
+    else:
+        print_debug_log("Telegram message was not sent because: "+b)
     return
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
@@ -1432,6 +1437,9 @@ def runcronjobs():
             for r in list(results): 
                 print(f"Running {r[1]} cronjob")
                 try:
+                    if int(r[5]) == 1:
+                        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+                        cursor.execute(query, ("This cronjob is disabled",r[0],))
                     command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
                     if len(command_ran.stderr) > 0:
                         query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''

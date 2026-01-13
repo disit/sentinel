@@ -232,38 +232,37 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 
 function makeCronJobTable(data) {
 	const container = document.getElementById('cronJobTable');
-    container.innerHTML = ''; // Destroy existing content
+    container.innerHTML = ''; 
 
-    // 1. Create Search Bar
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.placeholder = 'Search table...';
-    searchInput.className = 'table-search';
-    searchInput.onkeyup = function() { filterTable(this.value); };
-    container.appendChild(searchInput);
+    // 1. Map data & logic for the "Details" column
+    const processedData = data.map(row => {
+        const statusValue = (!row[2] || row[2].trim() === "") ? "ok" : "ko";
+        return {
+            name: row[3] || "",
+            category: row[5] || "",
+            command: row[4] || "",
+            update: row[0] || "",
+            status: statusValue,
+            details: statusValue === "ok" ? (row[1] || "") : (row[2] || "")
+        };
+    });
 
-    // 2. Map the data into a standard object array for easier handling
-    const processedData = data.map(row => ({
-        name: row[3] || "",
-        category: row[5] || "",
-        command: row[4] || "",
-        update: row[0] || "",
-        status: (!row[2] || row[2].trim() === "") ? "ok" : "ko"
-    }));
+    // 2. Initial Sort by Status (ok first)
+    processedData.sort((a, b) => a.status.localeCompare(b.status));
 
-    // 3. Build Table
+    // 3. Build Table Structure
     const table = document.createElement('table');
     table.id = 'main-table';
     table.className = 'custom-table';
     
-    const headers = ['Name', 'Category', 'Command', 'Last Update', 'Status'];
+    const headers = ['Name', 'Category', 'Command', 'Last Update', 'Status', 'Details'];
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
     headers.forEach((text, index) => {
         const th = document.createElement('th');
         th.textContent = text;
-        th.onclick = () => sortTable(index); // Attach sorting
+        th.onclick = () => sortTable(index); 
         headerRow.appendChild(th);
     });
 
@@ -273,16 +272,29 @@ function makeCronJobTable(data) {
     table.appendChild(tbody);
     container.appendChild(table);
 
-    // 4. Function to render body rows
+    // 4. Function to render body rows with conditional styling
     function renderRows(rowsToRender) {
         tbody.innerHTML = '';
         rowsToRender.forEach(item => {
             const tr = document.createElement('tr');
-            Object.values(item).forEach(val => {
+            
+            // Iterate through the keys to apply specific styling to 'details'
+            Object.keys(item).forEach(key => {
                 const td = document.createElement('td');
-                td.textContent = val;
-                if (val === "ok") td.style.color = "green";
-                if (val === "ko") td.style.color = "red";
+                const value = item[key];
+                td.textContent = value;
+
+                // Style logic for Status column
+                if (key === 'status') {
+                    if (value === "ok") td.style.color = "green";
+                    if (value === "ko") td.style.color = "red";
+                }
+
+                // Style logic for Details column: Red only if status is ko
+                if (key === 'details' && item.status === "ko") {
+                    td.style.color = "red";
+                }
+
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
@@ -313,7 +325,7 @@ function makeCronJobTable(data) {
         renderRows(filtered);
     };
 
-    renderRows(processedData); // Initial render
+    renderRows(processedData);
 }
 
 	
@@ -1392,6 +1404,9 @@ function makeCronJobTable(data) {
 		</div>
 	</div>
 </div>
+
+<h1 style="text-align: center;">CronJobs</h1>
+
 <div id="cronJobTable">
 </div>
 

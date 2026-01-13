@@ -1,3 +1,2 @@
 reanimate certification
 add tops, snmp tops to full logs
-logs of cronjobs are not formatted for html (change /n with <br> for instance), in ui separate stdout from stderr
