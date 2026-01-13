@@ -1440,13 +1440,14 @@ def runcronjobs():
                     if int(r[5]) == 1:
                         query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
                         cursor.execute(query, ("This cronjob is disabled",r[0],))
-                    command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
-                    if len(command_ran.stderr) > 0:
-                        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
-                        cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
                     else:
-                        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
-                        cursor.execute(query, (command_ran.stdout.strip(),r[0],))
+                        command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
+                        if len(command_ran.stderr) > 0:
+                            query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                            cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
+                        else:
+                            query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+                            cursor.execute(query, (command_ran.stdout.strip(),r[0],))
                 except subprocess.TimeoutExpired:
                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, ("",r[0],"Internal timeout of "+os.getenv("cron-timeout","10")+"s exceeded.",))

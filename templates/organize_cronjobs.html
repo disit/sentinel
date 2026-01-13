@@ -6,316 +6,344 @@
 {% block content %}
 <table id="cronjobs">
   <thead>
-	  <tr>
-		<th>Cronjob</th>
-		<th>Name</th>
-		<th>Command</th>
-		<th>Category</th>
-		<th>Where To Run</th>
-		<th>Delete</th>
-		<th>Edit</th>
-	  </tr>
+      <tr>
+        <th>Cronjob</th>
+        <th>Name</th>
+        <th>Command</th>
+        <th>Category</th>
+        <th>Where To Run</th>
+		<th>Disabled</th>
+        <th>Delete</th>
+        <th>Edit</th>
+      </tr>
   </thead>
   <tbody>
 {%for item in cronjobs%}
     <tr>
-	  <td>{{item[0]}}</td>
-	  <td>{{item[1]}}</td>
-	  <td>{{category[item[2]-1][1]}}</td>
-	  <td>{{item[3]}}</td>
-	  <td>{{item[4]}}</td>
-	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
-	</tr>
+      <td>{{item[0]}}</td>
+      <td>{{item[1]}}</td>
+      {% set item_cat_id = item[2] %}
+      {% for cat_id, cat_name in categories %}
+        {% if cat_id == item_cat_id %}
+          <td>{{cat_name}}</td>
+        {% endif %}
+      {% endfor %}
+      <td>{{item[2]}}</td>
+      <td>{{item[3]}}</td>
+      <td>{{item[4]}}</td>
+	  {%if item[5] == "1"}
+	  <td>Disabled</td>
+	  {%else%}
+	  <td>Enabled</td>
+	  {%endif%}
+	  <!--Remember to add enabled/disabled to edit button form-->
+      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+    </tr>
 {% endfor %}
   </tbody>
 </table>
 <button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addCronJobModal" id="addCronjob">Add</button>
 <div class="modal fade" id="addCronJobModal" tabindex="-1" role="dialog" aria-labelledby="addCronJobLabel" aria-hidden="true">
-	<div class="modal-dialog" role="document">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title" id="addCronJobLabel">Add a new cronjob</h5>
-				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addCronJobModal').modal('hide')">
-					<span aria-hidden="true">X</span>
-				</button>
-			</div>
-			<div class="modal-body">
-				<form id="addCronJobForm">
-					<div class="form-group">
-						<label for="passwordInputAdd">Password</label>
-						<input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addCronJobLabel">Add a new cronjob</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addCronJobModal').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addCronJobForm">
+                    <div class="form-group">
+                        <label for="passwordInputAdd">Password</label>
+                        <input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+                    </div>
+                    <label for="category-selection">Select category:</label>
+                    <select id="category-selection" name="category-selection" class="form-select">
+                        {%for item in categories %}
+                            <option value="{{item[0]}}">{{item[1]}}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-group">
+                        <label for="NameCronJobAdd">Name</label>
+                        <input type="text" class="form-control" id="NameCronJobAdd" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="CommandAdd">Command</label>
+                        <input type="text" class="form-control" id="CommandAdd" placeholder="Insert a bash command" required>
+                        <p class="d-inline-flex gap-1">
+                            <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseAdd" role="button" aria-expanded="false" aria-controls="collapseAdd">Show More</a>
+                        </p>                
+                        <div class="collapse" id="collapseAdd">
+                            <div class="card card-body">
+                                <h3>Network Port & Service Monitoring Examples</h3>
+                                <ul>
+                                    <pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
+                                    <pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
+                                    <pre><code>CODE=$(curl -sL -o /dev/null -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
+                                    
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="WhereToRunAdd">Where to run</label>
+                        <input type="text" class="form-control" id="WhereToRunAdd" placeholder="Insert where to run this cronjob (leave empty for master)">
+                    </div>
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" value="" id="createEnabled" checked>
+						<label class="form-check-label" for="createEnabled">
+							Enabled Cronjob
+						</label>
 					</div>
-					<label for="category-selection">Select category:</label>
-					<select id="category-selection" name="category-selection" class="form-select">
-						{%for item in categories %}
-							<option value="{{item[0]}}">{{item[1]}}</option>
-						{% endfor %}
-					</select>
-					<div class="form-group">
-						<label for="NameCronJobAdd">Name</label>
-						<input type="text" class="form-control" id="NameCronJobAdd" required>
-					</div>
-					<div class="form-group">
-						<label for="CommandAdd">Command</label>
-						<input type="text" class="form-control" id="CommandAdd" placeholder="Insert a bash command" required>
-						<p class="d-inline-flex gap-1">
-							<a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseAdd" role="button" aria-expanded="false" aria-controls="collapseAdd">Show More</a>
-						</p>				
-						<div class="collapse" id="collapseAdd">
-							<div class="card card-body">
-								<h3>Network Port & Service Monitoring Examples</h3>
-								<ul>
-									<pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
-									<pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
-									<pre><code>CODE=$(curl -sLI -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
-									
-								</ul>
-							</div>
-						</div>
-					</div>
-					<div class="form-group">
-						<label for="WhereToRunAdd">Where to run</label>
-						<input type="text" class="form-control" id="WhereToRunAdd" placeholder="Insert where to run this cronjob (leave empty for master)">
-					</div>
-				</form>
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addCronJobModal').modal('hide')">Close</button>
-				<button type="button" class="btn btn-primary" data-dismiss="modal" id="addCronJobButton">Add cronjob</button>
-			</div>
-		</div>
-	</div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addCronJobModal').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="addCronJobButton">Add cronjob</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="editCronJob" tabindex="-1" role="dialog" aria-labelledby="editCronJobModal" aria-hidden="true">
-	<div class="modal-dialog" role="document">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title" id="editComponentLabel">Edit cronjob</h5>
-				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editCronJob').modal('hide')">
-					<span aria-hidden="true">X</span>
-				</button>
-			</div>
-			<div class="modal-body">
-				<form id="editComponentForm">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editComponentLabel">Edit cronjob</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editCronJob').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="editComponentForm">
+                    
+                    <div class="form-group">
+                        <label for="CronJobEditId">Cronjob ID</label>
+                        <input type="text" class="form-control" id="CronJobEditId" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="passwordInputEdit">Password</label>
+                        <input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+                    </div>
+                    <label for="category-selection-edit">Select category:</label>
+                    <select id="category-selection-edit" name="category-selection-edit" class="form-select">
+                        {% for item in categories %}
+                            <option value="{{item[0]}}">{{item[1]}}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-group">
+                        <label for="NameCronJobEdit">Name</label>
+                        <input type="text" class="form-control" id="NameCronJobEdit" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="CommandEdit">Command</label>
+                        <input type="text" class="form-control" id="CommandEdit" placeholder="Insert a bash command" required>
+                        <p class="d-inline-flex gap-1">
+                            <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseEdit" role="button" aria-expanded="false" aria-controls="collapseEdit">Show More</a>
+                        </p>
+                                        
+                        <div class="collapse" id="collapseEdit">
+                            <div class="card card-body">
+                                <h3>Network Port & Service Monitoring Examples</h3>
+                                <ul>
+                                    <pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
+                                    <pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
+                                    <pre><code>CODE=$(curl -sL -o /dev/null -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
+                                    
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="WhereToRunEdit">Where to run</label>
+                        <input type="text" class="form-control" id="WhereToRunEdit" placeholder="Insert where to run this cronjob (leave empty for master)">
+                    </div>
 					
-					<div class="form-group">
-						<label for="CronJobEditId">Cronjob ID</label>
-						<input type="text" class="form-control" id="CronJobEditId" readonly>
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" value="" id="editEnabled" checked>
+						<label class="form-check-label" for="editEnabled">
+							Enabled Cronjob
+						</label>
 					</div>
-					<div class="form-group">
-						<label for="passwordInputEdit">Password</label>
-						<input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
-					</div>
-					<label for="category-selection-edit">Select category:</label>
-					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
-						{% for item in categories %}
-							<option value="{{item[0]}}">{{item[1]}}</option>
-						{% endfor %}
-					</select>
-					<div class="form-group">
-						<label for="NameCronJobEdit">Name</label>
-						<input type="text" class="form-control" id="NameCronJobEdit" required>
-					</div>
-					<div class="form-group">
-						<label for="CommandEdit">Command</label>
-						<input type="text" class="form-control" id="CommandEdit" placeholder="Insert a bash command" required>
-						<p class="d-inline-flex gap-1">
-							<a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseEdit" role="button" aria-expanded="false" aria-controls="collapseEdit">Show More</a>
-						</p>
-										
-						<div class="collapse" id="collapseEdit">
-							<div class="card card-body">
-								<h3>Network Port & Service Monitoring Examples</h3>
-								<ul>
-									<pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
-									<pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
-									<pre><code>CODE=$(curl -sLI -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
-									
-								</ul>
-							</div>
-						</div>
-					</div>
-					<div class="form-group">
-						<label for="WhereToRunEdit">Where to run</label>
-						<input type="text" class="form-control" id="WhereToRunEdit" placeholder="Insert where to run this cronjob (leave empty for master)">
-					</div>
-				</form>
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJob').modal('hide')">Cancel</button>
-				<button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton">Save changes</button>
-			</div>
-		</div>
-	</div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJob').modal('hide')">Cancel</button>
+                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton">Save changes</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="deleteCronJob" tabindex="-1" role="dialog" aria-labelledby="deleteCronJobLabel">
-	<div class="modal-dialog" role="document">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting cronjob</h5>
-				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteCronJob').modal('hide')">
-					<span aria-hidden="true">X</span>
-				</button>
-			</div>
-			<div class="modal-body">
-				<form id="deleteComponentForm">
-					<div class="form-group">
-						<label for="passwordInputDelete">Password</label>
-						<input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
-					</div>
-					<div class="form-group">
-						<label for="CronJobDeleteId">Cronjob ID</label>
-						<input type="text" class="form-control" id="CronJobDeleteId" readonly>
-					</div>
-				</form>
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#deleteCronJob').modal('hide')">Close</button>
-				<button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteCronJobButton" >Delete cronjob</button>
-			</div>
-		</div>
-	</div>
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting cronjob</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteCronJob').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="deleteComponentForm">
+                    <div class="form-group">
+                        <label for="passwordInputDelete">Password</label>
+                        <input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="CronJobDeleteId">Cronjob ID</label>
+                        <input type="text" class="form-control" id="CronJobDeleteId" readonly>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#deleteCronJob').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteCronJobButton" >Delete cronjob</button>
+            </div>
+        </div>
+    </div>
 </div>
 <script>
 
-	const formModal = document.getElementById('editCronJob');
+    const formModal = document.getElementById('editCronJob');
 
-	formModal.addEventListener('show.bs.modal', event => {
-		// Button that triggered the modal
-		const button = event.relatedTarget;
-		
-		// Extract info from data-bs-* attributes
-		const categoryValue = button.getAttribute('data-category');
-		
-		// Update the modal's select content.
-		const modalSelect = formModal.querySelector('#category-selection-edit');
-		
-		// This line does the magic:
-		modalSelect.value = categoryValue;
-	});
+    formModal.addEventListener('show.bs.modal', event => {
+        // Button that triggered the modal
+        const button = event.relatedTarget;
+        
+        // Extract info from data-bs-* attributes
+        const categoryValue = button.getAttribute('data-category');
+        
+        // Update the modal's select content.
+        const modalSelect = formModal.querySelector('#category-selection-edit');
+        
+        // This line does the magic:
+        modalSelect.value = categoryValue;
+    });
 
-	$('.open-modal-m').on('click', function() {
-		var id = $(this).data('component');
-		$('#CronJobDeleteId').val(id);
-		$('#deleteCronJob').modal('show');
-	});
-	$("#cronjobs").DataTable();
-	$('.open-modal-e').on('click', function() {
-		var id = $(this).data('component');
+    $('.open-modal-m').on('click', function() {
+        var id = $(this).data('component');
+        $('#CronJobDeleteId').val(id);
+        $('#deleteCronJob').modal('show');
+    });
+    $("#cronjobs").DataTable();
+    $('.open-modal-e').on('click', function() {
+        var id = $(this).data('component');
 
-		var name = $(this).data('name');
-		var command = $(this).data('command');
-		var category = $(this).data('category');
-		var where_to_run = $(this).data('where');
-		$('#CronJobEditId').val(id);
-		$('#NameCronJobEdit').val(name);
-		$('#CommandEdit').val(command);
-		if (where_to_run==="master") {$('#WhereToRunEdit').val("");} else {$('#WhereToRunEdit').val(where_to_run);}
+        var name = $(this).data('name');
+        var command = $(this).data('command');
+        var category = $(this).data('category');
+        var where_to_run = $(this).data('where');
+        $('#CronJobEditId').val(id);
+        $('#NameCronJobEdit').val(name);
+        $('#CommandEdit').val(command);
+        if (where_to_run==="master") {$('#WhereToRunEdit').val("");} else {$('#WhereToRunEdit').val(where_to_run);}
 
-		let select = document.getElementById('category-selection-edit');
+        let select = document.getElementById('category-selection-edit');
 
-		for (let i = 0; i < select.options.length; i++) {
-			if (select.options[i].text === category) {
-				select.selectedIndex = i;
-				break;
-			}
-		}
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].text === category) {
+                select.selectedIndex = i;
+                break;
+            }
+        }
 
-		$('#editCronJob').modal('show');
-	});
-	$('.open-modal').on('click', function() {
-		$('#addCronJobModal').modal('show');
-	});
-	$('#deleteCronJobButton').on('click', function() {
-		var password = $('#passwordInputDelete').val();
-		var id = $('#CronJobDeleteId').val();
-		if (password) {
-			try {
-				$.ajax({
-					url: './delete_cronjob',
-					data: {id: id, psw: password},
-					type: 'POST',
-					success: function(response) {
-						alert("Cronjob was deleted!");
-						location.reload();
-					},
-					error: function(error) {
-						alert("Cronjob was not deleted because of: " + error);
-					},
-					timeout: {{timeout}}
-				});
-			}
-			catch (exception_var) {
-				console.log(exception_var);
-			}
-		}
-		else {
-			alert('Please enter a password');
-		}
-	});
-	$('#addCronJobButton').on('click', function() {
-		var password = $('#passwordInputAdd').val();
-		var category = $('#category-selection').val();
-		var command = $('#CommandAdd').val();
-		var name = $('#NameCronJobAdd').val();
-		var where = $('#WhereToRunAdd').val();
-		if (password) {
-			try {
-				$.ajax({
-					url: './add_cronjob',
-					data: {psw: password, category: category, command: command, name: name, where_to_run: where},
-					type: 'POST',
-					success: function(response) {
-						alert("Cronjob was added!");
-						location.reload();
-					},
-					error: function(error) {
-						alert("Cronjob was not added because of: " + error);
-					},
-					timeout: {{timeout}}
-				});
-			}
-			catch (exception_var) {
-				console.log(exception_var);
-			}
-		}
-		else {
-			alert('Please enter a password');
-		}
-	});
-	$('#saveCronJobChangesButton').on('click', function() {
-	var id = $('#CronJobEditId').val();
-	var password = $('#passwordInputEdit').val();
-	var category = $('#category-selection-edit').val();
-	var command = $('#CommandEdit').val();
-	var name = $('#NameCronJobEdit').val();
-	var where = $('#WhereToRunEdit').val();
-	if (password) {
-		try {
-			$.ajax({
-				url: './edit_cronjob',
-				data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id},
-				type: 'POST',
-				success: function(response) {
-					alert("Cronjob was edited!");
-					location.reload();
-				},
-				error: function(error) {
-					alert("Cronjob was not edited because of: " + error.responseText);
-				},
-				timeout: {{timeout}}
-			});
-		}
-		catch (exception_var) {
-			console.log(exception_var);
-		}
-	}
-	else {
-		alert('Please enter a password');
-	}
-	});
+        $('#editCronJob').modal('show');
+    });
+    $('.open-modal').on('click', function() {
+        $('#addCronJobModal').modal('show');
+    });
+    $('#deleteCronJobButton').on('click', function() {
+        var password = $('#passwordInputDelete').val();
+        var id = $('#CronJobDeleteId').val();
+        if (password) {
+            try {
+                $.ajax({
+                    url: './delete_cronjob',
+                    data: {id: id, psw: password},
+                    type: 'POST',
+                    success: function(response) {
+                        alert("Cronjob was deleted!");
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert("Cronjob was not deleted because of: " + error);
+                    },
+                    timeout: {{timeout}}
+                });
+            }
+            catch (exception_var) {
+                console.log(exception_var);
+            }
+        }
+        else {
+            alert('Please enter a password');
+        }
+    });
+    $('#addCronJobButton').on('click', function() {
+        var password = $('#passwordInputAdd').val();
+        var category = $('#category-selection').val();
+        var command = $('#CommandAdd').val();
+        var name = $('#NameCronJobAdd').val();
+        var where = $('#WhereToRunAdd').val();
+		var enabled = $('createEnabled').val(); // probably doesn't work as expected
+        if (password) {
+            try {
+                $.ajax({
+                    url: './add_cronjob',
+                    data: {psw: password, category: category, command: command, name: name, where_to_run: where, enabled: enabled},
+                    type: 'POST',
+                    success: function(response) {
+                        alert("Cronjob was added!");
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert("Cronjob was not added because of: " + error);
+                    },
+                    timeout: {{timeout}}
+                });
+            }
+            catch (exception_var) {
+                console.log(exception_var);
+            }
+        }
+        else {
+            alert('Please enter a password');
+        }
+    });
+    $('#saveCronJobChangesButton').on('click', function() {
+    var id = $('#CronJobEditId').val();
+    var password = $('#passwordInputEdit').val();
+    var category = $('#category-selection-edit').val();
+    var command = $('#CommandEdit').val();
+    var name = $('#NameCronJobEdit').val();
+    var where = $('#WhereToRunEdit').val();
+	var enabled = $('editEnabled').val(); // probably doesn't work as expected
+    if (password) {
+        try {
+            $.ajax({
+                url: './edit_cronjob',
+                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, enabled: enabled},
+                type: 'POST',
+                success: function(response) {
+                    alert("Cronjob was edited!");
+                    location.reload();
+                },
+                error: function(error) {
+                    alert("Cronjob was not edited because of: " + error.responseText);
+                },
+                timeout: {{timeout}}
+            });
+        }
+        catch (exception_var) {
+            console.log(exception_var);
+        }
+    }
+    else {
+        alert('Please enter a password');
+    }
+    });
 </script>
 {% endblock %}
