@@ -89,11 +89,11 @@ spec:
         - name: telegram-api-token # if using telegram notifications, use the api token
           value: replaceme
         - name: telegram-channel # if using telegram notifications, the channel id where to print messaegs
-          value: "123456789"
+          value: "123456789changeme"
         - name: db-user # name of the user to log in for the sentinel database, defined in this file
           value: root
         - name: db-passwd # password of above
-          value: cPehkP5bbNJMt6Ao
+          value: changeme
         - name: db-host # host of the above
           value: sentineldb
         - name: db-port # port of the above
@@ -130,10 +130,16 @@ spec:
           value: "5" # minutes
         - name: application-root # for serving behind nginx
           value: "/sentinel"
+        - name: secret-key
+          value: "changeme"
+        - name: cron-frequency-minutes
+          value: "5"
+        - name: cron-timeout
+          value: "120"
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"
-        image: fabriziomereu/sentinel:v0.5.19
+        image: fabriziomereu/sentinel:v0.5.200
         #command: ["sleep", "3600"]
         name: k8sentinel
         volumeMounts:
@@ -203,9 +209,9 @@ spec:
           - name: MYSQL_DATABASE
             value: checker
           - name: MYSQL_PASSWORD
-            value: 7fBluEbtiEWZgiJs
+            value: changeme
           - name: MYSQL_ROOT_PASSWORD
-            value: cPehkP5bbNJMt6Ao
+            value: changeme
           - name: MYSQL_USER
             value: user
           - name: TZ

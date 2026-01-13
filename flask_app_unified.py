@@ -296,24 +296,93 @@ class Snap4SentinelTelegramBot:
         if not self._actually_send:
             return True, "Did not send but was told not to"
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
-        payload = {}
-        if chat_id is None:
-            if self._chat_id is None:
-                return False, "Chat id was not set"
-            else:
-                payload["chat_id"] = self._chat_id
-        else:
-            payload["chat_id"] = chat_id
+        if chat_id is None or self._chat_id is None:
+            return False, "Chat id was not set"
         if not isinstance(message, str):
             return False, "Message wasn't text"
-        payload["text"] = os.getenv("platform-url","unseturl")+" is in trouble!\n" + message
-        payload["parse_mode"] = "HTML"
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            return True, "Message was sent"
-        else:
-            return False, f"Failed to send message: {response.text}"
+        split_text=split_html_telegram(os.getenv("platform-url","unseturl")+" is in trouble!\n" + message)
+        for split_text_item in split_text:
+            payload_2 = {}
+            if chat_id is None:
+                if self._chat_id is None:
+                    pass # can't happen, we have been here already
+                else:
+                    payload_2["chat_id"] = self._chat_id
+            else:
+                payload_2["chat_id"] = chat_id
+            payload_2["parse_mode"] = "HTML"
+            payload_2["text"] = split_text_item
+            response = requests.post(url, json=payload_2)
+            if response.status_code == 200:
+                pass
+            else:
+                return False, f"Failed to send (complete) message: {response.text}"
+        return True, "Message was sent"
         
+
+def split_html_telegram(html, max_len=4096, safety_margin=100):
+    # Adjust limit to account for closing/reopening tags
+    limit = max_len - safety_margin
+    
+    # Matches tags or text blocks
+    token_pattern = re.compile(r'(<[^>]+>|[^<]+)')
+    tokens = token_pattern.findall(html)
+    
+    messages = []
+    current_tokens = []
+    current_len = 0
+    opened_tags = []
+
+    for token in tokens:
+        token_len = len(token)
+        
+        # If adding this token exceeds our safety limit
+        if current_len + token_len > limit:
+            # 1. Look for the best split point (last \n\n)
+            split_index = -1
+            for i in range(len(current_tokens) - 1, -1, -1):
+                if "\n\n" in current_tokens[i]:
+                    split_index = i + 1
+                    break
+            
+            # 2. If no \n\n found, split at the last possible token
+            if split_index == -1:
+                split_index = len(current_tokens)
+
+            # 3. Create the current message chunk
+            to_send = current_tokens[:split_index]
+            remaining = current_tokens[split_index:]
+            
+            # Close tags for the current message (LIFO order)
+            closers = "".join([f"</{t}>" for t in reversed(opened_tags)])
+            messages.append("".join(to_send).strip() + closers)
+            
+            # 4. Prepare for the next message
+            openers = "".join([f"<{t}>" for t in opened_tags])
+            current_tokens = [openers] + remaining + [token]
+            current_len = sum(len(t) for t in current_tokens)
+        else:
+            current_tokens.append(token)
+            current_len += token_len
+        
+        # Track HTML tags to maintain state
+        tag_match = re.match(r'^<(/?)(\w+).*?>$', token)
+        if tag_match:
+            is_closing = tag_match.group(1) == "/"
+            tag_name = tag_match.group(2)
+            if is_closing:
+                if opened_tags and opened_tags[-1] == tag_name:
+                    opened_tags.pop()
+            elif not token.endswith('/>'): # Ignore self-closing
+                opened_tags.append(tag_name)
+
+    # Append the final remaining piece
+    if current_tokens:
+        final_text = "".join(current_tokens).strip()
+        if final_text:
+            messages.append(final_text)
+        
+    return messages
 
 f = open("conf.json")
 config = json.load(f)
@@ -1517,15 +1586,15 @@ def send_advanced_alerts(message):
             print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
         text_for_telegram = "" #probably needs fixing
         if len(message[0])>0:
-            text_for_telegram = "These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])) +"\n"
+            text_for_telegram = "These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])) +"\n\n"
         if len(message[1])>0:
-            text_for_telegram+= 'These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1]))+"\n"
+            text_for_telegram+= 'These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1]))+"\n\n"
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
-            text_for_telegram+= f"These containers weren't found: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n"
+            text_for_telegram+= f"These containers weren't found: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n\n"
         if len(message[3])>0:
-            text_for_telegram+= message[3] +"\n"
+            text_for_telegram+= message[3] +"\n\n"
         if len(message[4])>0:
-            text_for_telegram+= message[4] +"\n"
+            text_for_telegram+= message[4] +"\n\n"
         if len(message[5])>0:
             ## telegram hates some chars with html escaping
             prepare_text = "These cronjobs failed:\n"
@@ -1552,7 +1621,7 @@ def send_advanced_alerts(message):
                     f"Cronjob named <b>{cron_name}</b> assigned to category <b>{category}</b> "
                     f"with code <pre><code class=\"language-bash\">{bash_code}</code></pre>"
                     f"gave {result_text}"
-                    f"Error: <code>{escaped_err}</code> at {timestamp}\n"
+                    f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
                 text_for_telegram += prepare_text + "\n\n"
             ##
@@ -1606,7 +1675,7 @@ def create_app():
     app = Flask(__name__)
     app.config['application-root'] =os.getenv("application-root", "2")
     app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_host=1)
-    app.secret_key = b'\x8a\x17\x93kT\xc0\x0b6;\x93\xfdp\x8bLl\xe6u\xa9\xf5x'
+    app.secret_key = os.getenv("secret-key", "")
     app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
 
     @app.route("/")
@@ -1754,7 +1823,7 @@ def create_app():
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT idcronjobs, name, command, category, where_to_run FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master' FROM checker.cronjobs where where_to_run is null;'''
+                    query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled FROM checker.cronjobs where where_to_run is null;'''
                     query2 = '''SELECT * from categories;'''
                     cursor.execute(query)
                     conn.commit()
@@ -1781,11 +1850,11 @@ def create_app():
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
-                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],))
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`) VALUES (%s, %s, %s, %s, %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1))
                     else:
-                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`) VALUES (%s, %s, %s, NULL);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],))
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`) VALUES (%s, %s, %s, NULL, %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1))
                     
                     conn.commit()
                     return "ok", 201
@@ -1796,7 +1865,7 @@ def create_app():
     
     @app.route("/edit_cronjob", methods=["POST"])
     def edit_cronjob(): 
-        print_debug_log("Editing cronjob")
+        print_debug_log("Editing cronjob: "+str(request.form.to_dict()))
         if 'username' in session:
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
@@ -1806,11 +1875,11 @@ def create_app():
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
-                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s WHERE (`idcronjobs` = %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],request.form.to_dict()['id'],)) 
+                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s WHERE (`idcronjobs` = %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['id'],)) 
                     else:
-                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL WHERE (`idcronjobs` = %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL, `disabled` = %s WHERE (`idcronjobs` = %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2224,12 +2293,15 @@ def create_app():
                     cursor.execute(query, (request.form.to_dict()['id'],))
                     conn.commit()
                     try:
-                        _ = cursor.fetchone()
+                        extra_resource = cursor.fetchone()
+                        response = requests.get(extra_resource[1]) #holds the address
+                        try:
+                            response.raise_for_status()
+                            return response.text
+                        except Exception:
+                            render_template("error_showing.html", r = "The webpage returned "+response.status_code), 500
                     except Exception:
                         return "An unauthorized url was attempted to use", 400
-                    response = requests.get(request.args.to_dict()['url_of_resource'])
-                    response.raise_for_status()
-                    return response.text
             except Exception:
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
@@ -2567,7 +2639,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
-SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
+SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
@@ -2648,6 +2720,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         if os.getenv("is-multi","False") == "False":
             if "False" == os.getenv("running-as-kubernetes","False"):
                 print("Debug for logs:", podname, request.form.to_dict())
+                regex = r"^[\w\-\d]*$"
+                matches = re.match(regex, podname)
+                if matches is None:
+                    return render_template("error_showing.html", r = f"{podname} is not a legal container name"), 500
                 process = subprocess.Popen(
                     'docker logs '+podname+" --tail "+str(config["default-log-length"]),
                     shell=True,

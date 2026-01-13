@@ -23,5 +23,6 @@
 	"is-multi": "True",
 	"debug": "True",
 	"cron-timeout":"10",
-	"cron-frequency-minutes":"5"
+	"cron-frequency-minutes":"5",
+	"secret-key": ""
 }
