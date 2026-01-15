@@ -71,14 +71,17 @@
                         <div class="collapse" id="collapseAdd">
                             <div class="card card-body">
                                 <h3>Network Port & Service Monitoring Examples</h3>
-                                <ul>
-                                    <pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
-                                    <hr>
-                                    <pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
-                                    <hr>
-                                    <pre><code>CODE=$(curl -sL -o /dev/null -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
-                                    
-                                </ul>
+                                <pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
+                                <hr>
+                                <pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
+                                <hr>
+                                <pre><code>CODE=$(curl -sL -o /dev/null -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_curl.sh url [timeout=10]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_nc.sh host port [timeout=10]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_curl_httpcode.sh url httpcode [timeout=10]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                             </div>
                         </div>
                     </div>
@@ -148,11 +151,11 @@
                                 <hr>
                                 <pre><code>CODE=$(curl -sL -o /dev/null -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
                                 <hr>
-                                <pre><code>/app/scripts/sentinel_curl.sh url [timeout=10]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds.
+                                <pre><code>/app/scripts/sentinel_curl.sh url [timeout=10]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                                 <hr>
-                                <pre><code>/app/scripts/sentinel_nc.sh host port [timeout=10]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds.
+                                <pre><code>/app/scripts/sentinel_nc.sh host port [timeout=10]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                                 <hr>
-                                <pre><code>/app/scripts/sentinel_curl_httpcode.sh url httpcode [timeout=10]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Optional timeout may be set, in seconds.
+                                <pre><code>/app/scripts/sentinel_curl_httpcode.sh url httpcode [timeout=10]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                             </div>
                         </div>
                     </div>
@@ -262,6 +265,7 @@
                     type: 'POST',
                     success: function(response) {
                         alert("Cronjob was deleted!");
+                        window.location = window.location.href.split("?")[0];
                         location.reload();
                     },
                     error: function(error) {
@@ -293,6 +297,7 @@
                     type: 'POST',
                     success: function(response) {
                         alert("Cronjob was added!");
+                        window.location = window.location.href.split("?")[0];
                         location.reload();
                     },
                     error: function(error) {
@@ -325,6 +330,7 @@
                 type: 'POST',
                 success: function(response) {
                     alert("Cronjob was edited!");
+                    window.location = window.location.href.split("?")[0];
                     location.reload();
                 },
                 error: function(error) {

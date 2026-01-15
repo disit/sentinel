@@ -14,4 +14,4 @@ fi
 
 # Execute the curl command
 # --max-time (or -m) sets the total time the operation is allowed to take
-curl -ILsSf --max-time "$TIMEOUT" "$URL"
+curl -ILsSf --max-time "$TIMEOUT" "$URL" -o /dev/null -w "%{http_code}"

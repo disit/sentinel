@@ -290,7 +290,7 @@ function makeCronJobTable(data) {
             if (key === 'edit') {
                 // Use innerHTML because name contains the <input> button string
                 td.innerHTML = value;
-            } else if (key === 'details') {
+            } else if (key === 'details' || key === 'command') {
                 // Wrap long text in a div that can be toggled
                 const wrapper = document.createElement('div');
                 wrapper.className = 'details-wrapper';
@@ -1463,7 +1463,6 @@ function makeCronJobTable(data) {
 	user-select: text;
 	}
 	table th, table td {
-	max-width: 200px;
 	overflow: auto;
 	}
 	.main {
@@ -1557,6 +1556,7 @@ function makeCronJobTable(data) {
 			text-align: right;
 			padding: 8px 5px;
 			border-bottom: 1px inset #eee;
+			font-size: xx-large;
 			width: auto !important;
 		}
 
@@ -1570,9 +1570,15 @@ function makeCronJobTable(data) {
 			margin-right: 15px;
 		}
 
-		.details-wrapper {
-			max-width: 200px; /* Limit width on mobile cards too */
-		}
+		td[data-label="Edit"] .btn {
+        width: 30% !important;   /* Make it span the full width of the card */
+        padding: 15px !important; /* Increase the height and internal space */
+        font-size: 1.5rem !important; /* Make the text slightly larger */
+        font-weight: bold;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        border-radius: 8px;      /* Rounded corners for a modern look */
+    }
 	}
 
 	/* end styles for cronjob table */
