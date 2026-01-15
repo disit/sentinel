@@ -326,28 +326,29 @@ class Snap4SentinelTelegramBot:
         if not isinstance(message, str):
             return False, "Message wasn't text"
         for split_text_item in message.split("\n\n"):
-            payload_2 = {}
-            if chat_id is None:
-                if self._chat_id is None:
-                    pass # can't happen, we have been here already
+            if not len(split_text_item) == 0:
+                payload_2 = {}
+                if chat_id is None:
+                    if self._chat_id is None:
+                        pass # can't happen, we have been here already
+                    else:
+                        payload_2["chat_id"] = self._chat_id
                 else:
-                    payload_2["chat_id"] = self._chat_id
-            else:
-                payload_2["chat_id"] = chat_id
-            payload_2["parse_mode"] = "HTML"
-            payload_2["text"] = split_text_item
-            response = requests.post(url, json=payload_2)
-            if response.status_code == 200:
-                pass
-            else:
-                print_debug_log("Failed to send telegram message, will try again but no formatting.\nReason: "+response.text)
-                del payload_2["parse_mode"]
-                response_2 = requests.post(url, json=payload_2)
-                if response_2.status_code == 200:
-                    print_debug_log("Succeeded at sending unformatted message, continuing...")
+                    payload_2["chat_id"] = chat_id
+                payload_2["parse_mode"] = "HTML"
+                payload_2["text"] = split_text_item
+                response = requests.post(url, json=payload_2)
+                if response.status_code == 200:
                     pass
                 else:
-                    return False, f"Failed to send (complete) message\nReason: {response_2.text}"
+                    print_debug_log("Failed to send telegram message, will try again but no formatting.\nReason: "+response.text)
+                    del payload_2["parse_mode"]
+                    response_2 = requests.post(url, json=payload_2)
+                    if response_2.status_code == 200:
+                        print_debug_log("Succeeded at sending unformatted message, continuing...")
+                        pass
+                    else:
+                        return False, f"Failed to send (complete) message\nReason: {response_2.text}"
         return True, "Message was sent"
         
 
@@ -1634,10 +1635,10 @@ def send_advanced_alerts(message):
 
                 # 2. Build the final string (much cleaner now!)
                 prepare_text += (
-                    f"Cronjob named <b>{cron_name}</b> assigned to category <b>{category}</b> "
-                    f"with code <pre><code class=\"language-bash\">{bash_code}</code></pre>"
+                    f"In category <b>{category}</b> "
+                    f"a CronJob with code <pre><code class=\"language-bash\">{bash_code}</code></pre>"
                     f"gave {result_text}"
-                    f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
+                    f"Error: <code>{escaped_err}</code>\n{timestamp}\n\n"
                 )
                 text_for_telegram += prepare_text + "\n\n"
             ##
@@ -1682,12 +1683,11 @@ scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("
 scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
-scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
+scheduler.add_job(runcronjobs_parallel, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
 scheduler.add_job(clean_old_db_entries, 'cron',week=1)
 scheduler.start()
 auto_alert_status()
 
-runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
     app = Flask(__name__)
     app.config['application-root'] =os.getenv("application-root", "2")
