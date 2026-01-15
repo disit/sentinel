@@ -238,8 +238,9 @@ function makeCronJobTable(data) {
     const processedData = data.map(row => {
         const statusValue = (!row[2] || row[2].trim() === "") ? "ok" : "ko";
         return {
-            name: row[3] + "<input type=\"button\" class=\"btn btn-info\" value=\"Edit cronjob\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+row[6]+"')\">"|| "",
-            category: row[5] || "",
+            name: row[3] || "",
+            edit: "<input type=\"button\" class=\"btn btn-info\" value=\"Edit cronjob\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+row[6]+"')\">" || "",
+			category: row[5] || "",
             command: row[4] || "",
             update: row[0] || "",
 			enabled: row[7] === 0 ? "Enabled" : "Disabled",
@@ -256,7 +257,7 @@ function makeCronJobTable(data) {
     table.id = 'main-table';
     table.className = 'custom-table';
     
-    const headers = ['Name', 'Category', 'Command', 'Last Update', 'Enabled', 'Status' ,'Details (click on cell to enlarge)'];
+    const headers = ['Name', 'Edit', 'Category', 'Command', 'Last Update', 'Enabled', 'Status' ,'Details (click on cell to enlarge)'];
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
@@ -286,7 +287,7 @@ function makeCronJobTable(data) {
             // Set a data-label for mobile card view
             td.setAttribute('data-label', key.charAt(0).toUpperCase() + key.slice(1));
 
-            if (key === 'name') {
+            if (key === 'edit') {
                 // Use innerHTML because name contains the <input> button string
                 td.innerHTML = value;
             } else if (key === 'details') {
@@ -1423,7 +1424,14 @@ function makeCronJobTable(data) {
 </div>
 
 <h1 style="text-align: center;">CronJobs</h1>
-
+<div class="table-controls">
+    <input 
+        type="text" 
+        id="tableSearch" 
+        placeholder="Search cronjobs..." 
+        onkeyup="filterTable(this.value)"
+    >
+</div>
 <div id="cronJobTable">
 </div>
 
