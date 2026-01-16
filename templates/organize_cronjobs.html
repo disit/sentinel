@@ -220,6 +220,8 @@
             console.warn(`Element not found for selector: ${selector}`);
             }
         }
+        
+        $("#cronjobs").DataTable();
         });
 
     $('.open-modal-m').on('click', function() {
@@ -336,6 +338,5 @@
         alert('Please enter a password');
     }
     });
-    $("#cronjobs").DataTable();
 </script>
 {% endblock %}

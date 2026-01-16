@@ -307,7 +307,7 @@ class Snap4SentinelTelegramBot:
             payload["chat_id"] = chat_id
         if not isinstance(message, str):
             return False, "Message wasn't text"
-        payload["text"] = os.getenv("platform-url","unseturl")+" is in trouble!\n" + message
+        payload["text"] =message
         payload["parse_mode"] = "HTML"
         response = requests.post(url, json=payload)
         if response.status_code == 200:
@@ -325,8 +325,17 @@ class Snap4SentinelTelegramBot:
             return False, "Chat id was not set"
         if not isinstance(message, str):
             return False, "Message wasn't text"
-        split_text=split_html_telegram(os.getenv("platform-url","unseturl")+" is in trouble!\n" + message)
-        for split_text_item in split_text:
+        split_text=message.split("\n\n")
+        recompressed = []
+        current_message = ""
+        for little_msg in split_text:
+            if len(little_msg) + len(current_message) > 4000:
+                recompressed.append(current_message)
+                current_message=little_msg
+            else:
+                current_message+=little_msg+"\n"
+        recompressed.append(current_message)
+        for split_text_item in recompressed:
             payload_2 = {}
             if chat_id is None:
                 if self._chat_id is None:
@@ -623,7 +632,7 @@ def parse_top(data):
 def send_telegram(chat_id, message):
     if isinstance(message, list):
         message[2]=filter_out_muted_containers_for_telegram(message[2])
-    a,b = bot_2.send_message(message, chat_id)
+    a,b = bot_2.send_message_new(message, chat_id)
     if a:
         print_debug_log("Telegram message was sent")
     else:
@@ -1727,7 +1736,7 @@ def send_advanced_alerts(message):
             text_for_telegram += prepare_text_top_error + "\n\n"
         if len(text_for_telegram)>5:  
             try:
-                send_telegram(int(os.getenv("telegram-channel","0")), text_for_telegram)
+                send_telegram(int(os.getenv("telegram-channel","0")),  os.getenv("platform-url","unseturl")+" is in trouble!\n" + text_for_telegram)
             except:
                 print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
     except Exception:
@@ -1739,11 +1748,10 @@ scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("
 scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
-scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
+scheduler.add_job(runcronjobs_parallel, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
 scheduler.add_job(clean_old_db_entries, 'cron',week=1)
 scheduler.start()
 auto_alert_status()
-
 def create_app():
     app = Flask(__name__)
     app.config['application-root'] =os.getenv("application-root", "2")

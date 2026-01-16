@@ -1,5 +1,4 @@
 reanimate certification
 add tops, snmp tops to full logs
- premere su tasto modifica in pagina principale non porta a modifica su pagina dedicata se non è tra i primi 10 comandi (colpa di datatable)
-fix time in containers (ntp non allineato)
+repair long text telegram messages
 parallelize cronjobs
