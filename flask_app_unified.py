@@ -1748,10 +1748,12 @@ scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("
 scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
-scheduler.add_job(runcronjobs_parallel, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
+scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
 scheduler.add_job(clean_old_db_entries, 'cron',week=1)
 scheduler.start()
 auto_alert_status()
+
+runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
     app = Flask(__name__)
     app.config['application-root'] =os.getenv("application-root", "2")

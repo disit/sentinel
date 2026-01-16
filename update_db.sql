@@ -20,6 +20,7 @@ CHANGE COLUMN `position` `position` VARCHAR(45) NOT NULL DEFAULT 'localhost' ;
 
 ALTER TABLE `checker`.`cronjobs` 
 CHARACTER SET = utf8mb4 ,
+CHANGE COLUMN `name` `name` VARCHAR(200) NOT NULL,
 ADD COLUMN `where_to_run` VARCHAR(45) CHARACTER SET 'utf8mb4' NULL DEFAULT NULL AFTER `categrory`,
 ADD COLUMN `disabled` TINYINT NOT NULL DEFAULT 0 AFTER `where_to_run`,
 ADD CONSTRAINT `where_fk`
