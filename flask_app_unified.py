@@ -291,30 +291,6 @@ class Snap4SentinelTelegramBot:
         if self._chat_id == None or force is True:
             self._chat_id = chat_id
             return True
-
-    def send_message(self, message, chat_id=None):
-        print_debug_log("Sending telegram message")
-        if not self._actually_send:
-            return True, "Did not send but was told not to"
-        url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
-        payload = {}
-        if chat_id is None:
-            if self._chat_id is None:
-                return False, "Chat id was not set"
-            else:
-                payload["chat_id"] = self._chat_id
-        else:
-            payload["chat_id"] = chat_id
-        if not isinstance(message, str):
-            return False, "Message wasn't text"
-        payload["text"] =message
-        payload["parse_mode"] = "HTML"
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            return True, "Message was sent"
-        else:
-            return False, f"Failed to send message: {response.text}"
-      
     
     def send_message_new(self, message, chat_id=None):
         print_debug_log("Sending telegram message")
@@ -325,98 +301,31 @@ class Snap4SentinelTelegramBot:
             return False, "Chat id was not set"
         if not isinstance(message, str):
             return False, "Message wasn't text"
-        split_text=message.split("\n\n")
-        recompressed = []
-        current_message = ""
-        for little_msg in split_text:
-            if len(little_msg) + len(current_message) > 4000:
-                recompressed.append(current_message)
-                current_message=little_msg
-            else:
-                current_message+=little_msg+"\n"
-        recompressed.append(current_message)
-        for split_text_item in recompressed:
-            payload_2 = {}
+        for split_text_item in message:
+            payload = {}
             if chat_id is None:
                 if self._chat_id is None:
                     pass # can't happen, we have been here already
                 else:
-                    payload_2["chat_id"] = self._chat_id
+                    payload["chat_id"] = self._chat_id
             else:
-                payload_2["chat_id"] = chat_id
-            payload_2["parse_mode"] = "HTML"
-            payload_2["text"] = split_text_item
-            response = requests.post(url, json=payload_2)
+                payload["chat_id"] = chat_id
+            payload["parse_mode"] = "HTML"
+            payload["text"] = split_text_item
+            response = requests.post(url, json=payload)
             if response.status_code == 200:
                 pass
             else:
-                return False, f"Failed to send (complete) message: {response.text}"
+                print_debug_log(f"Failed to send html-formatted message due to {response.text}, attempting unformatted sending...")
+                del payload["parse_mode"]
+                response_2 = requests.post(url,json=payload)
+                if response_2.status_code == 200:
+                    pass
+                else:
+                    print_debug_log(f"Failed to send unformatted message as well due to {response_2.text}")
+                    return False, f"Failed to send (complete) message: {response_2.text}"
         return True, "Message was sent"
         
-
-def split_html_telegram(html, max_len=4096, safety_margin=100):
-    # Adjust limit to account for closing/reopening tags
-    limit = max_len - safety_margin
-    
-    # Matches tags or text blocks
-    token_pattern = re.compile(r'(<[^>]+>|[^<]+)')
-    tokens = token_pattern.findall(html)
-    
-    messages = []
-    current_tokens = []
-    current_len = 0
-    opened_tags = []
-
-    for token in tokens:
-        token_len = len(token)
-        
-        # If adding this token exceeds our safety limit
-        if current_len + token_len > limit:
-            # 1. Look for the best split point (last \n\n)
-            split_index = -1
-            for i in range(len(current_tokens) - 1, -1, -1):
-                if "\n\n" in current_tokens[i]:
-                    split_index = i + 1
-                    break
-            
-            # 2. If no \n\n found, split at the last possible token
-            if split_index == -1:
-                split_index = len(current_tokens)
-
-            # 3. Create the current message chunk
-            to_send = current_tokens[:split_index]
-            remaining = current_tokens[split_index:]
-            
-            # Close tags for the current message (LIFO order)
-            closers = "".join([f"</{t}>" for t in reversed(opened_tags)])
-            messages.append("".join(to_send).strip() + closers)
-            
-            # 4. Prepare for the next message
-            openers = "".join([f"<{t}>" for t in opened_tags])
-            current_tokens = [openers] + remaining + [token]
-            current_len = sum(len(t) for t in current_tokens)
-        else:
-            current_tokens.append(token)
-            current_len += token_len
-        
-        # Track HTML tags to maintain state
-        tag_match = re.match(r'^<(/?)(\w+).*?>$', token)
-        if tag_match:
-            is_closing = tag_match.group(1) == "/"
-            tag_name = tag_match.group(2)
-            if is_closing:
-                if opened_tags and opened_tags[-1] == tag_name:
-                    opened_tags.pop()
-            elif not token.endswith('/>'): # Ignore self-closing
-                opened_tags.append(tag_name)
-
-    # Append the final remaining piece
-    if current_tokens:
-        final_text = "".join(current_tokens).strip()
-        if final_text:
-            messages.append(final_text)
-        
-    return messages
 
 f = open("conf.json")
 config = json.load(f)
@@ -1666,17 +1575,17 @@ def send_advanced_alerts(message):
                 print("No mail was sent because no problem was detected")
         except:
             print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
-        text_for_telegram = "" #probably needs fixing
+        text_for_telegram = [os.getenv("platform-url","unseturl")+" is in trouble!\n"]
         if len(message[0])>0:
-            text_for_telegram = "These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])) +"\n\n"
+            text_for_telegram.append("These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])))
         if len(message[1])>0:
-            text_for_telegram+= 'These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1]))+"\n\n"
+            text_for_telegram.append('These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1])))
         if len(filter_out_muted_containers_for_telegram(message[2]))>0:
-            text_for_telegram+= f"These containers weren't found: "+ str(filter_out_muted_containers_for_telegram(message[2]))+"\n\n"
+            text_for_telegram.append(f"These containers weren't found: "+ str(filter_out_muted_containers_for_telegram(message[2])))
         if len(message[3])>0:
-            text_for_telegram+= message[3] +"\n\n"
+            text_for_telegram.append(message[3])
         if len(message[4])>0:
-            text_for_telegram+= message[4] +"\n\n"
+            text_for_telegram.append(message[4])
         if len(message[5])>0:
             ## telegram hates some chars with html escaping
             prepare_text = "These cronjobs failed:\n"
@@ -1705,7 +1614,7 @@ def send_advanced_alerts(message):
                     f"gave {result_text}"
                     f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
-                text_for_telegram += prepare_text + "\n\n"
+                text_for_telegram.append(prepare_text)
             ##
             
             
@@ -1716,7 +1625,7 @@ def send_advanced_alerts(message):
                     prepare_text_top_cpu += f"\nHost named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}"
                 except:
                     prepare_text_top_cpu += f"\nIssue while interpreting cpu top: ({traceback.format_exc()})\n Original object: {str(overloaded_cpu_top)}</br>"
-            text_for_telegram += prepare_text_top_cpu + "\n\n"
+            text_for_telegram.append(prepare_text_top_cpu)
         if len(message[7])>0:
             prepare_text_top_mem = "\nThese hosts are overloaded on memory:"
             for overloaded_mem_top in message[7]:
@@ -1724,7 +1633,7 @@ def send_advanced_alerts(message):
                     prepare_text_top_mem += f"\nHost named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}"
                 except:
                     prepare_text_top_mem += f"\nIssue while interpreting mem top: ({traceback.format_exc()})\n Original object: {str(overloaded_mem_top)}</br>"
-            text_for_telegram += prepare_text_top_mem + "\n\n"
+            text_for_telegram.append(prepare_text_top_mem)
         if len(message[8])>0:
             prepare_text_top_error = "\nCouldn't load the tops for these hosts:"
             for error_top in message[8]:
@@ -1733,7 +1642,7 @@ def send_advanced_alerts(message):
                 except:
                     prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n Original object: {str(error_top)}</br>"
 
-            text_for_telegram += prepare_text_top_error + "\n\n"
+            text_for_telegram.append(prepare_text_top_error)
         if len(text_for_telegram)>5:  
             try:
                 send_telegram(int(os.getenv("telegram-channel","0")),  os.getenv("platform-url","unseturl")+" is in trouble!\n" + text_for_telegram)
