@@ -325,98 +325,30 @@ class Snap4SentinelTelegramBot:
             return False, "Chat id was not set"
         if not isinstance(message, str):
             return False, "Message wasn't text"
-        split_text=message.split("\n\n")
-        recompressed = []
-        current_message = ""
-        for little_msg in split_text:
-            if len(little_msg) + len(current_message) > 4000:
-                recompressed.append(current_message)
-                current_message=little_msg
-            else:
-                current_message+=little_msg+"\n"
-        recompressed.append(current_message)
-        for split_text_item in recompressed:
-            payload_2 = {}
-            if chat_id is None:
-                if self._chat_id is None:
-                    pass # can't happen, we have been here already
+        for split_text_item in message.split("\n\n"):
+            if not len(split_text_item)>0:
+                payload_2 = {}
+                if chat_id is None:
+                    if self._chat_id is None:
+                        pass # can't happen, we have been here already
+                    else:
+                        payload_2["chat_id"] = self._chat_id
                 else:
-                    payload_2["chat_id"] = self._chat_id
-            else:
-                payload_2["chat_id"] = chat_id
-            payload_2["parse_mode"] = "HTML"
-            payload_2["text"] = split_text_item
-            response = requests.post(url, json=payload_2)
-            if response.status_code == 200:
-                pass
-            else:
-                return False, f"Failed to send (complete) message: {response.text}"
+                    payload_2["chat_id"] = chat_id
+                payload_2["parse_mode"] = "HTML"
+                payload_2["text"] = split_text_item
+                response = requests.post(url, json=payload_2)
+                if response.status_code == 200:
+                    pass
+                else:
+                    print_debug_log(f"Failed first attempt because of {response.text}\n")
+                    del payload_2["parse_mode"]
+                    response_2 = requests.post(url, json=payload_2)
+                    if response_2.status_code != 200:
+                        print_debug_log(f"Failed second (unformatted) attempt because of {response_2.text}\n")
+                        return False, f"Failed to send (complete) message: {response_2.text}"
+                    print_debug_log("Second sending of message succeeded")
         return True, "Message was sent"
-        
-
-def split_html_telegram(html, max_len=4096, safety_margin=100):
-    # Adjust limit to account for closing/reopening tags
-    limit = max_len - safety_margin
-    
-    # Matches tags or text blocks
-    token_pattern = re.compile(r'(<[^>]+>|[^<]+)')
-    tokens = token_pattern.findall(html)
-    
-    messages = []
-    current_tokens = []
-    current_len = 0
-    opened_tags = []
-
-    for token in tokens:
-        token_len = len(token)
-        
-        # If adding this token exceeds our safety limit
-        if current_len + token_len > limit:
-            # 1. Look for the best split point (last \n\n)
-            split_index = -1
-            for i in range(len(current_tokens) - 1, -1, -1):
-                if "\n\n" in current_tokens[i]:
-                    split_index = i + 1
-                    break
-            
-            # 2. If no \n\n found, split at the last possible token
-            if split_index == -1:
-                split_index = len(current_tokens)
-
-            # 3. Create the current message chunk
-            to_send = current_tokens[:split_index]
-            remaining = current_tokens[split_index:]
-            
-            # Close tags for the current message (LIFO order)
-            closers = "".join([f"</{t}>" for t in reversed(opened_tags)])
-            messages.append("".join(to_send).strip() + closers)
-            
-            # 4. Prepare for the next message
-            openers = "".join([f"<{t}>" for t in opened_tags])
-            current_tokens = [openers] + remaining + [token]
-            current_len = sum(len(t) for t in current_tokens)
-        else:
-            current_tokens.append(token)
-            current_len += token_len
-        
-        # Track HTML tags to maintain state
-        tag_match = re.match(r'^<(/?)(\w+).*?>$', token)
-        if tag_match:
-            is_closing = tag_match.group(1) == "/"
-            tag_name = tag_match.group(2)
-            if is_closing:
-                if opened_tags and opened_tags[-1] == tag_name:
-                    opened_tags.pop()
-            elif not token.endswith('/>'): # Ignore self-closing
-                opened_tags.append(tag_name)
-
-    # Append the final remaining piece
-    if current_tokens:
-        final_text = "".join(current_tokens).strip()
-        if final_text:
-            messages.append(final_text)
-        
-    return messages
 
 f = open("conf.json")
 config = json.load(f)
