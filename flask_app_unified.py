@@ -46,6 +46,7 @@ import subprocess
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 
 def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
@@ -1651,10 +1652,43 @@ def send_advanced_alerts(message):
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
+def job_wrapper_updatedb(timeout_seconds):
+    # Create a process to run the task
+    p = multiprocessing.Process(target=update_container_state_db)
+    p.start()
+
+    # Wait for the process to finish or hit the timeout
+    p.join(timeout=timeout_seconds)
+
+    if p.is_alive():
+        print_debug_log(f"Failed to update container state_db in {timeout_seconds}s. Terminating.")
+        p.terminate()  # Force kill the process
+        p.join()       # Clean up the zombie process
+    else:
+        pass  # all is fine
+    
+def job_wrapper_notifications(timeout_seconds):
+    # Create a process to run the task
+    p = multiprocessing.Process(target=auto_alert_status)
+    p.start()
+
+    # Wait for the process to finish or hit the timeout
+    p.join(timeout=timeout_seconds)
+
+    if p.is_alive():
+        print_debug_log(f"Failed to send notifications in {timeout_seconds}s. Terminating.")
+        p.terminate()  # Force kill the process
+        p.join()       # Clean up the zombie process
+    else:
+        pass  # all is fine
+        
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error-notification-frequency","5")))
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
+#scheduler.add_job(job_wrapper_updatedb, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")), args=[120])
+#scheduler.add_job(job_wrapper_notifications, trigger='interval', max_instances=5, minutes=int(os.getenv("error-notification-frequency","5")), args=[120])
+
+scheduler.add_job(auto_alert_status, trigger='interval', max_instances=5, minutes=int(os.getenv("error-notification-frequency","5")))
+scheduler.add_job(update_container_state_db, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
