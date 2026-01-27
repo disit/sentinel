@@ -300,8 +300,6 @@ class Snap4SentinelTelegramBot:
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         if chat_id is None or self._chat_id is None:
             return False, "Chat id was not set"
-        if not isinstance(message, str):
-            return False, "Message wasn't text"
         for split_text_item in message:
             payload = {}
             if chat_id is None:
@@ -540,8 +538,6 @@ def parse_top(data):
 
 
 def send_telegram(chat_id, message):
-    if isinstance(message, list):
-        message[2]=filter_out_muted_containers_for_telegram(message[2])
     a,b = bot_2.send_message_new(message, chat_id)
     if a:
         print_debug_log("Telegram message was sent")
@@ -551,8 +547,8 @@ def send_telegram(chat_id, message):
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
-        print("Email was not sent, no email address(es) set as recipients")
-    composite_message = os.getenv("platform-explanation","No explanation set") + "<br>" + message
+        print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
+    composite_message = f"<a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a><br>" + os.getenv("platform-explanation","No explanation set") + "<br>" + message
     smtp_server = os.getenv("smtp-server","no.server.set")
     if not smtp_server:
         print("MISSING smtp-server, email not sent.")
@@ -572,11 +568,10 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     server.send_message(msg)
     server.quit()
     print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
-    return
     
 
 def filter_out_muted_containers_for_telegram(containers):
-    print_debug_log("Filtering out muted cotnainers")
+    print_debug_log("Filtering out muted containers")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -1644,11 +1639,11 @@ def send_advanced_alerts(message):
                     prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n Original object: {str(error_top)}</br>"
 
             text_for_telegram.append(prepare_text_top_error)
-        if len(text_for_telegram)>5:  
-            try:
-                send_telegram(int(os.getenv("telegram-channel","0")),  os.getenv("platform-url","unseturl")+" is in trouble!\n" + text_for_telegram)
-            except:
-                print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
+        print_debug_log(str(text_for_telegram))
+        try:
+            send_telegram(int(os.getenv("telegram-channel","0")), text_for_telegram)
+        except:
+            print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
