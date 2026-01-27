@@ -545,6 +545,21 @@ def send_telegram(chat_id, message):
         print_debug_log("Telegram message was not sent because: "+b)
     return
 
+
+def linkify(text):
+    # This regex looks for patterns starting with http://, https://, or www.
+    url_pattern = r'(https?://[^\s]+|www\.[^\s]+)'
+    
+    def replace_with_link(match):
+        url = match.group(0)
+        href = url
+        # If it starts with www, we need to prepending https:// for the link to work
+        if url.startswith('www.'):
+            href = 'https://' + url
+        return f'<a href="{href}">{url}</a>'
+
+    return re.sub(url_pattern, replace_with_link, text)
+
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
         print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
@@ -1535,7 +1550,8 @@ def send_advanced_alerts(message):
             for failed_cron in message[5]:
                 stdout_msg=failed_cron[1].replace('\n','<br>')
                 stderr_msg=failed_cron[2].replace('\n','<br>')
-                prepare_text += f"<br>Cronjob named {failed_cron[3]} assigned to category {failed_cron[5]} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + stdout_msg + ' but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
+                origin_cmd=failed_cron[4].replace('\n','<br>')
+                prepare_text += f"<br>Cronjob named {failed_cron[3]} assigned to category {failed_cron[5]} with code {linkify(origin_cmd)} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + stdout_msg + ' but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
             text_for_email += prepare_text + "<br><br>"
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
@@ -1606,7 +1622,7 @@ def send_advanced_alerts(message):
                 # 2. Build the final string (much cleaner now!)
                 prepare_text += (
                     f"Cronjob named <b>{cron_name}</b> assigned to category <b>{category}</b> "
-                    f"with code <pre><code class=\"language-bash\">{bash_code}</code></pre>"
+                    f"with code <br>{linkify(bash_code)}</br>"
                     f"gave {result_text}"
                     f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
