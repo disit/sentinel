@@ -669,7 +669,7 @@ def filter_out_wrong_status_containers_for_telegram(containers):
 def isalive():
     print_debug_log("Sending 'is alive'")
     send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is alive", os.getenv("platform-url","unseturl")+" is alive")
-    send_telegram(int(os.getenv("telegram-channel","0")), os.getenv("platform-url","unseturl")+" is alive")
+    send_telegram(int(os.getenv("telegram-channel","0")), [os.getenv("platform-url","unseturl")+" is alive"])
     return
 
 def clean_old_db_entries():
