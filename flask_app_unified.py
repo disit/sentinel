@@ -546,6 +546,21 @@ def send_telegram(chat_id, message):
         print_debug_log("Telegram message was not sent because: "+b)
     return
 
+
+def linkify(text):
+    # This regex looks for patterns starting with http://, https://, or www.
+    url_pattern = r'(https?://[^\s]+|www\.[^\s]+)'
+    
+    def replace_with_link(match):
+        url = match.group(0)
+        href = url
+        # If it starts with www, we need to prepending https:// for the link to work
+        if url.startswith('www.'):
+            href = 'https://' + url
+        return f'<a href="{href}">{url}</a>'
+
+    return re.sub(url_pattern, replace_with_link, text)
+
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
         print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
