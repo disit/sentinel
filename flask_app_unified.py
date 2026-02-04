@@ -46,6 +46,8 @@ import subprocess
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
+import hashlib
 
 def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
@@ -299,8 +301,6 @@ class Snap4SentinelTelegramBot:
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         if chat_id is None or self._chat_id is None:
             return False, "Chat id was not set"
-        if not isinstance(message, str):
-            return False, "Message wasn't text"
         for split_text_item in message:
             payload = {}
             if chat_id is None:
@@ -539,8 +539,6 @@ def parse_top(data):
 
 
 def send_telegram(chat_id, message):
-    if isinstance(message, list):
-        message[2]=filter_out_muted_containers_for_telegram(message[2])
     a,b = bot_2.send_message_new(message, chat_id)
     if a:
         print_debug_log("Telegram message was sent")
@@ -550,8 +548,8 @@ def send_telegram(chat_id, message):
 
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
-        print("Email was not sent, no email address(es) set as recipients")
-    composite_message = os.getenv("platform-explanation","No explanation set") + "<br>" + message
+        print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
+    composite_message = f"<a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a><br>" + message
     smtp_server = os.getenv("smtp-server","no.server.set")
     if not smtp_server:
         print("MISSING smtp-server, email not sent.")
@@ -571,11 +569,10 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     server.send_message(msg)
     server.quit()
     print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
-    return
     
 
 def filter_out_muted_containers_for_telegram(containers):
-    print_debug_log("Filtering out muted cotnainers")
+    print_debug_log("Filtering out muted containers")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -658,7 +655,7 @@ def filter_out_wrong_status_containers_for_telegram(containers):
 def isalive():
     print_debug_log("Sending 'is alive'")
     send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is alive", os.getenv("platform-url","unseturl")+" is alive")
-    send_telegram(int(os.getenv("telegram-channel","0")), os.getenv("platform-url","unseturl")+" is alive")
+    send_telegram(int(os.getenv("telegram-channel","0")), [os.getenv("platform-url","unseturl")+" is alive"])
     return
 
 def clean_old_db_entries():
@@ -739,7 +736,32 @@ def populate_tops_entries():
         print(errors)
         raise E
 
-
+def is_this_notification_duplicated(message) -> bool:
+    try:
+        list_string = json.dumps(message, sort_keys=True, default=str)
+        list_bytes = list_string.encode('utf-8')
+        hash_object = hashlib.sha256(list_bytes)
+        hex_string = hash_object.hexdigest()
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''SELECT * FROM checker.sent_notification where sent_when < current_timestamp() - INTERVAL 1 DAY and hash=%s;''' # get a past notification if it matches the hash, at best one day old
+            cursor.execute(query,(hex_string,))
+            conn.commit()
+            check_notification_results = cursor.fetchall()
+            if len(check_notification_results) > 0:
+                print_debug_log("Attempted to send a notification but a previous one seems to be already be there")
+                return True
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(dictionary=True)
+            query = '''INSERT INTO `checker`.`sent_notification` (`hash`) VALUES (%s);'''
+            cursor.execute(query, (hex_string,))
+            conn.commit()
+            cursor.close()
+            return False
+    except Exception as E:
+        print_debug_log("Something went wrong when tying to determine if a notification was about to be sent more than once (will act as if it wasn't): "+traceback.format_exc())
+        return False
+    return False
 
 async def auto_run_tests():
     print_debug_log("Automatically running tests")
@@ -1240,7 +1262,7 @@ def send_alerts(message):
     print_debug_log("Sending alerts")
     try:
         send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is in trouble!", message)
-        send_telegram(int(os.getenv("telegram-channel","0")), message)
+        send_telegram(int(os.getenv("telegram-channel","0")), [message])
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
@@ -1518,6 +1540,8 @@ def task_wrapper(r):
 
 def send_advanced_alerts(message):
     print_debug_log("Preparing the content of an alert")
+    if is_this_notification_duplicated(message):
+        return # won't send a doubled notification
     try:
         text_for_email = ""
         for a in range(len(message)):
@@ -1539,7 +1563,8 @@ def send_advanced_alerts(message):
             for failed_cron in message[5]:
                 stdout_msg=failed_cron[1].replace('\n','<br>')
                 stderr_msg=failed_cron[2].replace('\n','<br>')
-                prepare_text += f"<br>Cronjob named {failed_cron[3]} assigned to category {failed_cron[5]} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + stdout_msg + ' but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
+                ran_command = failed_cron[4].replace('\n','<br>')
+                prepare_text += f"<br>Cronjob {failed_cron[3]} assigned to category {failed_cron[5]} with code {ran_command} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + stdout_msg + ' but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
             text_for_email += prepare_text + "<br><br>"
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
@@ -1570,7 +1595,36 @@ def send_advanced_alerts(message):
             if len(text_for_email) > 15:
                 print("Will send email with text:")
                 print(text_for_email)
-                send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is in trouble!", text_for_email)
+                
+                #TODO make descriptive logic for subject
+                subject = ""
+                amount_of_errors = sum([len(message[i]) for i in range(len(message))])
+                if amount_of_errors>3:
+                    subject = "Many issues detected"
+                else:
+                    for i in range(len(message)):
+                        if len(message[i]) > 0:
+                            for instance in message[i]:
+                                if i == 0:  # wrong container status
+                                    subject+=f"Container {instance['Name']} has a wrong status, "
+                                elif i==1:  # is alive fails
+                                    subject+=f"Container {instance['Name']} fails on isalive, "
+                                elif i==2:  # not found
+                                    subject+=f"Container {instance['Name']} not found, "
+                                elif i==3:  # cpu overloaded
+                                    subject+= "CPU load issues, "
+                                elif i==4:  # memory overloaded
+                                    subject+= "Memory load issues, "
+                                elif i==5:  # cronjob failed
+                                    subject+=f"Cronjob {instance[4]} gave an error, "  # maybe replace with description, later
+                                elif i==6:  # other host overloaded on cpu
+                                    subject+=f"Host {instance['host']} overloaded on CPU, "
+                                elif i==7:  # other host overloaded on memory
+                                    subject+=f"Host {instance['host']} overloaded on memory, "
+                                else:       # didn't read the top for some reason
+                                    subject+=f"Host {instance['host']} wasn't readable, "
+                    subject = subject[:-2]
+                send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), subject, text_for_email)
             else:
                 print("No mail was sent because no problem was detected")
         except:
@@ -1588,10 +1642,10 @@ def send_advanced_alerts(message):
             text_for_telegram.append(message[4])
         if len(message[5])>0:
             ## telegram hates some chars with html escaping
-            prepare_text = "These cronjobs failed:\n"
+            all_msgs = []
+            prepare_text = "This cronjob failed:\n"
             for failed_cron in message[5]:
                 cron_name = failed_cron[3]
-                category = failed_cron[5]
                 bash_code = failed_cron[4]
                 raw_result = failed_cron[1]
                 raw_error = failed_cron[2]
@@ -1606,16 +1660,14 @@ def send_advanced_alerts(message):
 
                 # Escape the error text
                 escaped_err = raw_error.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-
-                # 2. Build the final string (much cleaner now!)
                 prepare_text += (
-                    f"Cronjob named <b>{cron_name}</b> assigned to category <b>{category}</b> "
-                    f"with code <pre><code class=\"language-bash\">{bash_code}</code></pre>"
-                    f"gave {result_text}"
+                    f"Cronjob<b>{cron_name}  "
+                    f"with code {bash_code}  "
+                    f"gave {result_text}  "
                     f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
-                text_for_telegram.append(prepare_text)
-            ##
+                all_msgs.append(prepare_text)
+            [text_for_telegram.append(msg) for msg in all_msgs]
             
             
         if len(message[6])>0:
@@ -1643,18 +1695,51 @@ def send_advanced_alerts(message):
                     prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n Original object: {str(error_top)}</br>"
 
             text_for_telegram.append(prepare_text_top_error)
-        if len(text_for_telegram)>5:  
-            try:
-                send_telegram(int(os.getenv("telegram-channel","0")),  os.getenv("platform-url","unseturl")+" is in trouble!\n" + text_for_telegram)
-            except:
-                print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
+        print_debug_log(str(text_for_telegram))
+        try:
+            send_telegram(int(os.getenv("telegram-channel","0")), text_for_telegram)
+        except:
+            print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
         
+def job_wrapper_updatedb(timeout_seconds):
+    # Create a process to run the task
+    p = multiprocessing.Process(target=update_container_state_db)
+    p.start()
+
+    # Wait for the process to finish or hit the timeout
+    p.join(timeout=timeout_seconds)
+
+    if p.is_alive():
+        print_debug_log(f"Failed to update container state_db in {timeout_seconds}s. Terminating.")
+        p.terminate()  # Force kill the process
+        p.join()       # Clean up the zombie process
+    else:
+        pass  # all is fine
+    
+def job_wrapper_notifications(timeout_seconds):
+    # Create a process to run the task
+    p = multiprocessing.Process(target=auto_alert_status)
+    p.start()
+
+    # Wait for the process to finish or hit the timeout
+    p.join(timeout=timeout_seconds)
+
+    if p.is_alive():
+        print_debug_log(f"Failed to send notifications in {timeout_seconds}s. Terminating.")
+        p.terminate()  # Force kill the process
+        p.join()       # Clean up the zombie process
+    else:
+        pass  # all is fine
+        
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
-scheduler.add_job(auto_alert_status, trigger='interval', minutes=int(os.getenv("error-notification-frequency","5")))
-scheduler.add_job(update_container_state_db, trigger='interval', minutes=int(os.getenv("database-update-frequency", "2")))
+scheduler.add_job(job_wrapper_updatedb, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")), args=[120])
+scheduler.add_job(job_wrapper_notifications, trigger='interval', max_instances=5, minutes=int(os.getenv("error-notification-frequency","5")), args=[120])
+
+#scheduler.add_job(auto_alert_status, trigger='interval', max_instances=5, minutes=int(os.getenv("error-notification-frequency","5")))
+#scheduler.add_job(update_container_state_db, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")))
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
@@ -1675,6 +1760,15 @@ def create_app():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
                 if 'username' in session:
+                    # basis for making a better mobile ui, if mobile then make main ui with far less columns
+                    # ua_string = request.headers.get('User-Agent')
+                    # user_agent = parse(ua_string)
+
+                    # Access easy-to-use boolean properties
+                    #    if user_agent.is_mobile:
+                    # device = "Mobile"
+
+
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''SELECT complex_tests.*, GetHighContrastColor(button_color), COALESCE(categories.category, "System") as category FROM checker.complex_tests left join categories on categories.idcategories = complex_tests.category_id;'''
@@ -1688,7 +1782,10 @@ def create_app():
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"),multi=os.getenv("is-multi","False"))
+                        query_3 = "SELECT name,categories.category FROM categories join cronjobs on categories.idcategories=cronjobs.category;"
+                        cursor.execute(query_3)
+                        results_cronjobs = cursor.fetchall()
+                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),cronjobs=results_cronjobs,admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"),multi=os.getenv("is-multi","False"))
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
@@ -1805,6 +1902,48 @@ def create_app():
     
     ## start add cronjob
     
+    restart_cronjob_lock = Lock()
+    @app.route("/restart_logic_cronjob", methods=["POST"])
+    def restart_logic_cronjob():
+        if 'username' not in session:
+            return "Session not active, won't proceed.", 500
+        try:
+            cronjob_id = request.form.get('cronjob_id','',int)
+        except ValueError:
+            return "Cronjob identifier invalid, it must be an non-negative integer", 500
+        if len(cronjob_id):
+            return "Cronjob identifier not found or not set", 500
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''SELECT restart_logic FROM checker.cronjobs where idcronjobs=%s;'''
+            cursor.execute(query,(cronjob_id,))
+            conn.commit()
+            result_command = cursor.fetchone()
+            if not result_command or len(result[0])==0:
+                return "This cronjob doesn't have a restart logic", 500
+            else:
+                with restart_cronjob_lock:
+                    with mysql.connector.connect(**db_conn_info) as conn:
+                        cursor = conn.cursor(buffered=True)
+                        query = '''SELECT * FROM checker.rebooting_cronjobs WHERE datetime >= NOW() - INTERVAL 30 SECOND AND cronjob_id=%s;'''
+                        cursor.execute(query,(cronjob_id,))
+                        conn.commit()
+                        result = cursor.fetchone()
+                    if not result or len(result[0])==0: # free to go
+                        restart_result = queued_running(result_command)
+                        with mysql.connector.connect(**db_conn_info) as conn:
+                            cursor = conn.cursor(buffered=True)
+                            query = '''INSERT INTO `checker`.`rebooting_cronjobs` (`cronjob_id`, `perpetrator`, `result`) VALUES (%s, %s, %s)'''
+                            cursor.execute(query,(cronjob_id,session['username'],restart_result.stdout+"\n"+restart_result.stderr))
+                            conn.commit()
+                        if len(restart_result.stderr)>0:
+                            return "Error in restarting the cronjob: "+restart_result.stderr, 500
+                        else:
+                            return "Restarting the service behing the cronjob returned " + restart_result.stderr, 500
+                    else: # too soon
+                        return "This cronjob restart was called very recently, wait a minute", 500
+    
+    
     @app.route("/organize_cronjobs", methods=["GET"])
     def organize_cronjobs():
         if 'username' in session:
@@ -1842,11 +1981,11 @@ def create_app():
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
-                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`) VALUES (%s, %s, %s, %s, %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1))
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`) VALUES (%s, %s, %s, %s, %s, %s, %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description']))
                     else:
-                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`) VALUES (%s, %s, %s, NULL, %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1))
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`) VALUES (%s, %s, %s, NULL, %s, %s, %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description']))
                     
                     conn.commit()
                     return "ok", 201
@@ -1867,11 +2006,11 @@ def create_app():
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
-                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s WHERE (`idcronjobs` = %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['id'],)) 
+                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s, `restart_logic`= %s, `description`= %s WHERE (`idcronjobs` = %s);'''
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['id'],)) 
                     else:
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL, `disabled` = %s WHERE (`idcronjobs` = %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['id'],)) 
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2369,7 +2508,35 @@ def create_app():
                     tobereturned_answer = {"result":json.loads(result[0]), "error":[]}
                 except Exception as E:
                     tobereturned_answer = {"result": {}, "error":["Couldn't load container data because of "+str(E)]}
-                return tobereturned_answer
+                    return tobereturned_answer
+            with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled,where_to_run FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    for result in results:
+                        cronjob_dict = {
+                            "Container": result[3],
+                            "CreatedAt": "Not applicable",
+                            "ID": "Cronjob "+str(result[6]),
+                            "Image": "Not applicable",
+                            "Labels": "Cronjob",
+                            "Mounts": "Not applicable",
+                            "Name": result[3],
+                            "Names": result[3],
+                            "Namespace": result[3],
+                            "Node": "Not applicable",
+                            "Ports": "Not applicable",
+                            "RunningFor": "Not applicable",
+                            "Source": os.getenv("platform-url","") if result[8] else "Nonlocal",
+                            "State": "running - "+str(result[1]) if result[2]==None else result[2],
+                            "Status": "Enabled" if result[7]==0 else "Disabled",
+                            "Volumes": "Not applicable"
+                        }
+                        tobereturned_answer["result"].append(cronjob_dict)
+                    return tobereturned_answer
         return redirect(url_for('login'))
 
     def get_container_categories():
@@ -2631,7 +2798,7 @@ def create_app():
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
-SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
+SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled,description,restart_logic FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
@@ -2921,6 +3088,29 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                         return f"Issue while rebooting pod: {traceback.format_exc()}", 500
             except:
                 return f"Issue while getting logs of container/pod: {traceback.format_exc()}", 500
+        
+    @app.route("/cronjobs_logs", methods=["POST", "GET"])
+    def get_cronjobs_logs():
+        if 'username' not in session:
+            return redirect(url_for('login'))
+        try:
+            cronjob_id = request.args.get('cronjob_id',0,int)
+        except ValueError:
+            return render_template("error_showing.html", r = "Cronjob identifier invalid, it must be an non-negative integer"), 500
+        if not cronjob_id or cronjob_id == 0:
+            return render_template("error_showing.html", r = "Cronjob identifier not found or not set"), 500
+        cronjob_amount = request.args.get('how_many',default=20,type=int)
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''SELECT datetime, result FROM checker.cronjob_history where id_cronjob = %s order by datetime desc limit %s;'''
+            cursor.execute(query,(cronjob_id, cronjob_amount,))
+            conn.commit()
+            results = cursor.fetchall()
+            if len(results) > 1:
+                logs = '<br>'.join([f"{result[0]}: {result[1]}" for result in results])
+            else:
+                logs = "This cronjob doesn't exists or it has no logs yet"
+            return render_template('log_show.html', r = logs, container_name=f"cronjob #{cronjob_id}")
         
     
     @app.route("/advanced-container/<container_name>")

@@ -36,6 +36,11 @@
 		{%for item in categories%}'{{item[0]}}': ['{{item[1]}}','{{item[2]|safe}}','{{item[3]|safe}}'],
 		{% endfor %}'nothing': 'nothing'
 	};
+
+	const lookupTable_cronjobs = {
+		{%for item in cronjobs%}'{{item[0]}}': '{{item[1]}}',
+		{% endfor %}'nothing': 'nothing'
+	};
 	
 	async function toggleUpdate() {
 		if (donotupdate) {
@@ -230,7 +235,8 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		}
 	};
 
-function makeCronJobTable(data) {
+function makeCronJobTable(data) { // disabled
+	return;
 	const container = document.getElementById('cronJobTable');
     container.innerHTML = ''; 
 
@@ -244,8 +250,12 @@ function makeCronJobTable(data) {
             command: row[4] || "",
             update: row[0] || "",
 			enabled: row[7] === 0 ? "Enabled" : "Disabled",
+			description: row[9] || "",
+			restart: "<input type=\"button\" class=\"btn btn-info\" value=\"Attempt restart\" onclick=\"window.open('./restart_logic_cronjob?cronjob_id="+row[6]+"')\">" || "",
 			status: statusValue,
-            details: statusValue === "ok" ? (row[1] || "") : (row[2] || "")
+            details: statusValue === "ok" ? (row[1] || "") : (row[2] || ""),
+			logs: "<input type=\"button\" class=\"btn btn-info\" value=\"Open logs\" onclick=\"window.open('./cronjobs_logs?cronjob_id="+row[6]+"&how_many=20')\">" || ""
+			
         };
     });
 
@@ -257,7 +267,7 @@ function makeCronJobTable(data) {
     table.id = 'main-table';
     table.className = 'custom-table';
     
-    const headers = ['Name', 'Edit', 'Category', 'Command', 'Last Update', 'Enabled', 'Status' ,'Details (click on cell to enlarge)'];
+    const headers = ['Name', 'Edit', 'Category', 'Command', 'Last Update', 'Enabled', 'Description', 'Restart', 'Status', 'Details (click on cell to enlarge)', 'Previous logs'];
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
@@ -287,7 +297,7 @@ function makeCronJobTable(data) {
             // Set a data-label for mobile card view
             td.setAttribute('data-label', key.charAt(0).toUpperCase() + key.slice(1));
 
-            if (key === 'edit') {
+            if (key === 'edit' || key === 'restart' || key === 'logs') {
                 // Use innerHTML because name contains the <input> button string
                 td.innerHTML = value;
             } else if (key === 'details' || key === 'command') {
@@ -617,7 +627,8 @@ function makeCronJobTable(data) {
 		catch (exception_var) {
 			console.log("Failed to write to category log due to: "+exception_var)
 		}
-		logs_for_categories[log_destination] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		// tldr; if it's empty assign the value otherwise add to it, this avoids printing "undefined" (thanks js, always on point)
+		logs_for_categories[log_destination] === "" ? logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>" : new Date().toLocaleString() + ' - ' + logging_str + "<br>";
 		if (log_destination!="see_logs") { 
 			document.getElementById("see_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
 			logs_for_categories["see_logs"] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
@@ -794,97 +805,175 @@ function makeCronJobTable(data) {
 		thead.appendChild(headerRow);
 	
 		rowData.forEach(rowValues => {
-			if (container_rows[rowValues["Name"]]) {
-				console.log("shouldn't update", rowValues["Name"]);
-				tbody.appendChild(container_rows[rowValues["Name"]]);
-				return;
-			}
-			const row = document.createElement("tr");
-			row.setAttribute("name", rowValues["Name"]);			
-			var elements = Object.values(rowValues);
-			var index_of_below_array = 0;
-			const check = duration => ((t => t < 600 ? true : false)((s => (s.match(/\d+/g).map(Number)).reduce((a, v, i) => a + v * [86400, 3600, 60, 1][i], 0))((duration.replace(/and/g, ',')))));
+			if (rowValues["Labels"] === "Cronjob") {
+				const row = document.createElement("tr");
+				row.setAttribute("name", rowValues["Name"]);			
+				var elements = Object.values(rowValues);
+				var index_of_below_array = 0;
+				elements.forEach(cellData => {
+					const td = document.createElement("td");
+					if (index_of_below_array === 6) {
+						var content_of_id_cell = '<a target="_blank" href="./cronjobs_logs?cronjob_id='+Number(elements[2].match(/\d+/)[0])+'">' + cellData + '</a>';
 
-			elements.forEach(cellData => {
-				const td = document.createElement("td");
-				if (index_of_below_array === 6) {
-					var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'" data-source="' + elements[12] + '">' + cellData + '</a>';
-
-					td.innerHTML = content_of_id_cell;
-					var link = td.querySelector('a');
-					if (link) {
-						link.addEventListener('click', handlePostLinkClickLogs);
-					}
-				}
-				else if (index_of_below_array === 13) {
-					var content_of_id_cell;
-					try {
-						if (cellData === "running" || cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
-							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
-							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+						td.innerHTML = content_of_id_cell;
+						var link = td.querySelector('a');
+						if (link) {
+							link.addEventListener('click', handlePostLinkClickLogs);
 						}
-						catch {
+					}
+					else if (index_of_below_array === 13) {
+						var content_of_id_cell;
+						if (cellData.startsWith("running - ")){
+							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+						}
+						else {
 							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 						}
-					td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
-				}
-				else {
-					td.textContent = cellData;
-				}
-				row.appendChild(td);
-				index_of_below_array = index_of_below_array + 1;
-			});
-			
-			var rebootbutton = document.createElement("td");
-			{%if multi == "True"%}
-			rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-source="`+elements[12]+`" data-containerid="`+elements[6]+`" data-containercategory="`+name_of_table_value+`">Reboot</button>`;
-			{% else %}
-			rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-containerid="`+elements[6]+`" data-containercategory="`+name_of_table_value+`">Reboot</button>`;
-			{%endif%}
-			row.appendChild(rebootbutton);
-			var testsbutton = document.createElement("td");
-			testsbutton.innerHTML=`<input type="button" name="`+elements[6]+`" value="Check the port..." class="btn btn-info" onclick="runTests('`+elements[6]+`', this, '`+name_of_table_value+`')"/>`;
-			row.appendChild(testsbutton);
-			tbody.appendChild(row);
-			var testresults = document.createElement("td");
-			testresults.setAttribute('id',elements[6]+'-result');
-
-			var some_value;
-			for (const key in lookupTable) {
-				if (rowValues["Name"].startsWith(key.replace('*', ''))) {
-					some_value = lookupTable[key];
-				break;
-				}
-			}
-			if (!some_value) some_value = ["","Failure to retrieve contacts", "Failure to retrieve location"];
-			
-
-			var in_case_of_problems = document.createElement("td");
-			in_case_of_problems.innerHTML=some_value[1];
-			
-			var location_of_component = document.createElement("td");
-			location_of_component.innerHTML=some_value[2];
-			in_case_of_problems.innerHTML=some_value[1];
-
-			row.appendChild(testresults);
-			row.appendChild(in_case_of_problems);
+						
+						td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
+					}
+					else {
+						td.textContent = cellData;
+					}
+					row.appendChild(td);
+					index_of_below_array = index_of_below_array + 1;
+				});
 				
-			var do_not_update_this_td = document.createElement("td");
-			var do_not_update_this = document.createElement("input");
-			do_not_update_this.setAttribute("onclick", "toggle_update_this_line(this)");
-			do_not_update_this.setAttribute("class", "btn btn-info");
-			do_not_update_this.setAttribute("type", "button");
-			do_not_update_this.setAttribute("value", "Stop refreshing");
-			do_not_update_this_td.appendChild(do_not_update_this);
-			do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[6]+'" id="mutebutton-'+elements[6]+'">Mute</button>';
-			row.appendChild(do_not_update_this_td);
-			tbody.appendChild(row);
-			testresults.innerHTML=findClosestKeyStartsWith(row.childNodes[7].innerHTML, test_results_divs).matchValue;
-			// ugly
-			if (testresults.innerHTML == "undefined" || testresults.innerHTML == '[object Object]') {
-				testresults.innerHTML = "No tests found";
+				var rebootbutton = document.createElement("td");
+				rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal-c" data-toggle="modal" data-target="#passwordModalCronjob" data-target="`+rowValues["Name"]+`" data-containerid="`+Number(elements[2].match(/\d+/)[0])+`">Restart</button>`;
+				row.appendChild(rebootbutton);
+				var testsbutton = document.createElement("td");
+				testsbutton.innerHTML=`Not applicable`;
+				row.appendChild(testsbutton);
+				tbody.appendChild(row);
+				var testresults = document.createElement("td");
+				testresults.setAttribute('id',elements[6]+'-result');
+
+				var some_value;
+				for (const key in lookupTable) {
+					if (rowValues["Name"].startsWith(key.replace('*', ''))) {
+						some_value = lookupTable[key];
+					break;
+					}
+				}
+				if (!some_value) some_value = ["","Not applicable", "Not applicable"];
+				
+
+				var in_case_of_problems = document.createElement("td");
+				in_case_of_problems.innerHTML=some_value[1];
+				
+				var location_of_component = document.createElement("td");
+				location_of_component.innerHTML=some_value[2];
+				in_case_of_problems.innerHTML=some_value[1];
+
+				row.appendChild(testresults);
+				row.appendChild(in_case_of_problems);
+					
+				var do_not_update_this_td = document.createElement("td");
+				do_not_update_this_td.innerHTML="<input type=\"button\" class=\"btn btn-info\" value=\"Edit cronjob\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+Number(elements[2].match(/\d+/)[0])+"')\">"
+				row.appendChild(do_not_update_this_td);
+				tbody.appendChild(row);
+				testresults.innerHTML="Not applicable";
+		
 			}
-		});
+			else {
+				if (container_rows[rowValues["Name"]]) {
+					console.log("shouldn't update", rowValues["Name"]);
+					tbody.appendChild(container_rows[rowValues["Name"]]);
+					return;
+				}
+				const row = document.createElement("tr");
+				row.setAttribute("name", rowValues["Name"]);			
+				var elements = Object.values(rowValues);
+				var index_of_below_array = 0;
+				const check = duration => ((t => t < 600 ? true : false)((s => (s.match(/\d+/g).map(Number)).reduce((a, v, i) => a + v * [86400, 3600, 60, 1][i], 0))((duration.replace(/and/g, ',')))));
+
+				elements.forEach(cellData => {
+					const td = document.createElement("td");
+					if (index_of_below_array === 6) {
+						var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'" data-source="' + elements[12] + '">' + cellData + '</a>';
+
+						td.innerHTML = content_of_id_cell;
+						var link = td.querySelector('a');
+						if (link) {
+							link.addEventListener('click', handlePostLinkClickLogs);
+						}
+					}
+					else if (index_of_below_array === 13) {
+						var content_of_id_cell;
+						try {
+							if (elements[4] === "Cronjob") {
+								if (cellData.startsWith("running - ")){
+									content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+								}
+								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';}
+							}
+							else if (cellData === "running" || cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
+								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+							}
+							catch {
+								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+							}
+						td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
+					}
+					else {
+						td.textContent = cellData;
+					}
+					row.appendChild(td);
+					index_of_below_array = index_of_below_array + 1;
+				});
+				
+				var rebootbutton = document.createElement("td");
+				{%if multi == "True"%}
+				rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-source="`+elements[12]+`" data-containerid="`+elements[6]+`" data-containercategory="`+name_of_table_value+`">Restart</button>`;
+				{% else %}
+				rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#passwordModal" data-containerid="`+elements[6]+`" data-containercategory="`+name_of_table_value+`">Restart</button>`;
+				{%endif%}
+				row.appendChild(rebootbutton);
+				var testsbutton = document.createElement("td");
+				testsbutton.innerHTML=`<input type="button" name="`+elements[6]+`" value="Check the port..." class="btn btn-info" onclick="runTests('`+elements[6]+`', this, '`+name_of_table_value+`')"/>`;
+				row.appendChild(testsbutton);
+				tbody.appendChild(row);
+				var testresults = document.createElement("td");
+				testresults.setAttribute('id',elements[6]+'-result');
+
+				var some_value;
+				for (const key in lookupTable) {
+					if (rowValues["Name"].startsWith(key.replace('*', ''))) {
+						some_value = lookupTable[key];
+					break;
+					}
+				}
+				if (!some_value) some_value = ["","Failure to retrieve contacts", "Failure to retrieve location"];
+				
+
+				var in_case_of_problems = document.createElement("td");
+				in_case_of_problems.innerHTML=some_value[1];
+				
+				var location_of_component = document.createElement("td");
+				location_of_component.innerHTML=some_value[2];
+				in_case_of_problems.innerHTML=some_value[1];
+
+				row.appendChild(testresults);
+				row.appendChild(in_case_of_problems);
+					
+				var do_not_update_this_td = document.createElement("td");
+				var do_not_update_this = document.createElement("input");
+				do_not_update_this.setAttribute("onclick", "toggle_update_this_line(this)");
+				do_not_update_this.setAttribute("class", "btn btn-info");
+				do_not_update_this.setAttribute("type", "button");
+				do_not_update_this.setAttribute("value", "Stop refreshing");
+				do_not_update_this_td.appendChild(do_not_update_this);
+				do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[6]+'" id="mutebutton-'+elements[6]+'">Mute</button>';
+				row.appendChild(do_not_update_this_td);
+				tbody.appendChild(row);
+				testresults.innerHTML=findClosestKeyStartsWith(row.childNodes[7].innerHTML, test_results_divs).matchValue;
+				// ugly
+				if (testresults.innerHTML == "undefined" || testresults.innerHTML == '[object Object]') {
+					testresults.innerHTML = "No tests found";
+				}
+		}});
 	
 		table.appendChild(thead);
 		table.appendChild(tbody);
@@ -950,20 +1039,28 @@ function makeCronJobTable(data) {
 		const categorizedData = {};
 		
 		containerdata.forEach(item => {
-			const name = item.Name;
 			let category = 'Unknown';
-			for (const key in lookupTable) {
-				if (name.startsWith(key.replace('*', ''))) {
-					if (item.Namespace.includes(lookupTable[key][2])) {
-						category = lookupTable[key][0];
-						break;
+			if (item.Labels === "Cronjob") {
+				if (!categorizedData[lookupTable_cronjobs[item.Name]]) {
+					categorizedData[lookupTable_cronjobs[item.Name]] = [];
+				}
+				categorizedData[lookupTable_cronjobs[item.Name]].push(item);
+			}
+			else { // kuber/docker container
+				const name = item.Name;
+				for (const key in lookupTable) {
+					if (name.startsWith(key.replace('*', ''))) {
+						if (item.Namespace.includes(lookupTable[key][2])) {
+							category = lookupTable[key][0];
+							break;
+						}
 					}
 				}
+				if (!categorizedData[category]) {
+					categorizedData[category] = [];
+				}
+				categorizedData[category].push(item);
 			}
-			if (!categorizedData[category]) {
-				categorizedData[category] = [];
-			}
-			categorizedData[category].push(item);
 		});
 		
 		
@@ -1061,6 +1158,12 @@ function makeCronJobTable(data) {
 			$('#muteComponent').modal('show');
 		});
 		
+		$('.open-modal-c').on('click', function() {
+			$('#cronjobnamemodal').val($(this).data('cronjobnamemodal'));
+			$('#cronjobidmodal').val($(this).data('cronjobid'));
+			$('#passwordModalCronjob').modal('show');
+		});
+		
 		
 
 		$('#muteContainer').on('click', function() {
@@ -1120,7 +1223,7 @@ function makeCronJobTable(data) {
 				var source = "";
 			}
 			var result_loc = document.getElementById(id+"-reboot-result");
-			result_loc.innerHTML='Rebooting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			result_loc.innerHTML='Restarting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
 			var string = new Date().toLocaleString();
 			if (password) {
 				try {
@@ -1129,7 +1232,7 @@ function makeCronJobTable(data) {
 						data: {id: id, psw: password, source: source},
 						type: 'POST',
 						success: function(response) {
-							logging('<b>' + id + "</b> was rebooted!", category+"-logs");
+							logging('<b>' + id + "</b> was restarted!", category+"-logs");
 							$('#passwordModal').modal('hide');
 							if (id.includes('proxy')) {
 								alert("By restarting the proxy, you will lose connection to the Snap4Sentinel backend. By closing this alert, you will reload the page.");
@@ -1137,7 +1240,43 @@ function makeCronJobTable(data) {
 							}
 						},
 						error: function(error) {
-							logging('<b>' + id + "</b> was not rebooted! Reason: " + error, category+"-logs");
+							logging('<b>' + id + "</b> was not restarted! Reason: " + error, category+"-logs");
+							$('#passwordModal').modal('hide');
+						},
+						timeout: {{timeout}}
+					});
+				}
+				catch (exception_var) {
+					console.log(exception_var);
+				}
+			}
+			else {
+				alert('Please enter a password');
+			}
+		};
+
+	function attempt_reboot_cronjob() {
+			var password = $('#passwordInputCronjob').val();
+			var id = $('#cronjobidmodal').val();
+			var result_loc = document.getElementById(id+"-reboot-result");
+			result_loc.innerHTML='Restarting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			var string = new Date().toLocaleString();
+			if (password) {
+				try {
+					$.ajax({
+						url: './restart_logic_cronjob',
+						data: {cronjob_id: id, psw: password},
+						type: 'POST',
+						success: function(response) {
+							logging('<b>' + id + "</b> was restarted!", category+"-logs");
+							$('#passwordModal').modal('hide');
+							if (id.includes('proxy')) {
+								alert("By restarting the proxy, you will lose connection to the Snap4Sentinel backend. By closing this alert, you will reload the page.");
+								location.reload();
+							}
+						},
+						error: function(error) {
+							logging('<b>' + id + "</b> was not restarted! Reason: " + error, category+"-logs");
 							$('#passwordModal').modal('hide');
 						},
 						timeout: {{timeout}}
@@ -1184,7 +1323,7 @@ function makeCronJobTable(data) {
 			if (index===0) return;
 			var dataTable = $(table).DataTable();
 			var isNotRunning = true;
-			var columnData = dataTable.column(12).data().toArray();
+			var columnData = dataTable.column(13).data().toArray();
 			for (var i = 0; i < columnData.length; i++)  // maybe check if too many restarts
 				{
 				if (typeof columnData[i] === 'string' && !columnData[i].includes("running")) {
@@ -1280,7 +1419,7 @@ function makeCronJobTable(data) {
 			}, 500);
 		});
 </script>
-<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column;min-width: 1000px;">
+<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column;">
 	<div class="collapse navbar-collapse container-fluid" id="navbarSupportedContent">
 		<ul class="navbar-nav mr-auto">
 			<li class="nav-item active">
@@ -1289,7 +1428,7 @@ function makeCronJobTable(data) {
 		</ul>
 		<ul class="navbar-nav mr-auto">
 			<li class="nav-item active">
-				<a class="navbar-brand">Snap4Sentinel (Kubernetes): Platform Process Monitoring and Control</a>
+				<a class="navbar-brand">Snap4Sentinel: Platform Process Monitoring and Control</a>
 			</li>
 		</ul>
 		<ul class="dropdown" style="margin-top: auto; margin-bottom: auto;">
@@ -1347,11 +1486,11 @@ function makeCronJobTable(data) {
 <h1 style="text-align: center;">Loading, please wait...</h1>
 </div>
 
-<div class="modal fade" id="muteComponent" tabindex="-1" role="dialog" aria-labelledby="passwordModalLabel" aria-hidden="true">
+<div class="modal fade" id="muteComponent" tabindex="-1" role="dialog" aria-labelledby="passwordModalMutingLabel" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
-				<h5 class="modal-title" id="passwordModalLabel">Confirmation for muting a container</h5>
+				<h5 class="modal-title" id="passwordModalMutingLabel">Confirmation for muting a container</h5>
 				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#muteComponent').modal('hide')">
 					<span aria-hidden="true">X</span>
 				</button>
@@ -1388,11 +1527,11 @@ function makeCronJobTable(data) {
 	</div>
 </div>
 
-<div class="modal fade" id="passwordModal" tabindex="-1" role="dialog" aria-labelledby="passwordModalLabel" aria-hidden="true">
+<div class="modal fade" id="passwordModal" tabindex="-1" role="dialog" aria-labelledby="passwordModalContainerLabel" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
-				<h5 class="modal-title" id="passwordModalLabel">Confirmation for rebooting container</h5>
+				<h5 class="modal-title" id="passwordModalContainerLabel">Confirmation for restarting container</h5>
 				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#passwordModal').modal('hide')">
 					<span aria-hidden="true">X</span>
 				</button>
@@ -1416,13 +1555,46 @@ function makeCronJobTable(data) {
 				</form>
 			</div>
 			<div class="modal-footer">
-				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close">Close</button>
-				<button type="button" class="btn btn-primary" data-dismiss="modal" id="attemptReboot" onClick="attempt_reboot()">Attempt Reboot</button>
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#passwordModal').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="attemptReboot" onClick="attempt_reboot()">Attempt Restart</button>
+			</div>
+		</div>
+	</div>
+</div>
+<div class="modal fade" id="passwordModalCronjob" tabindex="-1" role="dialog" aria-labelledby="passwordModalCronjobLabel" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="passwordModalCronjobLabel">Confirmation for cronjob-related restarting</h5>
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#passwordModal').modal('hide')">
+					<span aria-hidden="true">X</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<form id="passwordForm">
+					<div class="form-group">
+						<label for="passwordInputCronjob">Password</label>
+						<input type="password" class="form-control" id="passwordInputCronjob" autocomplete="current-password" required>
+					</div>
+					<div class="form-group">
+						<label for="containeridmodal">Cronjob Name</label>
+						<input type="text" class="form-control" id="cronjobnamemodal" readonly>
+					</div>
+					<div class="form-group">
+						<input type="text" class="form-control" id="cronjobidmodal" readonly hidden>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#passwordModalCronjob').modal('hide')">Close</button>
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="attemptReboot" onClick="attempt_reboot_cronjob()">Attempt Restart</button>
 			</div>
 		</div>
 	</div>
 </div>
 
+
+<!--
 <h1 style="text-align: center;">CronJobs</h1>
 <div class="table-controls">
     <input 
@@ -1440,6 +1612,7 @@ function makeCronJobTable(data) {
 	<p>Cronjob Console Log</p>
 	<p class="ui-widget-header" id="cronjob_logs" style="white-space: pre-line;"></p>
 </div>
+-->
 <div id="notDraggable" class="ui-widget-content">
 	<p>Master Console Log</p>
 	<p class="ui-widget-header" id="see_logs" style="white-space: pre-line;"></p>

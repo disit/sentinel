@@ -12,6 +12,8 @@
         <th>Command</th>
         <th>Category</th>
         <th>Where To Run</th>
+        <th>Restart logic</th>
+        <th>Description</th>
 		<th>Is Enabled?</th>
         <th>Delete</th>
         <th>Edit</th>
@@ -24,16 +26,16 @@
       <td>{{item[1]}}</td>
       <td>{{item[2]}}</td>
       {% for cat in categories %}{%if item[3] == cat[0] %}<td>{{cat[1]}}</td>{% endif %}{% endfor %}
-      
       <td>{{item[4]}}</td>
+      <td>{{item[6]}}</td>
+      <td>{{item[7]}}</td>
 	  {%if item[5] == 1%}
 	  <td>Disabled</td>
 	  {%else%}
 	  <td>Enabled</td>
 	  {%endif%}
-	  <!--Remember to add enabled/disabled to edit button form-->
       <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
     </tr>
 {% endfor %}
   </tbody>
@@ -82,6 +84,12 @@
                                 <pre><code>/app/scripts/sentinel_nc.sh host port [timeout=10]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                                 <hr>
                                 <pre><code>/app/scripts/sentinel_curl_httpcode.sh url httpcode [timeout=10]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_curl_retries.sh url [timeout=10] [retries=3]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error.  Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_nc_retries.sh host port [timeout=10] [retries=3]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error. Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_curl_httpcode_retries.sh url httpcode [retries=3]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Will attempt up to the number of retries, if all attempts fail then will return an error.  Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                             </div>
                         </div>
                     </div>
@@ -95,6 +103,14 @@
 							Enabled Cronjob
 						</label>
 					</div>
+                    <div class="form-group">
+                        <label for="RestartLogicAdd">Restart Logic</label>
+                        <input type="text" class="form-control" id="RestartLogicAdd" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
+                    </div>
+                    <div class="form-group">
+                        <label for="DescriptionAdd">Restart Logic</label>
+                        <input type="text" class="form-control" id="DescriptionAdd" placeholder="Insert the description which explains the cronjob">
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -156,6 +172,12 @@
                                 <pre><code>/app/scripts/sentinel_nc.sh host port [timeout=10]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                                 <hr>
                                 <pre><code>/app/scripts/sentinel_curl_httpcode.sh url httpcode [timeout=10]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_curl_retries.sh url [timeout=10] [retries=3]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error.  Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_nc_retries.sh host port [timeout=10] [retries=3]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error. Sentinel's maximum cronjob timeout still applies.
+                                <hr>
+                                <pre><code>/app/scripts/sentinel_curl_httpcode_retries.sh url httpcode [retries=3]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Will attempt up to the number of retries, if all attempts fail then will return an error.  Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
                             </div>
                         </div>
                     </div>
@@ -170,6 +192,15 @@
 							Enabled Cronjob
 						</label>
 					</div>
+                    
+                    <div class="form-group">
+                        <label for="RestartLogicEdit">Restart Logic</label>
+                        <input type="text" class="form-control" id="RestartLogicEdit" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
+                    </div>
+                    <div class="form-group">
+                        <label for="DescriptionEdit">Restart Logic</label>
+                        <input type="text" class="form-control" id="DescriptionEdit" placeholder="Insert the description which explains the cronjob">
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -242,9 +273,13 @@
         var command = $(this).data('command');
         var category = $(this).data('category');
         var where_to_run = $(this).data('where');
+        var restart = $(this).data('restart');
+        var description = $(this).data('description');
         $('#CronJobEditId').val(id);
         $('#NameCronJobEdit').val(name);
         $('#CommandEdit').val(command);
+        $('#RestartLogicEdit').val(restart);
+        $('#DescriptionEdit').val(description);
         if (where_to_run==="master") {$('#WhereToRunEdit').val("");} else {$('#WhereToRunEdit').val(where_to_run);}
         $('#editEnabled')[0].checked=1^enabled;
         let select = document.getElementById('category-selection-edit');
@@ -288,12 +323,14 @@
         var command = $('#CommandAdd').val();
         var name = $('#NameCronJobAdd').val();
         var where = $('#WhereToRunAdd').val();
+        var restart = $('#RestartLogicAdd').val();
+        var description = $('#DescriptionAdd').val();
 		var disabled = $('#createEnabled')[0].checked;
         if (password) {
             try {
                 $.ajax({
                     url: './add_cronjob',
-                    data: {psw: password, category: category, command: command, name: name, where_to_run: where, disabled: disabled},
+                    data: {psw: password, category: category, command: command, name: name, where_to_run: where, disabled: disabled, restart: restart, description: description},
                     type: 'POST',
                     success: function(response) {
                         alert("Cronjob was added!");
@@ -322,11 +359,13 @@
     var name = $('#NameCronJobEdit').val();
     var where = $('#WhereToRunEdit').val();
 	var disabled = $('#editEnabled')[0].checked;
+    var restart = $('#RestartLogicEdit').val();
+    var description = $('#DescriptionEdit').val();
     if (password) {
         try {
             $.ajax({
                 url: './edit_cronjob',
-                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled},
+                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled, restart: restart, description: description},
                 type: 'POST',
                 success: function(response) {
                     alert("Cronjob was edited!");
