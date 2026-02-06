@@ -48,6 +48,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
 import hashlib
+from user_agents import parse
 
 def oid_tuple(oid_str):
     """Convert OID string to tuple of integers for proper comparison"""
@@ -564,7 +565,7 @@ def linkify(text):
 def send_email(sender_email, sender_password, receiver_emails, subject, message):
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
         print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
-    composite_message = f"<a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a><br>" + message
+    composite_message = message + f"<br><a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a>"
     smtp_server = os.getenv("smtp-server","no.server.set")
     if not smtp_server:
         print("MISSING smtp-server, email not sent.")
@@ -759,7 +760,7 @@ def is_this_notification_duplicated(message) -> bool:
         hex_string = hash_object.hexdigest()
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''SELECT * FROM checker.sent_notification where sent_when < current_timestamp() - INTERVAL 1 DAY and hash=%s;''' # get a past notification if it matches the hash, at best one day old
+            query = '''SELECT * FROM checker.sent_notification where sent_when > current_timestamp() - INTERVAL 1 DAY and hash=%s;''' # get a past notification if it matches the hash, at best one day old
             cursor.execute(query,(hex_string,))
             conn.commit()
             check_notification_results = cursor.fetchall()
@@ -1079,7 +1080,7 @@ def auto_alert_status():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
-SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
+SELECT datetime,result,errors,name,command,categories.category,restart_logic,description FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
             cursor.execute(query)
             conn.commit()
             cron_results = cursor.fetchall()
@@ -1486,7 +1487,7 @@ def runcronjobs():
             conn.commit()
             results = cursor.fetchall()
             for r in list(results): 
-                print(f"Running {r[1]} cronjob")
+                print(f"{datetime.now()} Running {r[1]} cronjob")
                 try:
                     if int(r[5]) == 1:
                         query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
@@ -1578,8 +1579,9 @@ def send_advanced_alerts(message):
             for failed_cron in message[5]:
                 stdout_msg=failed_cron[1].replace('\n','<br>')
                 stderr_msg=failed_cron[2].replace('\n','<br>')
-                ran_command = failed_cron[4].replace('\n','<br>')
-                prepare_text += f"<br>Cronjob {failed_cron[3]} assigned to category {failed_cron[5]} with code {ran_command} gave {'no result and' if len(failed_cron[1])<1 else 'result of: ' + stdout_msg + ' but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}"
+                ran_command=failed_cron[4].replace('\n','<br>')
+                name_to_call=failed_cron[3] if (failed_cron[7]==None or failed_cron[7]=="") else failed_cron[7]
+                prepare_text += f'''<br>{name_to_call} assigned to category {failed_cron[5]} with code <code>{ran_command}</code> gave {'no result and' if len(failed_cron[1])<1 else 'result of: <div style="color:green;">' + stdout_msg + '</div> but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}'''
             text_for_email += prepare_text + "<br><br>"
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
@@ -1660,7 +1662,7 @@ def send_advanced_alerts(message):
             all_msgs = []
             prepare_text = "This cronjob failed:\n"
             for failed_cron in message[5]:
-                cron_name = failed_cron[3]
+                cron_name = failed_cron[3] if (failed_cron[7]==None or failed_cron[7]=="") else failed_cron[7]
                 bash_code = failed_cron[4]
                 raw_result = failed_cron[1]
                 raw_error = failed_cron[2]
@@ -1668,17 +1670,17 @@ def send_advanced_alerts(message):
 
                 # Handle the result logic and escaping outside the f-string
                 if len(raw_result) < 1:
-                    result_text = "no result.\n"
+                    result_text = "no result."
                 else:
                     escaped_res = raw_result.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                    result_text = f"result of: <code>{escaped_res}</code>\n"
+                    result_text = f"result of: <code>{escaped_res}</code>"
 
                 # Escape the error text
                 escaped_err = raw_error.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
                 prepare_text += (
-                    f"Cronjob<b>{cron_name}  "
-                    f"with code {bash_code}  "
-                    f"gave {result_text}  "
+                    f"<b>{cron_name}</b>\n"
+                    f"with code {bash_code}\n"
+                    f"gave {result_text}\n"
                     f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
                 all_msgs.append(prepare_text)
@@ -1776,12 +1778,13 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if 'username' in session:
                     # basis for making a better mobile ui, if mobile then make main ui with far less columns
-                    # ua_string = request.headers.get('User-Agent')
-                    # user_agent = parse(ua_string)
-
-                    # Access easy-to-use boolean properties
-                    #    if user_agent.is_mobile:
-                    # device = "Mobile"
+                    user_agent_string = request.headers.get('User-Agent')
+                    user_agent = parse(user_agent_string)
+                    
+                    if user_agent.is_mobile: # maybe remove 19/20
+                        column_string = """{columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 8, visible: false},{target: 10, visible: false},{target: 11, visible: false},{target: 12, visible: false},{target: 14, visible: false},{target: 15, visible: false},{target: 19, visible: false},{target: 20, visible: false}]}""" # less columns
+                    else:
+                        column_string = """{columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]}""" # usual columns
 
 
                     cursor = conn.cursor(buffered=True)
@@ -1791,7 +1794,7 @@ def create_app():
                     conn.commit()
                     results = cursor.fetchall()
                     if session['username'] != "admin":
-                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],multi=os.getenv("is-multi","False"))
+                        return render_template("checker-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],multi=os.getenv("is-multi","False"), column_string=column_string)
                     else:
                         query_2 = '''select * from all_logs limit %s;'''
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
@@ -1800,7 +1803,7 @@ def create_app():
                         query_3 = "SELECT name,categories.category FROM categories join cronjobs on categories.idcategories=cronjobs.category;"
                         cursor.execute(query_3)
                         results_cronjobs = cursor.fetchall()
-                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),cronjobs=results_cronjobs,admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"),multi=os.getenv("is-multi","False"))
+                        return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),cronjobs=results_cronjobs,admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"),multi=os.getenv("is-multi","False"), column_string=column_string)
                 return redirect(url_for('login'))
         except Exception:
             print("Something went wrong because of",traceback.format_exc())
@@ -1969,7 +1972,7 @@ def create_app():
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled FROM checker.cronjobs where where_to_run is null;'''
+                    query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled, restart_logic, description FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled, restart_logic, description FROM checker.cronjobs where where_to_run is null;'''
                     query2 = '''SELECT * from categories;'''
                     cursor.execute(query)
                     conn.commit()

@@ -7,5 +7,6 @@ pysnmp
 reportlab
 requests
 starlette
+user_agents
 uvicorn
 waitress

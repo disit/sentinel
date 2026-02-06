@@ -16,7 +16,8 @@
 	];
 	var less_columns = true;
 	var container_names = [];
-	var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]};
+	var dict_of_hidden_columns = {{column_string | safe}};
+	//var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]};
 	var container_rows = {};
 	var iframes = {};
 	var closed_categories = new Set();
@@ -110,6 +111,9 @@
 		}
 	});
 	
+
+
+
 function findClosestKeyStartsWith(searchTerm, obj) {
     try {
         if (typeof searchTerm !== "string" || typeof obj !== "object" || obj === null) {
@@ -628,7 +632,12 @@ function makeCronJobTable(data) { // disabled
 			console.log("Failed to write to category log due to: "+exception_var)
 		}
 		// tldr; if it's empty assign the value otherwise add to it, this avoids printing "undefined" (thanks js, always on point)
-		logs_for_categories[log_destination] === "" ? logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>" : new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		if (document.getElementById(log_destination).innerHTML === "") {
+			logs_for_categories[log_destination] = new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		}
+		else {
+			logs_for_categories[log_destination] = logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		}
 		if (log_destination!="see_logs") { 
 			document.getElementById("see_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
 			logs_for_categories["see_logs"] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
@@ -813,7 +822,7 @@ function makeCronJobTable(data) { // disabled
 				elements.forEach(cellData => {
 					const td = document.createElement("td");
 					if (index_of_below_array === 6) {
-						var content_of_id_cell = '<a target="_blank" href="./cronjobs_logs?cronjob_id='+Number(elements[2].match(/\d+/)[0])+'">' + cellData + '</a>';
+						var content_of_id_cell = '<a target="_blank" href="./cronjobs_logs?cronjob_id='+Number(elements[2].match(/\d+/)[0])+'">' + cellData + ' (cronjob)</a>';
 
 						td.innerHTML = content_of_id_cell;
 						var link = td.querySelector('a');
@@ -891,7 +900,7 @@ function makeCronJobTable(data) { // disabled
 				elements.forEach(cellData => {
 					const td = document.createElement("td");
 					if (index_of_below_array === 6) {
-						var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'" data-source="' + elements[12] + '">' + cellData + '</a>';
+						var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'" data-source="' + elements[12] + '">' + cellData + ' (container)</a>';
 
 						td.innerHTML = content_of_id_cell;
 						var link = td.querySelector('a');
@@ -978,8 +987,8 @@ function makeCronJobTable(data) { // disabled
 		table.appendChild(thead);
 		table.appendChild(tbody);
 		const box = document.createElement("div");
-		box.setAttribute("class", "p-5 text-center");
-		box.setAttribute("style", "border-radius: 3rem; background-color: "+cg.next().value)
+		box.setAttribute("class", "p-1 text-center");
+		box.setAttribute("style", "padding: 1rem !important;border-radius: 3rem; background-color: "+cg.next().value)
 		const name_of_table = document.createElement("h1");
 		name_of_table.setAttribute("class", "text-body-emphasis");
 		name_of_table.innerHTML = name_of_table_value;
@@ -1071,7 +1080,7 @@ function makeCronJobTable(data) { // disabled
 			var val = categorizedData[val_2];
 			var i = val_2;
 			const box = document.createElement("div");
-			box.setAttribute("class", "p-5 text-center");
+			box.setAttribute("class", "p-1 text-center");
 			box.setAttribute("style", "border-radius: 1.2rem; background-color: "+cg.next().value);
 			box.setAttribute("id",i);
 			if (!closed_categories.has(i)) box.style.display = "none"; else box.style.display = "block";
@@ -1366,6 +1375,12 @@ function makeCronJobTable(data) { // disabled
 			closed_categories.delete(category_element_id);
 		}
 		update_routine();
+		const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+		// 4. Scroll to the position minus the header height
+		window.scrollTo({
+			top: elementPosition, // maybe this works
+			behavior: 'smooth'
+		});
 	};
 	
 	
@@ -1373,7 +1388,7 @@ function makeCronJobTable(data) { // disabled
 		less_columns = !less_columns;
 		if (less_columns) {
 			button.innerHTML = "Show additional columns";
-			dict_of_hidden_columns={columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 13, visible: false},{target: 14, visible: false}]};
+			dict_of_hidden_columns={{column_string | safe}};
 		}
 		else {
 			dict_of_hidden_columns={retrieve: true};
@@ -1419,7 +1434,7 @@ function makeCronJobTable(data) { // disabled
 			}, 500);
 		});
 </script>
-<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column;">
+<nav id="navbar" class="navbar navbar-custom sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column; transition: transform 0.3s ease-in-out; ">
 	<div class="collapse navbar-collapse container-fluid" id="navbarSupportedContent">
 		<ul class="navbar-nav mr-auto">
 			<li class="nav-item active">
@@ -1428,7 +1443,7 @@ function makeCronJobTable(data) { // disabled
 		</ul>
 		<ul class="navbar-nav mr-auto">
 			<li class="nav-item active">
-				<a class="navbar-brand">Snap4Sentinel: Platform Process Monitoring and Control</a>
+				<a class="navbar-brand" style="text-wrap-mode: wrap;">Snap4Sentinel: Platform Process Monitoring and Control</a>
 			</li>
 		</ul>
 		<ul class="dropdown" style="margin-top: auto; margin-bottom: auto;">
@@ -1618,7 +1633,7 @@ function makeCronJobTable(data) { // disabled
 	<p class="ui-widget-header" id="see_logs" style="white-space: pre-line;"></p>
 </div>
 {% block additional_content_admin_log %}{% endblock %}
-<nav class="navbar sticky-bottom bg-body-tertiary">
+<nav class="navbar sticky-md-bottom bg-body-tertiary">
 	<div class="container-fluid">
 		<a class="navbar-brand"><button id="alerts" class="btn btn-danger" onClick="alerts()">No alerts to be shown</button></a>
 		<a class="navbar-brand">Welcome, {{user}}</a>
@@ -1632,6 +1647,12 @@ function makeCronJobTable(data) { // disabled
     <div class="floating-div" id="floating-div">
     </div>
 <style>
+
+	/* State when hidden */
+	.nav--hidden {
+		transform: translateY(-100%);
+	}
+
 	.tooltip-inner {
 	user-select: text;
 	}
@@ -1714,6 +1735,13 @@ function makeCronJobTable(data) { // disabled
 			display: none; /* Hide headers on mobile */
 		}
 
+		
+		.navbar-custom {
+			/* Scale the element to 70% of its size */
+			zoom: 70%;
+		}
+
+
 		.custom-table tr {
 			display: block;
 			margin-bottom: 1rem;
@@ -1756,4 +1784,29 @@ function makeCronJobTable(data) { // disabled
 
 	/* end styles for cronjob table */
 </style>
+<script>
+	
+	//navbar things
+	const nav = document.getElementById('navbar');
+	let lastScrollY = window.scrollY;
+
+	window.addEventListener('scroll', () => {
+		const currentScrollY = window.scrollY;
+
+		// 1. Prevent logic from firing on iOS elastic "bounce" (top of page)
+		if (currentScrollY < 0) return;
+
+		// 2. Hide on scroll down, show on scroll up
+		if (currentScrollY > lastScrollY && currentScrollY > 200) {
+			// Scrolling Down & scrolled at least 100px
+			nav.classList.add('nav--hidden');
+		} else {
+			// Scrolling Up
+			nav.classList.remove('nav--hidden');
+		}
+
+		// 3. Update position
+		lastScrollY = currentScrollY;
+	});
+</script>
 {% endblock %}
