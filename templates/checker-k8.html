@@ -822,7 +822,7 @@ function makeCronJobTable(data) { // disabled
 				elements.forEach(cellData => {
 					const td = document.createElement("td");
 					if (index_of_below_array === 6) {
-						var content_of_id_cell = '<a target="_blank" href="./cronjobs_logs?cronjob_id='+Number(elements[2].match(/\d+/)[0])+'">' + cellData + '</a>';
+						var content_of_id_cell = '<a target="_blank" href="./cronjobs_logs?cronjob_id='+Number(elements[2].match(/\d+/)[0])+'">' + cellData + ' (cronjob)</a>';
 
 						td.innerHTML = content_of_id_cell;
 						var link = td.querySelector('a');
@@ -900,7 +900,7 @@ function makeCronJobTable(data) { // disabled
 				elements.forEach(cellData => {
 					const td = document.createElement("td");
 					if (index_of_below_array === 6) {
-						var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'" data-source="' + elements[12] + '">' + cellData + '</a>';
+						var content_of_id_cell = '<a target="_blank" href="./container/'+elements[6]+'" data-source="' + elements[12] + '">' + cellData + ' (container)</a>';
 
 						td.innerHTML = content_of_id_cell;
 						var link = td.querySelector('a');

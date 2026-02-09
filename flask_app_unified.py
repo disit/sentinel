@@ -1678,10 +1678,10 @@ def send_advanced_alerts(message):
                 # Escape the error text
                 escaped_err = raw_error.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
                 prepare_text += (
-                    f"<b>{cron_name}</b><br>"
-                    f"with code {bash_code}<br>"
-                    f"gave {result_text}<br>"
-                    f"Error: <code>{escaped_err}</code> at {timestamp}<br><br>"
+                    f"Cronjob<b>{cron_name}  "
+                    f"with code {bash_code}  "
+                    f"gave {result_text}  "
+                    f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
                 all_msgs.append(prepare_text)
             [text_for_telegram.append(msg) for msg in all_msgs]
@@ -1778,13 +1778,12 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if 'username' in session:
                     # basis for making a better mobile ui, if mobile then make main ui with far less columns
-                    user_agent_string = request.headers.get('User-Agent')
-                    user_agent = parse(user_agent_string)
-                    
-                    if user_agent.is_mobile: # maybe remove 19/20
-                        column_string = """{columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 8, visible: false},{target: 10, visible: false},{target: 11, visible: false},{target: 12, visible: false},{target: 14, visible: false},{target: 15, visible: false}]}""" # less columns
-                    else:
-                        column_string = """{columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]}""" # usual columns
+                    # ua_string = request.headers.get('User-Agent')
+                    # user_agent = parse(ua_string)
+
+                    # Access easy-to-use boolean properties
+                    #    if user_agent.is_mobile:
+                    # device = "Mobile"
 
 
                     cursor = conn.cursor(buffered=True)
