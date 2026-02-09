@@ -50,6 +50,7 @@
 						<label for="containeridmodalAdd">Container ID</label>
 						<input type="text" class="form-control" id="containeridmodalAdd" required>
 					</div>
+					<div id="containerextradetailsAdd" class="form-text">End the string with an asterisk (*) to match all which starts with string behind asterisk</div>
 					<label for="category-selection">Select category:</label>
 					<select id="category-selection" name="category-selection" class="form-select">
 						{%for item in categories %}
@@ -102,6 +103,7 @@
 						<label for="containeridmodalEdit">Container ID</label>
 						<input type="text" class="form-control" id="containeridmodalEdit" required readonly>
 					</div>
+					<div id="containerextradetailsEdit" class="form-text">End the string with an asterisk (*) to match all which starts with string behind asterisk</div>
 					<label for="category-selection-edit">Select category:</label>
 					<select id="category-selection-edit" name="category-selection-edit" class="form-select">
 						{% for item in categories %}
@@ -165,7 +167,27 @@
 	</div>
 </div>
 <script>
+	    document.addEventListener('DOMContentLoaded', () => {
+        // 1. Get the 'value' from the URL query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetValue = urlParams.get('container_id');
 
+        // 2. Only proceed if the parameter 'value' is actually present
+        if (targetValue) {
+            // 3. Construct the selector for class "thisclass" and attribute "thisattribute"
+            const selector = `.open-modal-e[data-component="${targetValue}"]`;
+            const button = document.querySelector(selector);
+
+            if (button) {
+            button.click();
+            } else {
+			alert(`Precise container not found, this is likely due to kubernetes not having guaranteed names, try look for something which starts with "${targetValue}"`);
+            console.warn(`Element not found for selector: ${selector}`);
+            }
+        }
+        
+		$("#containers").DataTable();
+        });
 	$('.open-modal-m').on('click', function() {
 		var id = $(this).data('component');
 		$('#componentDeleteId').val(id);
@@ -197,7 +219,6 @@
 		}
 		$('#editComponent').modal('show');
 	});
-	$("#containers").DataTable();
 	$('.open-modal').on('click', function() {
 		$('#addComponentModal').modal('show');
 	});

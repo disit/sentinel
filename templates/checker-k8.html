@@ -16,7 +16,8 @@
 	];
 	var less_columns = true;
 	var container_names = [];
-	var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]};
+	var dict_of_hidden_columns = {{column_string | safe}};
+	//var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]};
 	var container_rows = {};
 	var iframes = {};
 	var closed_categories = new Set();
@@ -110,6 +111,9 @@
 		}
 	});
 	
+
+
+
 function findClosestKeyStartsWith(searchTerm, obj) {
     try {
         if (typeof searchTerm !== "string" || typeof obj !== "object" || obj === null) {
@@ -245,7 +249,7 @@ function makeCronJobTable(data) { // disabled
         const statusValue = (!row[2] || row[2].trim() === "") ? "ok" : "ko";
         return {
             name: row[3] || "",
-            edit: "<input type=\"button\" class=\"btn btn-info\" value=\"Edit cronjob\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+row[6]+"')\">" || "",
+            edit: "<input type=\"button\" class=\"btn btn-info\" value=\"Edit\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+row[6]+"')\">" || "",
 			category: row[5] || "",
             command: row[4] || "",
             update: row[0] || "",
@@ -511,7 +515,7 @@ function makeCronJobTable(data) { // disabled
 			return;
 		}
 		element.value = "Checking the port...";
-		document.getElementById(container+'-result').innerHTML= 'Pending... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+		document.getElementById(container+'-result').innerHTML= 'Pending... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/><title>Checking port...</title></svg>';
 		try {
 			$.ajax({
 				url: './run_test',
@@ -575,7 +579,7 @@ function makeCronJobTable(data) { // disabled
 		try {
 			var oldtext = test_element.name;
 			test_element.value = "Running " + test_element.value;
-			document.getElementById(oldtext+'-result').innerHTML= 'Pending... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			document.getElementById(oldtext+'-result').innerHTML= 'Pending... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/><title>Running test...</title></svg>';
 			let test_family = test_element.parentElement.querySelectorAll('input');
 			let test_name = test_family[0].value;
 			let dict_to_be_sent = {};
@@ -628,7 +632,12 @@ function makeCronJobTable(data) { // disabled
 			console.log("Failed to write to category log due to: "+exception_var)
 		}
 		// tldr; if it's empty assign the value otherwise add to it, this avoids printing "undefined" (thanks js, always on point)
-		logs_for_categories[log_destination] === "" ? logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>" : new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		if (document.getElementById(log_destination).innerHTML === "") {
+			logs_for_categories[log_destination] = new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		}
+		else {
+			logs_for_categories[log_destination] = logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		}
 		if (log_destination!="see_logs") { 
 			document.getElementById("see_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
 			logs_for_categories["see_logs"] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
@@ -823,11 +832,11 @@ function makeCronJobTable(data) { // disabled
 					}
 					else if (index_of_below_array === 13) {
 						var content_of_id_cell;
-						if (cellData.startsWith("running - ")){
-							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+						if (cellData.startsWith("running - " || cellData.startsWith("This cronjob is disabled"))){
+							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/><title>Everything runs as expected</title></svg>';
 						}
 						else {
-							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/><title>Something is not running as expected</title></svg>';
 						}
 						
 						td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
@@ -870,7 +879,7 @@ function makeCronJobTable(data) { // disabled
 				row.appendChild(in_case_of_problems);
 					
 				var do_not_update_this_td = document.createElement("td");
-				do_not_update_this_td.innerHTML="<input type=\"button\" class=\"btn btn-info\" value=\"Edit cronjob\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+Number(elements[2].match(/\d+/)[0])+"')\">"
+				do_not_update_this_td.innerHTML="<input type=\"button\" class=\"btn btn-info\" value=\"Edit\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+Number(elements[2].match(/\d+/)[0])+"')\">"
 				row.appendChild(do_not_update_this_td);
 				tbody.appendChild(row);
 				testresults.innerHTML="Not applicable";
@@ -903,17 +912,17 @@ function makeCronJobTable(data) { // disabled
 						var content_of_id_cell;
 						try {
 							if (elements[4] === "Cronjob") {
-								if (cellData.startsWith("running - ")){
-									content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+								if (cellData.startsWith("running - " || cellData.startsWith("This cronjob is disabled"))){
+									content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 								}
-								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';}
+								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';}
 							}
 							else if (cellData === "running" || cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
-								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
-							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 							}
 							catch {
-								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 							}
 						td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
 					}
@@ -966,6 +975,7 @@ function makeCronJobTable(data) { // disabled
 				do_not_update_this.setAttribute("value", "Stop refreshing");
 				do_not_update_this_td.appendChild(do_not_update_this);
 				do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[6]+'" id="mutebutton-'+elements[6]+'">Mute</button>';
+				do_not_update_this_td.innerHTML+="<input type=\"button\" class=\"btn btn-info\" value=\"Edit container\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+Number(elements[2].match(/\d+/)[0])+"')\">"
 				row.appendChild(do_not_update_this_td);
 				tbody.appendChild(row);
 				testresults.innerHTML=findClosestKeyStartsWith(row.childNodes[7].innerHTML, test_results_divs).matchValue;
@@ -978,8 +988,8 @@ function makeCronJobTable(data) { // disabled
 		table.appendChild(thead);
 		table.appendChild(tbody);
 		const box = document.createElement("div");
-		box.setAttribute("class", "p-5 text-center");
-		box.setAttribute("style", "border-radius: 3rem; background-color: "+cg.next().value)
+		box.setAttribute("class", "p-1 text-center");
+		box.setAttribute("style", "padding: 1rem !important;border-radius: 3rem; background-color: "+cg.next().value)
 		const name_of_table = document.createElement("h1");
 		name_of_table.setAttribute("class", "text-body-emphasis");
 		name_of_table.innerHTML = name_of_table_value;
@@ -1071,7 +1081,7 @@ function makeCronJobTable(data) { // disabled
 			var val = categorizedData[val_2];
 			var i = val_2;
 			const box = document.createElement("div");
-			box.setAttribute("class", "p-5 text-center");
+			box.setAttribute("class", "p-1 text-center");
 			box.setAttribute("style", "border-radius: 1.2rem; background-color: "+cg.next().value);
 			box.setAttribute("id",i);
 			if (!closed_categories.has(i)) box.style.display = "none"; else box.style.display = "block";
@@ -1223,7 +1233,7 @@ function makeCronJobTable(data) { // disabled
 				var source = "";
 			}
 			var result_loc = document.getElementById(id+"-reboot-result");
-			result_loc.innerHTML='Restarting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			result_loc.innerHTML='Restarting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/><title>Restarting...</title></svg>';
 			var string = new Date().toLocaleString();
 			if (password) {
 				try {
@@ -1259,7 +1269,7 @@ function makeCronJobTable(data) { // disabled
 			var password = $('#passwordInputCronjob').val();
 			var id = $('#cronjobidmodal').val();
 			var result_loc = document.getElementById(id+"-reboot-result");
-			result_loc.innerHTML='Restarting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/></svg>';
+			result_loc.innerHTML='Restarting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/><title>Restarting</title></svg>';
 			var string = new Date().toLocaleString();
 			if (password) {
 				try {
@@ -1308,9 +1318,9 @@ function makeCronJobTable(data) { // disabled
 				}
 			}
 			if (hasFailure) {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="red" /></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="red" /><title>No issues in execution</title></svg>';
 			} else {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="green" /></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="green" /><title>Issues in execution</title></svg>';
 			}
 			//dataTable.destroy();
 		});
@@ -1332,10 +1342,10 @@ function makeCronJobTable(data) { // disabled
 				}
 			}
 			if (isNotRunning) {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/><title>No issues in execution</title></svg>';
 			} 
 			else {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/><title>Issues in execution</title></svg>';
 			}
 		});
 	};
@@ -1366,6 +1376,12 @@ function makeCronJobTable(data) { // disabled
 			closed_categories.delete(category_element_id);
 		}
 		update_routine();
+		const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+		// 4. Scroll to the position minus the header height
+		window.scrollTo({
+			top: elementPosition, // maybe this works
+			behavior: 'smooth'
+		});
 	};
 	
 	
@@ -1373,7 +1389,7 @@ function makeCronJobTable(data) { // disabled
 		less_columns = !less_columns;
 		if (less_columns) {
 			button.innerHTML = "Show additional columns";
-			dict_of_hidden_columns={columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 13, visible: false},{target: 14, visible: false}]};
+			dict_of_hidden_columns={{column_string | safe}};
 		}
 		else {
 			dict_of_hidden_columns={retrieve: true};
@@ -1419,7 +1435,7 @@ function makeCronJobTable(data) { // disabled
 			}, 500);
 		});
 </script>
-<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column;">
+<nav id="navbar" class="navbar navbar-custom sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column; transition: transform 0.3s ease-in-out; ">
 	<div class="collapse navbar-collapse container-fluid" id="navbarSupportedContent">
 		<ul class="navbar-nav mr-auto">
 			<li class="nav-item active">
@@ -1428,7 +1444,7 @@ function makeCronJobTable(data) { // disabled
 		</ul>
 		<ul class="navbar-nav mr-auto">
 			<li class="nav-item active">
-				<a class="navbar-brand">Snap4Sentinel: Platform Process Monitoring and Control</a>
+				<a class="navbar-brand" style="text-wrap-mode: wrap;">Snap4Sentinel: Platform Process Monitoring and Control</a>
 			</li>
 		</ul>
 		<ul class="dropdown" style="margin-top: auto; margin-bottom: auto;">
@@ -1618,7 +1634,7 @@ function makeCronJobTable(data) { // disabled
 	<p class="ui-widget-header" id="see_logs" style="white-space: pre-line;"></p>
 </div>
 {% block additional_content_admin_log %}{% endblock %}
-<nav class="navbar sticky-bottom bg-body-tertiary">
+<nav class="navbar sticky-md-bottom bg-body-tertiary">
 	<div class="container-fluid">
 		<a class="navbar-brand"><button id="alerts" class="btn btn-danger" onClick="alerts()">No alerts to be shown</button></a>
 		<a class="navbar-brand">Welcome, {{user}}</a>
@@ -1632,6 +1648,12 @@ function makeCronJobTable(data) { // disabled
     <div class="floating-div" id="floating-div">
     </div>
 <style>
+
+	/* State when hidden */
+	.nav--hidden {
+		transform: translateY(-100%);
+	}
+
 	.tooltip-inner {
 	user-select: text;
 	}
@@ -1714,6 +1736,13 @@ function makeCronJobTable(data) { // disabled
 			display: none; /* Hide headers on mobile */
 		}
 
+		
+		.navbar-custom {
+			/* Scale the element to 70% of its size */
+			zoom: 70%;
+		}
+
+
 		.custom-table tr {
 			display: block;
 			margin-bottom: 1rem;
@@ -1756,4 +1785,29 @@ function makeCronJobTable(data) { // disabled
 
 	/* end styles for cronjob table */
 </style>
+<script>
+	
+	//navbar things
+	const nav = document.getElementById('navbar');
+	let lastScrollY = window.scrollY;
+
+	window.addEventListener('scroll', () => {
+		const currentScrollY = window.scrollY;
+
+		// 1. Prevent logic from firing on iOS elastic "bounce" (top of page)
+		if (currentScrollY < 0) return;
+
+		// 2. Hide on scroll down, show on scroll up
+		if (currentScrollY > lastScrollY && currentScrollY > 200) {
+			// Scrolling Down & scrolled at least 100px
+			nav.classList.add('nav--hidden');
+		} else {
+			// Scrolling Up
+			nav.classList.remove('nav--hidden');
+		}
+
+		// 3. Update position
+		lastScrollY = currentScrollY;
+	});
+</script>
 {% endblock %}

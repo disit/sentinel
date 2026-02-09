@@ -297,7 +297,7 @@ CREATE TABLE `rebooting_cronjobs` (
 
 CREATE TABLE `sent_notification` (
   `idsent_notification` int(11) NOT NULL AUTO_INCREMENT,
-  `hash` varchar(32) NOT NULL,
+  `hash` varchar(128) NOT NULL,
   `sent_when` varchar(45) NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`idsent_notification`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -14,6 +14,11 @@
         <th>Where To Run</th>
         <th>Restart logic</th>
         <th>Description</th>
+        <th>Timeout Time</th>
+        <th>Retries</th>
+        <th>Retries wait</th>
+        <th>IP</th>
+        <th>Target</th>
 		<th>Is Enabled?</th>
         <th>Delete</th>
         <th>Edit</th>
@@ -29,13 +34,18 @@
       <td>{{item[4]}}</td>
       <td>{{item[6]}}</td>
       <td>{{item[7]}}</td>
+      <td>{{item[8]}}</td>
+      <td>{{item[9]}}</td>
+      <td>{{item[10]}}</td>
+      <td>{{item[11]}}</td>
+      <td>{{item[12]}}</td>
 	  {%if item[5] == 1%}
 	  <td>Disabled</td>
 	  {%else%}
 	  <td>Enabled</td>
 	  {%endif%}
       <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
     </tr>
 {% endfor %}
   </tbody>
@@ -66,33 +76,19 @@
                     </div>
                     <div class="form-group">
                         <label for="CommandAdd">Command</label>
-                        <input type="text" class="form-control" id="CommandAdd" placeholder="Insert a bash command" required>
-                        <p class="d-inline-flex gap-1">
-                            <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseAdd" role="button" aria-expanded="false" aria-controls="collapseAdd">Show More</a>
-                        </p>                
-                        <div class="collapse" id="collapseAdd">
-                            <div class="card card-body">
-                                <h3>Network Port & Service Monitoring Examples</h3>
-                                <pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
-                                <hr>
-                                <pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
-                                <hr>
-                                <pre><code>CODE=$(curl -sL -o /dev/null -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl.sh url [timeout=10]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_nc.sh host port [timeout=10]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl_httpcode.sh url httpcode [timeout=10]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl_retries.sh url [timeout=10] [retries=3]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error.  Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_nc_retries.sh host port [timeout=10] [retries=3]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl_httpcode_retries.sh url httpcode [retries=3]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Will attempt up to the number of retries, if all attempts fail then will return an error.  Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                            </div>
-                        </div>
+                        <input type="text" class="form-control" id="CommandAdd" placeholder="Insert a bash command" required disabled>               
                     </div>
+
+                    
+                    <label for="command-prototype-add">Select command type:</label>
+                    <select id="command-prototype-add" name="command-prototype-add" class="form-select" onchange="handleSelectionCommandPrototypeAdd(this)">
+                    {% for element in cronjobs_prototypes%}{% set word_list = element[3].split(',') %}
+                    <option value="{{element[1] | e}}" data-desc="{{element[2] | e}}" data-params="{{word_list}}">{{element[4]}}</option>
+                    {% endfor %}
+                    </select>
+                    <div id="category-selection-desc-add" class="form-text">{{cronjobs_prototypes[0][2] | e}}</div>
+                    <div id="additional-params-add"></div>
+
                     <div class="form-group">
                         <label for="WhereToRunAdd">Where to run</label>
                         <input type="text" class="form-control" id="WhereToRunAdd" placeholder="Insert where to run this cronjob (leave empty for master)">
@@ -105,6 +101,31 @@
                         <label for="DescriptionAdd">Description</label>
                         <input type="text" class="form-control" id="DescriptionAdd" placeholder="Insert the description which explains the cronjob">
                     </div>
+                    <div class="form-group">
+                        <label for="Timeout_timeAdd">Timeout_time</label>
+                        <input type="number" min="0"class="form-control" id="Timeout_timeAdd" placeholder="Insert the Timeout_time of the cronjob" onchange="update_add()">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="RetriesAdd">Retries</label>
+                        <input type="number" min="0" class="form-control" id="RetriesAdd" placeholder="Insert the Retries of the cronjob" onchange="update_add()">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="Retries_waitAdd">Retries_wait</label>
+                        <input type="number" min="0" class="form-control" id="Retries_waitAdd" placeholder="Insert the Retries_wait of the cronjob" onchange="update_add()">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="IPAdd">IP</label>
+                        <input class="form-control" id="IPAdd" placeholder="Insert the IP of the cronjob">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="TargetAdd">Target</label>
+                        <input type="text" class="form-control" id="TargetAdd" placeholder="Insert the Target of the cronjob" onchange="update_add()">
+                    </div>
+
 					<div class="form-check">
 						<input class="form-check-input" type="checkbox" value="" id="createEnabled" checked>
 						<label class="form-check-label" for="createEnabled">
@@ -151,50 +172,64 @@
                         <label for="NameCronJobEdit">Name</label>
                         <input type="text" class="form-control" id="NameCronJobEdit" required>
                     </div>
+
                     <div class="form-group">
                         <label for="CommandEdit">Command</label>
-                        <input type="text" class="form-control" id="CommandEdit" placeholder="Insert a bash command" required>
-                        <p class="d-inline-flex gap-1">
-                            <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseEdit" role="button" aria-expanded="false" aria-controls="collapseEdit">Show More</a>
-                        </p>
-                                        
-                        <div class="collapse" id="collapseEdit">
-                            <div class="card card-body">
-                                <h3>Network Port & Service Monitoring Examples</h3>
-                                <pre><code>curl -ILsSf http://127.0.0.1:9080</code></pre>Prints the head (-I) of a request to the provided url. Follows redirects (-L), doesn't print to stderr (-s) <i>unless</i> there's an error (-S). HTTP errors are considered errors (-f) and write to stderr.</li>
-                                <hr>
-                                <pre><code>nc -zn 127.0.0.1 9080 > /dev/null 2>&1 && echo "ok" || echo "error: connection refused or timeout" >&2</code></pre>Uses Netcat to check a port. Uses numeric ip (-n) and only checks the port (-z). Beyond <code>> /dev/null</code> there is a simple logic to send errors to stderr: nc sends much of its output to stderr and the rest of the script cleans it up.</li>
-                                <hr>
-                                <pre><code>CODE=$(curl -sL -o /dev/null -w "%{http_code}" http://127.0.0.1:9080) && [ "$CODE" -eq 200 ] && echo "ok" || echo "error: status $CODE" >&2</code></pre>Gets the headers of a get request which has its output thrown away (-o /dev/null), then reads and store the value. It is then compared to 200; if it is equal, print to stdout, otherwise print to stderr.</li>
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl.sh url [timeout=10]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_nc.sh host port [timeout=10]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl_httpcode.sh url httpcode [timeout=10]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl_retries.sh url [timeout=10] [retries=3]</code></pre>Makes a HEAD request with curl and accepts 2xx and 3xx. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error.  Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_nc_retries.sh host port [timeout=10] [retries=3]</code></pre>Uses nc to check a port. Optional timeout may be set, in seconds. Will attempt up to the number of retries, if all attempts fail then will return an error. Sentinel's maximum cronjob timeout still applies.
-                                <hr>
-                                <pre><code>/app/scripts/sentinel_curl_httpcode_retries.sh url httpcode [retries=3]</code></pre>Makes a GET request with curl and accepts only exactly httpcode, after follows. Will attempt up to the number of retries, if all attempts fail then will return an error.  Optional timeout may be set, in seconds. Sentinel's maximum cronjob timeout still applies.
-                            </div>
-                        </div>
+                        <input type="text" class="form-control" id="CommandEdit" placeholder="Insert a bash command" required disabled>
                     </div>
+
+
+                    <label for="command-prototype-edit">Select command type:</label>
+                    <select id="command-prototype-edit" name="command-prototype-edit" class="form-select" onchange="handleSelectionCommandPrototypeEdit(this)">
+                    {% for element in cronjobs_prototypes%}{% set word_list = element[3].split(',') %}
+                    <option value="{{element[1] | e}}" data-desc="{{element[2] | e}}" data-params="{{word_list}}">{{element[4]}}</option>
+                    {% endfor %}
+                    </select>
+                    <div id="category-selection-desc-edit" class="form-text">{{cronjobs_prototypes[0][2] | e}}</div>
+                    
+                    <div id="additional-params-edit"></div>
+
                     <div class="form-group">
                         <label for="WhereToRunEdit">Where to run</label>
                         <input type="text" class="form-control" id="WhereToRunEdit" placeholder="Insert where to run this cronjob (leave empty for master)">
                     </div>
-					
-                    
+
                     <div class="form-group">
                         <label for="RestartLogicEdit">Restart Logic</label>
                         <input type="text" class="form-control" id="RestartLogicEdit" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
                     </div>
+
                     <div class="form-group">
                         <label for="DescriptionEdit">Description</label>
-                        <input type="text" class="form-control" id="DescriptionEdit" placeholder="Insert the description which explains the cronjob">
+                        <input type="number" min="0" class="form-control" id="DescriptionEdit" placeholder="Insert the description which explains the cronjob">
+                    </div>                    
+                    
+                    <div class="form-group">
+                        <label for="Timeout_timeEdit">Timeout_time</label>
+                        <input type="number" min="0" class="form-control" id="Timeout_timeEdit" placeholder="Insert the Timeout_time of the cronjob" onchange="update_edit()">
                     </div>
+
+                    <div class="form-group">
+                        <label for="RetriesEdit">Retries</label>
+                        <input type="number" min="0" class="form-control" id="RetriesEdit" placeholder="Insert the Retries of the cronjob" onchange="update_edit()">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="Retries_waitEdit">Retries_wait</label>
+                        <input type="number" min="0" class="form-control" id="Retries_waitEdit" placeholder="Insert the Retries_wait of the cronjob" onchange="update_edit()">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="IPEdit">IP</label>
+                        <input type="text" class="form-control" id="IPEdit" placeholder="Insert the IP of the cronjob">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="TargetEdit">Target</label>
+                        <input type="text" class="form-control" id="TargetEdit" placeholder="Insert the Target of the cronjob" onchange="update_edit()">
+                    </div>
+
+                    
 					<div class="form-check">
 						<input class="form-check-input" type="checkbox" value="" id="editEnabled" checked>
 						<label class="form-check-label" for="editEnabled">
@@ -275,6 +310,18 @@
         var where_to_run = $(this).data('where');
         var restart = $(this).data('restart');
         var description = $(this).data('description');
+
+        var timeouttime = $(this).data('timeouttime');
+        var retries = $(this).data('retries');
+        var retrieswait = $(this).data('retrieswait');
+        var ip = $(this).data('ip');
+        var target = $(this).data('target_val');
+        $('#Timeout_timeEdit').val(timeouttime);
+        $('#RetriesEdit').val(retries);
+        $('#Retries_waitEdit').val(retrieswait);
+        $('#IPEdit').val(ip);
+        $('#TargetEdit').val(target);
+
         $('#CronJobEditId').val(id);
         $('#NameCronJobEdit').val(name);
         $('#CommandEdit').val(command);
@@ -326,11 +373,16 @@
         var restart = $('#RestartLogicAdd').val();
         var description = $('#DescriptionAdd').val();
 		var disabled = $('#createEnabled')[0].checked;
+        var Timeout_timeAdd = $('#Timeout_timeAdd').val();
+        var RetriesAdd = $('#RetriesAdd').val();
+        var Retries_waitAdd = $('#Retries_waitAdd').val();
+        var IPAdd = $('#IPAdd').val();
+        var TargetAdd = $('#TargetAdd').val();
         if (password) {
             try {
                 $.ajax({
-                    url: './add_cronjob',
-                    data: {psw: password, category: category, command: command, name: name, where_to_run: where, disabled: disabled, restart: restart, description: description},
+                    url: './add_cronjob_new',
+                    data: {psw: password, category: category, command: command, name: name, where_to_run: where, disabled: disabled, restart: restart, description: description, Timeout_timeAdd: Timeout_timeAdd, RetriesAdd: RetriesAdd, Retries_waitAdd: Retries_waitAdd, IPAdd: IPAdd, TargetAdd: TargetAdd},
                     type: 'POST',
                     success: function(response) {
                         alert("Cronjob was added!");
@@ -360,12 +412,17 @@
     var where = $('#WhereToRunEdit').val();
 	var disabled = $('#editEnabled')[0].checked;
     var restart = $('#RestartLogicEdit').val();
-    var description = $('#DescriptionEdit').val();
+    var description = $('#DescriptionEdit').val();        
+    var Timeout_timeEdit = $('#Timeout_timeEdit').val();
+    var RetriesEdit = $('#RetriesEdit').val();
+    var Retries_waitEdit = $('#Retries_waitEdit').val();
+    var IPEdit = $('#IPEdit').val();
+    var TargetEdit = $('#TargetEdit').val();
     if (password) {
         try {
             $.ajax({
-                url: './edit_cronjob',
-                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled, restart: restart, description: description},
+                url: './edit_cronjob_new',
+                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled, restart: restart, description: description, Timeout_timeEdit: Timeout_timeEdit, RetriesEdit: RetriesEdit, Retries_waitEdit: Retries_waitEdit, IPEdit: IPEdit, TargetEdit: TargetEdit},
                 type: 'POST',
                 success: function(response) {
                     alert("Cronjob was edited!");
@@ -386,5 +443,69 @@
         alert('Please enter a password');
     }
     });
+
+    function update_add(){
+        const container = document.getElementById('additional-params-add');
+        const inputs = Array.from(container.querySelectorAll('input'));
+        const inputs_final = inputs.map(input => input.value.trim()).filter(value => value !== "").join(' ');
+        let composed_command_text = $("#command-prototype-add").val() + " " + $("#TargetAdd").val() + " " + inputs_final + " " + $("#Timeout_timeAdd").val() + " " + $("#RetriesAdd").val() + " " + $("#Retries_waitAdd").val();
+        $("#CommandAdd").val(composed_command_text);
+    }
+    function update_edit(){
+        const container = document.getElementById('additional-params-edit');
+        const inputs = Array.from(container.querySelectorAll('input'));
+        const inputs_final = inputs.map(input => input.value.trim()).filter(value => value !== "").join(' ');
+        let composed_command_text = $("#command-prototype-edit").val() + " " + $("#TargetEdit").val() + " " + inputs_final + " " + $("#Timeout_timeEdit").val() + " " + $("#RetriesEdit").val() + " " + $("#Retries_waitEdit").val();
+        $("#CommandEdit").val(composed_command_text);
+    }
+
+    function handleSelectionCommandPrototypeEdit(selectElement) {
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const desc = selectedOption.getAttribute('data-desc');
+        const params = selectedOption.getAttribute('data-params').replace(/'/g, '"');
+        console.log("Params: "+params)
+        const container = document.getElementById('additional-params-edit');
+        // Clear container first if needed
+        container.innerHTML = '';
+
+        JSON.parse(params).forEach(word => {
+            // Create the HTML string by replacing "Element" with our word
+            const snippet = `
+                <div class="form-group">
+                <label for="${word}DynamicEdit">${word}</label>
+                <input type="text" class="form-control" id="${word}DynamicEdit" placeholder="${word}" update_edit()>
+                </div>
+            `;
+            
+            // Append the snippet to the container
+            container.insertAdjacentHTML('beforeend', snippet);
+        });
+        document.getElementById("category-selection-desc-edit").innerHTML=desc;
+        update_edit();
+    }
+    function handleSelectionCommandPrototypeAdd(selectElement) {
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const desc = selectedOption.getAttribute('data-desc');
+        const params = selectedOption.getAttribute('data-params').replace(/'/g, '"');
+        console.log("Params: "+params)
+        const container = document.getElementById('additional-params-add');
+        // Clear container first if needed
+        container.innerHTML = '';
+
+        JSON.parse(params).forEach(word => {
+            // Create the HTML string by replacing "Element" with our word
+            const snippet = `
+                <div class="form-group">
+                <label for="${word}DynamicAdd">${word}</label>
+                <input type="text" class="form-control" id="${word}DynamicAdd" placeholder="${word}" update_add()>
+                </div>
+            `;
+            
+            // Append the snippet to the container
+            container.insertAdjacentHTML('beforeend', snippet);
+        });
+        document.getElementById("category-selection-desc-add").innerHTML=desc;
+        update_add();
+    }
 </script>
 {% endblock %}

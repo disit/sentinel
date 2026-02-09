@@ -1,4 +1,10 @@
 reanimate certification
 add tops, snmp tops to full logs
-repair long text telegram messages
-parallelize cronjobs
+finalize button to run a specific cronjob at a given type
+move password confirmation elsewhere when editing/adding/deleting resources
+make it use ip over target sometimes
+add clickable urls (internal/externals) to main ui lines
+use unused columns for cronjobs
+make column (or icon?) to distinguish resource in main ui
+add edit button for non-cronjobs in main ui
+add contacts for cronjobs

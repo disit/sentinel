@@ -1,13 +1,11 @@
 #!/bin/bash
 
 # Parameter Mapping
-# $1: Host (e.g., 127.0.0.1)
-# $2: Port (e.g., 9080)
-# $3: Timeout (Defaults to 10 if not provided)
 HOST=$1
 PORT=$2
 TIMEOUT=${3:-10}
 RERTIES=${4:-3}
+RETRIES_TIMEOUT=${5:-10}
 
 # Basic validation to ensure Host and Port are provided
 if [ -z "$HOST" ] || [ -z "$PORT" ]; then
@@ -32,8 +30,8 @@ for ((i=1; i<=RETRIES; i++)); do
     TOTAL_LOG+="Attempt $i: $OUTPUT"$'\n'
 
     if [ "$i" -lt "$RETRIES" ]; then
-        echo "Attempt #$i failed, trying until $RETRIES"
-        sleep 1
+        echo "Attempt #$i failed, trying until $RETRIES total retries"
+        sleep $RETRIES_TIMEOUT
     fi
 done
 

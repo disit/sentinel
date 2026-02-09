@@ -4,6 +4,7 @@ URL=$1
 EXPECTED_CODE=$2
 TIMEOUT=${3:-10}
 RETRIES=${4:-3}
+RETRIES_TIMEOUT=${5:-10}
 
 if [ -z "$URL" ]; then
     echo "Usage: $0 <url> [timeout] [retries]" >&2
@@ -34,8 +35,8 @@ for ((i=1; i<=RETRIES; i++)); do
     TOTAL_LOG+="Attempt $i: $OUTPUT"$'\n'
 
     if [ "$i" -lt "$RETRIES" ]; then
-        echo "Attempt #$i failed, trying until $RETRIES"
-        sleep 1
+        echo "Attempt #$i failed, trying until $RETRIES total retries"
+        sleep $RETRIES_TIMEOUT
     fi
 done
 
