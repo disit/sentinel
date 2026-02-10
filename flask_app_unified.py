@@ -585,6 +585,32 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     server.send_message(msg)
     server.quit()
     print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
+
+def send_emails(sender_email, sender_password, receiver_emails, data_to_be_sent):
+    print_debug_log("Sending multiple emails")
+    if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
+        print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
+    smtp_server = os.getenv("smtp-server","no.server.set")
+    if not smtp_server:
+        print("MISSING smtp-server, email not sent.")
+        return
+    smtp_port = int(os.getenv("smtp-port","587"))
+    if os.getenv("smtp-type", "starttls") == "ssl":
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+    else:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+    server.login(sender_email, sender_password)
+    for dict_element in data_to_be_sent:
+        composite_message = dict_element["text"] + f"<br><a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a>"
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = ','.join(receiver_emails)
+        msg['Subject'] = dict_element["subject"]
+        msg.attach(MIMEText(str(composite_message), 'html'))
+        server.send_message(msg)
+    server.quit()
+    print("Email(s) was (were) sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
     
 
 def filter_out_muted_containers_for_telegram(containers):
@@ -765,7 +791,7 @@ def is_this_notification_duplicated(message) -> bool:
             conn.commit()
             check_notification_results = cursor.fetchall()
             if len(check_notification_results) > 0:
-                print_debug_log("Attempted to send a notification but a previous one seems to be already be there")
+                print_debug_log("Attempted to send a notification but a previous one seems to already be there")
                 return True
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(dictionary=True)
@@ -1080,7 +1106,7 @@ def auto_alert_status():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
-SELECT datetime,result,errors,name,command,categories.category,restart_logic,description FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
+SELECT datetime,result,errors,name,command,categories.category,restart_logic,description,target FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
             cursor.execute(query)
             conn.commit()
             cron_results = cursor.fetchall()
@@ -1553,6 +1579,23 @@ def task_wrapper(r):
         cursor.close()
         conn.close()
 
+def calculate_timedelta(first_time: str):
+    second_time=datetime.now()
+    if second_time > first_time:
+        delta = second_time - first_time
+    else:
+        delta = first_time - second_time
+    days = delta.days
+    hours, remainder = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    final_string=f"{seconds} seconds"
+    if minutes>0:
+        final_string = f"{minutes} minutes, " + final_string
+    if hours>0:
+        final_string = f"{hours} hours, " + final_string
+    if days>0:
+        final_string = f"{days} days, " + final_string
+    return final_string
 
 def send_advanced_alerts(message):
     print_debug_log("Preparing the content of an alert")
@@ -1560,10 +1603,12 @@ def send_advanced_alerts(message):
         return # won't send a doubled notification
     try:
         text_for_email = ""
+        email_data = []
         for a in range(len(message)):
             print(f"Element {a}: "+str(message[a])[:100])
         if len(message[0])>0:
             text_for_email = mixed_format_error_to_send("is not in the correct status ",containers=message[0],because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
+            
         if len(message[1])>0:
             #containers = ", ".join([a["container"] for a in message[1]])
             becauses = dict([[a["container"],a["command"]] for a in message[1]])
@@ -1581,7 +1626,9 @@ def send_advanced_alerts(message):
                 stderr_msg=failed_cron[2].replace('\n','<br>')
                 ran_command=failed_cron[4].replace('\n','<br>')
                 name_to_call=failed_cron[3] if (failed_cron[7]==None or failed_cron[7]=="") else failed_cron[7]
-                prepare_text += f'''<br>{name_to_call} assigned to category {failed_cron[5]} with code <code>{ran_command}</code> gave {'no result and' if len(failed_cron[1])<1 else 'result of: <div style="color:green;">' + stdout_msg + '</div> but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}'''
+                error_string = f'''<br>{name_to_call} assigned to category {failed_cron[5]} with code <code>{ran_command}</code> gave {'no result and' if len(failed_cron[1])<1 else 'result of: <div style="color:green;">' + stdout_msg + '</div> but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}'''
+                prepare_text += error_string
+                email_data.append({"subject":name_to_call + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This cronjob failed: "+prepare_text})
             text_for_email += prepare_text + "<br><br>"
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
@@ -1642,6 +1689,7 @@ def send_advanced_alerts(message):
                                     subject+=f"Host {instance['host']} wasn't readable, "
                     subject = subject[:-2]
                 send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), subject, text_for_email)
+                send_emails(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), email_data)
             else:
                 print("No mail was sent because no problem was detected")
         except:
@@ -1667,6 +1715,7 @@ def send_advanced_alerts(message):
                 raw_result = failed_cron[1]
                 raw_error = failed_cron[2]
                 timestamp = failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')
+                target = cron_name if not (failed_cron[8]==None or failed_cron[8]=="") else failed_cron[8]
 
                 # Handle the result logic and escaping outside the f-string
                 if len(raw_result) < 1:
@@ -1678,9 +1727,9 @@ def send_advanced_alerts(message):
                 # Escape the error text
                 escaped_err = raw_error.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
                 prepare_text += (
-                    f"Cronjob<b>{cron_name}  "
-                    f"with code {bash_code}  "
-                    f"gave {result_text}  "
+                    f"<b>{target}</b>\n"
+                    f"with code <code>{bash_code}</code>\n"
+                    f"gave {result_text}\n"
                     f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
                 all_msgs.append(prepare_text)
@@ -1778,12 +1827,14 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if 'username' in session:
                     # basis for making a better mobile ui, if mobile then make main ui with far less columns
-                    # ua_string = request.headers.get('User-Agent')
-                    # user_agent = parse(ua_string)
+                    user_agent_string = request.headers.get('User-Agent')
+                    user_agent = parse(user_agent_string)
+                    
+                    if user_agent.is_mobile: # maybe remove 19/20
+                        column_string = """{columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 8, visible: false},{target: 10, visible: false},{target: 11, visible: false},{target: 12, visible: false},{target: 14, visible: false},{target: 15, visible: false},{target: 19, visible: false},{target: 20, visible: false}]}""" # less columns
+                    else:
+                        column_string = """{columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]}""" # usual columns
 
-                    # Access easy-to-use boolean properties
-                    #    if user_agent.is_mobile:
-                    # device = "Mobile"
 
 
                     cursor = conn.cursor(buffered=True)
@@ -1970,10 +2021,10 @@ def create_app():
         if 'username' not in session:
             return "Session not active, won't proceed.", 500
         try:
-            cronjob_id = request.form.get('cronjob_id','',int)
+            cronjob_id = request.form.get('cronjob_id',0,int)
         except ValueError:
             return "Cronjob identifier invalid, it must be an non-negative integer", 500
-        if len(cronjob_id):
+        if cronjob_id < 1:
             return "Cronjob identifier not found or not set", 500
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -2670,14 +2721,15 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
-SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled,where_to_run FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
+SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled,where_to_run,target,ip,createtime FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
                     for result in results:
+                        createtime = result[11]
                         cronjob_dict = {
                             "Container": result[3],
-                            "CreatedAt": "Not applicable",
+                            "CreatedAt": createtime,
                             "ID": "Cronjob "+str(result[6]),
                             "Image": "Not applicable",
                             "Labels": "Cronjob",
@@ -2685,10 +2737,10 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                             "Name": result[3],
                             "Names": result[3],
                             "Namespace": result[3],
-                            "Node": "Not applicable",
+                            "Node": result[9],
                             "Ports": "Not applicable",
-                            "RunningFor": "Not applicable",
-                            "Source": os.getenv("platform-url","") if result[8] else "Nonlocal",
+                            "RunningFor": calculate_timedelta(createtime),
+                            "Source": result[10] if result[10] is not None else (os.getenv("platform-url","") if result[8] else "Nonlocal"),
                             "State": ("running - "+str(result[1]) if result[2]==None else result[2]) if result[7]==0 else "This cronjob is disabled",
                             "Status": "Enabled" if result[7]==0 else "Disabled",
                             "Volumes": "Not applicable"

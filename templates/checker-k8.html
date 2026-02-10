@@ -431,7 +431,7 @@ function makeCronJobTable(data) { // disabled
 					try {
 						if (el[2]) {
 							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1].replaceAll('\n','<br>') + "<br>With some errors: <div style='color: red;'>" + el[2] + "</div>";
-							document.getElementById(el[5]+"-status").innerHTML+='<svg viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Cronjob Failure"><title>Cronjob Failure</title><g fill="red"><rect x="10.5" y="3" width="3" height="12" rx="1"/><circle cx="12" cy="19.5" r="1.5"/></g></svg>';
+							document.getElementById(el[5]+"-status").innerHTML+='<svg viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Cronjob Failure"><title>Cronjob Failure '+el[3]+'</title><g fill="red"><rect x="10.5" y="3" width="3" height="12" rx="1"/><circle cx="12" cy="19.5" r="1.5"/></g></svg>';
 							add_alert(cronjobmsg);
 						}
 						else {
@@ -542,6 +542,45 @@ function makeCronJobTable(data) { // disabled
 		}
 		element.value = "Check the port...";
 	};
+
+	async function runCronjob(cronjobid, element, location) {
+		const currentTime = Date.now();
+		const button = event.target;
+		if (!button.lastExecutionTime) {
+			button.lastExecutionTime = 0;
+		}
+		if (currentTime - button.lastExecutionTime >= 3000) {
+			button.lastExecutionTime = currentTime;
+		} else {
+			alert("You cannot perform this action, wait a few seconds.");
+			return;
+		}
+		element.value = "Running the cronjob...";
+		document.getElementById(cronjobid+'-cronjob-result').innerHTML= 'Pending... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/><title>Running the cronjob...</title></svg>';
+		try {
+			$.ajax({
+				url: './run_specific_cronjob',
+				type: 'POST',
+				data: {cronjob_id: cronjobid},
+				success: function(response) {
+					if (response.result==="") response = "No test was found for this component."; 
+					logging("<b>" + element.name + "</b> had its cronjob executed and the result was: <b>"+response.result+'</b><br>With errors: ' + response.errors + '<hr>', location+'-logs');
+					document.getElementById(container+'-result').innerHTML= response.result;
+		
+				},
+				error: function(error) {
+					add_alert("Failed to contact the backend for the tests results with reason: "+error.statusText);
+					logging("Failed to contact the backend for the tests results with reason: "+error.statusText);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			logging(exception_var);
+			add_alert(exception_var);
+		}
+		element.value = "Run cronjob";
+	};
 	
 	function load_db() {
 		try {
@@ -626,13 +665,18 @@ function makeCronJobTable(data) { // disabled
 			log_destination = "see_logs"; 
 		}
 		try {
-		document.getElementById(log_destination).innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+			if (document.getElementById(log_destination).innerHTML === "") {
+				document.getElementById(log_destination).innerHTML = new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+			}
+			else {
+				document.getElementById(log_destination).innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+			}
 		}
 		catch (exception_var) {
 			console.log("Failed to write to category log due to: "+exception_var)
 		}
 		// tldr; if it's empty assign the value otherwise add to it, this avoids printing "undefined" (thanks js, always on point)
-		if (document.getElementById(log_destination).innerHTML === "") {
+		if (document.getElementById(log_destination).innerHTML === "" || document.getElementById(log_destination).innerHTML === "undefined") {
 			logs_for_categories[log_destination] = new Date().toLocaleString() + ' - ' + logging_str + "<br>";
 		}
 		else {
@@ -822,7 +866,8 @@ function makeCronJobTable(data) { // disabled
 				elements.forEach(cellData => {
 					const td = document.createElement("td");
 					if (index_of_below_array === 6) {
-						var content_of_id_cell = '<a target="_blank" href="./cronjobs_logs?cronjob_id='+Number(elements[2].match(/\d+/)[0])+'">' + cellData + ' (cronjob)</a>';
+						var image_icon = `<img src="{{url_for('static', filename='commandicon.png')}}" style="width: 1cm" />`;
+						var content_of_id_cell = image_icon + '<a target="_blank" href="./cronjobs_logs?cronjob_id='+Number(elements[2].match(/\d+/)[0])+'">' + cellData + '</a>';
 
 						td.innerHTML = content_of_id_cell;
 						var link = td.querySelector('a');
@@ -830,9 +875,22 @@ function makeCronJobTable(data) { // disabled
 							link.addEventListener('click', handlePostLinkClickLogs);
 						}
 					}
+					else if (index_of_below_array === 9 || index_of_below_array === 12) {
+						if (cellData === null || cellData === "Nonlocal") var content_of_id_cell = "No value set";
+						else {
+							if (!cellData.startsWith("http"))
+								var content_of_id_cell = '<a target="_blank" href="http://' + cellData + '">' + cellData + ' (cronjob)</a>';
+							else var content_of_id_cell = '<a target="_blank" href="' + cellData + '">' + cellData + ' (cronjob)</a>';
+							td.innerHTML = content_of_id_cell;
+							var link = td.querySelector('a');
+							if (link) {
+								link.addEventListener('click', handlePostLinkClickLogs);
+							}
+						}
+					}
 					else if (index_of_below_array === 13) {
 						var content_of_id_cell;
-						if (cellData.startsWith("running - " || cellData.startsWith("This cronjob is disabled"))){
+						if (cellData.startsWith("running - ") || cellData.startsWith("This cronjob is disabled")){
 							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/><title>Everything runs as expected</title></svg>';
 						}
 						else {
@@ -852,11 +910,11 @@ function makeCronJobTable(data) { // disabled
 				rebootbutton.innerHTML=`<button type="button" class="btn btn-primary open-modal-c" data-toggle="modal" data-target="#passwordModalCronjob" data-target="`+rowValues["Name"]+`" data-containerid="`+Number(elements[2].match(/\d+/)[0])+`">Restart</button>`;
 				row.appendChild(rebootbutton);
 				var testsbutton = document.createElement("td");
-				testsbutton.innerHTML=`Not applicable`;
+				testsbutton.innerHTML=`<input type="button" name="`+elements[6]+`" value="Run cronjob" class="btn btn-info" onclick="runCronjob('`+Number(elements[2].match(/\d+/)[0])+`', this, '`+name_of_table_value+`')"/>`;
 				row.appendChild(testsbutton);
 				tbody.appendChild(row);
 				var testresults = document.createElement("td");
-				testresults.setAttribute('id',elements[6]+'-result');
+				testresults.setAttribute('id',Number(elements[2].match(/\d+/)[0])+'-cronjob-result');
 
 				var some_value;
 				for (const key in lookupTable) {
@@ -975,7 +1033,7 @@ function makeCronJobTable(data) { // disabled
 				do_not_update_this.setAttribute("value", "Stop refreshing");
 				do_not_update_this_td.appendChild(do_not_update_this);
 				do_not_update_this_td.innerHTML+='<button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-containercategory="'+name_of_table_value+'" data-target="#muteComponent" data-containerid="'+elements[6]+'" id="mutebutton-'+elements[6]+'">Mute</button>';
-				do_not_update_this_td.innerHTML+="<input type=\"button\" class=\"btn btn-info\" value=\"Edit container\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+Number(elements[2].match(/\d+/)[0])+"')\">"
+				do_not_update_this_td.innerHTML+="<input type=\"button\" class=\"btn btn-info\" value=\"Edit container\" onclick=\"window.open('./organize_containers?container_id="+elements[6]+"')\">"
 				row.appendChild(do_not_update_this_td);
 				tbody.appendChild(row);
 				testresults.innerHTML=findClosestKeyStartsWith(row.childNodes[7].innerHTML, test_results_divs).matchValue;
@@ -1318,9 +1376,9 @@ function makeCronJobTable(data) { // disabled
 				}
 			}
 			if (hasFailure) {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="red" /><title>No issues in execution</title></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="red" /><title>Issues in test execution</title></svg>';
 			} else {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="green" /><title>Issues in execution</title></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="green" /><title>No issues in test execution</title></svg>';
 			}
 			//dataTable.destroy();
 		});
@@ -1336,7 +1394,7 @@ function makeCronJobTable(data) { // disabled
 			var columnData = dataTable.column(13).data().toArray();
 			for (var i = 0; i < columnData.length; i++)  // maybe check if too many restarts
 				{
-				if (typeof columnData[i] === 'string' && !columnData[i].includes("running")) {
+				if (typeof columnData[i] === 'string' && (!columnData[i].includes("running") && !columnData[i].includes("enabled") && !columnData[i].includes("disabled"))) {
 					isNotRunning = false;
 					break;
 				}

@@ -73,6 +73,7 @@
 					<select id="kind-selection" name="kind-selection" class="form-select">
 						<option value="docker">Docker</option>
 						<option value="kubernetes">Kubernetes</option>
+						<option value="cronjob">Cronjob</option>
 					</select>
 				</form>
 			</div>
@@ -126,6 +127,7 @@
 					<select id="kind-selection-edit" name="kind-selection-edit" class="form-select">
 						<option value="docker">Docker</option>
 						<option value="kubernetes">Kubernetes</option>
+						<option value="cronjob">Cronjob</option>
 					</select>
 				</form>
 			</div>
@@ -181,7 +183,7 @@
             if (button) {
             button.click();
             } else {
-			alert(`Precise container not found, this is likely due to kubernetes not having guaranteed names, try look for something which starts with "${targetValue}"`);
+			alert(`Precise container not found, this is likely due to kubernetes not having guaranteed names, try look for something which starts with a substring of "${targetValue}"`);
             console.warn(`Element not found for selector: ${selector}`);
             }
         }

@@ -1,10 +1,6 @@
 reanimate certification
 add tops, snmp tops to full logs
-finalize button to run a specific cronjob at a given type
+finalize button to run a specific cronjob at a given time (use name not id)
 move password confirmation elsewhere when editing/adding/deleting resources
-make it use ip over target sometimes
-add clickable urls (internal/externals) to main ui lines
-use unused columns for cronjobs
-make column (or icon?) to distinguish resource in main ui
-add edit button for non-cronjobs in main ui
-add contacts for cronjobs
+adjust logs for linebreaks
+notification for cronjob failure sometimes flickers
