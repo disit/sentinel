@@ -249,7 +249,7 @@ function makeCronJobTable(data) { // disabled
         const statusValue = (!row[2] || row[2].trim() === "") ? "ok" : "ko";
         return {
             name: row[3] || "",
-            edit: "<input type=\"button\" class=\"btn btn-info\" value=\"Edit\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+row[6]+"')\">" || "",
+            edit: "<input type=\"button\" class=\"btn btn-info\" value=\"Edit\" onclick=\"window.open('./organize_cronjobs_new?cronjob_id="+row[6]+"')\">" || "",
 			category: row[5] || "",
             command: row[4] || "",
             update: row[0] || "",
@@ -665,32 +665,27 @@ function makeCronJobTable(data) { // disabled
 			log_destination = "see_logs"; 
 		}
 		try {
-			if (document.getElementById(log_destination).innerHTML === "") {
-				document.getElementById(log_destination).innerHTML = new Date().toLocaleString() + ' - ' + logging_str + '<br>';
-			}
-			else {
-				document.getElementById(log_destination).innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
-			}
+			document.getElementById(log_destination).innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
 		}
 		catch (exception_var) {
 			console.log("Failed to write to category log due to: "+exception_var)
 		}
-		// tldr; if it's empty assign the value otherwise add to it, this avoids printing "undefined" (thanks js, always on point)
-		if (document.getElementById(log_destination).innerHTML === "" || document.getElementById(log_destination).innerHTML === "undefined") {
-			logs_for_categories[log_destination] = new Date().toLocaleString() + ' - ' + logging_str + "<br>";
-		}
-		else {
-			logs_for_categories[log_destination] = logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>";
-		}
+		if (document.getElementById(log_destination).innerHTML.startsWith("undefined")) document.getElementById(log_destination).innerHTML = document.getElementById(log_destination).innerHTML.slice(9);
+
+		logs_for_categories[log_destination] = logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+		
 		if (log_destination!="see_logs") { 
 			document.getElementById("see_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
 			logs_for_categories["see_logs"] += new Date().toLocaleString() + ' - ' + logging_str + "<br>";
+			if (logs_for_categories["see_logs"].startsWith("undefined")) logs_for_categories["see_logs"] = logs_for_categories["see_logs"].slice(9);
+
 		}
 	};
-
+	// there is no more cronjob master log
 	function logging_cronjobs(logging_str) {
 		try {
-			document.getElementById("cronjob_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
+			return;
+			//document.getElementById("cronjob_logs").innerHTML += new Date().toLocaleString() + ' - ' + logging_str + '<br>';
 		}
 		catch (exception_var) {
 			console.log("Failed to write to cronjob logs due to: "+exception_var)
@@ -937,7 +932,7 @@ function makeCronJobTable(data) { // disabled
 				row.appendChild(in_case_of_problems);
 					
 				var do_not_update_this_td = document.createElement("td");
-				do_not_update_this_td.innerHTML="<input type=\"button\" class=\"btn btn-info\" value=\"Edit\" onclick=\"window.open('./organize_cronjobs?cronjob_id="+Number(elements[2].match(/\d+/)[0])+"')\">"
+				do_not_update_this_td.innerHTML="<input type=\"button\" class=\"btn btn-info\" value=\"Edit\" onclick=\"window.open('./organize_cronjobs_new?cronjob_id="+Number(elements[2].match(/\d+/)[0])+"')\">"
 				row.appendChild(do_not_update_this_td);
 				tbody.appendChild(row);
 				testresults.innerHTML="Not applicable";

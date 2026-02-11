@@ -62,10 +62,6 @@
             </div>
             <div class="modal-body">
                 <form id="addCronJobForm">
-                    <div class="form-group">
-                        <label for="passwordInputAdd">Password</label>
-                        <input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
-                    </div>
                     <label for="category-selection">Select category:</label>
                     <select id="category-selection" name="category-selection" class="form-select">
                         {%for item in categories %}<option value="{{item[0]}}">{{item[1]}}</option>{% endfor %}
@@ -136,7 +132,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addCronJobModal').modal('hide')">Close</button>
-                <button type="button" class="btn btn-primary" data-dismiss="modal" id="addCronJobButton">Add cronjob</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="addCronJobButton" onClick="$('#confirmAddCronjob').modal('show')">Add cronjob</button>
             </div>
         </div>
     </div>
@@ -157,10 +153,6 @@
                     <div class="form-group">
                         <label for="CronJobEditId">Cronjob ID</label>
                         <input type="text" class="form-control" id="CronJobEditId" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="passwordInputEdit">Password</label>
-                        <input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
                     </div>
                     <label for="category-selection-edit">Select category:</label>
                     <select id="category-selection-edit" name="category-selection-edit" class="form-select">
@@ -240,12 +232,60 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJob').modal('hide')">Cancel</button>
-                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton">Save changes</button>
+                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton" onClick="$('#confirmEditModal').modal('show')">Save changes</button>
             </div>
         </div>
     </div>
 </div>
 
+<div class="modal fade" id="confirmEditModal" tabindex="-1" role="dialog" aria-labelledby="confirmEditModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmEditModalLabel">Confirmation for deleting cronjob</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#confirmEditModal').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="confirmEditForm">
+                    <div class="form-group">
+                        <label for="passwordInputEdit">Password</label>
+                        <input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#confirmEditModal').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmEditButton" >Edit cronjob</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="confirmAddCronjob" tabindex="-1" role="dialog" aria-labelledby="confirmAddCronjobLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmAddCronjobLabel">Confirmation for creating cronjob</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#confirmAddCronjob').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="confirmAddCronjobForm">
+                    <div class="form-group">
+                        <label for="passwordInputAdd">Password</label>
+                        <input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#confirmAddCronjob').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmAddCronjobButton" >Add cronjob</button>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="deleteCronJob" tabindex="-1" role="dialog" aria-labelledby="deleteCronJobLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -364,7 +404,7 @@
             alert('Please enter a password');
         }
     });
-    $('#addCronJobButton').on('click', function() {
+    $('#confirmAddCronjobButton').on('click', function() {
         var password = $('#passwordInputAdd').val();
         var category = $('#category-selection').val();
         var command = $('#CommandAdd').val();
@@ -403,7 +443,7 @@
             alert('Please enter a password');
         }
     });
-    $('#saveCronJobChangesButton').on('click', function() {
+    $('#confirmEditButton').on('click', function() {
     var id = $('#CronJobEditId').val();
     var password = $('#passwordInputEdit').val();
     var category = $('#category-selection-edit').val();
@@ -473,7 +513,7 @@
             const snippet = `
                 <div class="form-group">
                 <label for="${word}DynamicEdit">${word}</label>
-                <input type="text" class="form-control" id="${word}DynamicEdit" placeholder="${word}" update_edit()>
+                <input type="text" class="form-control" id="${word}DynamicEdit" placeholder="${word}" onchange="update_edit()">
                 </div>
             `;
             
@@ -497,7 +537,7 @@
             const snippet = `
                 <div class="form-group">
                 <label for="${word}DynamicAdd">${word}</label>
-                <input type="text" class="form-control" id="${word}DynamicAdd" placeholder="${word}" update_add()>
+                <input type="text" class="form-control" id="${word}DynamicAdd" placeholder="${word}" onchange="update_add()">
                 </div>
             `;
             

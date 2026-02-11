@@ -1,6 +1,3 @@
 reanimate certification
 add tops, snmp tops to full logs
-finalize button to run a specific cronjob at a given time (use name not id)
-move password confirmation elsewhere when editing/adding/deleting resources
-adjust logs for linebreaks
-notification for cronjob failure sometimes flickers
+contacts??

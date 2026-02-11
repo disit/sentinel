@@ -5,7 +5,15 @@
 
 {% endblock %}
 {% block content %}
-<div id="logs" style="background-color: #000000; color: #ffffff; font-family: 'Courier New', Courier, monospace; padding: 1rem;">
+<div id="logs">
     {{r|safe}}
 </div>
+<style>
+    body {
+        background-color: #000000;
+        color: #ffffff;
+        font-family: 'Courier New', Courier, monospace;
+        padding: 1rem;
+    }
+</style>
 {% endblock %}

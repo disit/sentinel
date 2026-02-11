@@ -1608,17 +1608,35 @@ def send_advanced_alerts(message):
             print(f"Element {a}: "+str(message[a])[:100])
         if len(message[0])>0:
             text_for_email = mixed_format_error_to_send("is not in the correct status ",containers=message[0],because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
+            for el in text_for_email.split("<br>"):
+                cont_names = re.findall("named (.+)",el,re.MULTILINE)
+                if len(cont_names) > 0: # filters out something that won't work
+                    email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
             
         if len(message[1])>0:
             #containers = ", ".join([a["container"] for a in message[1]])
             becauses = dict([[a["container"],a["command"]] for a in message[1]])
-            text_for_email+= mixed_format_error_to_send_tests_test_ran("is not answering correctly to its 'is alive' test ",containers=message[1],because=becauses,explain_reason="given the failure of: ")+"<br><br>"    
+            current_text = mixed_format_error_to_send_tests_test_ran("is not answering correctly to its 'is alive' test ",containers=message[1],because=becauses,explain_reason="given the failure of: ")+"<br><br>"
+            text_for_email+= current_text
+            for el in current_text.split("<br>"):
+                cont_names = re.findall("named (.+)",el,re.MULTILINE)
+                if len(cont_names) > 0: # filters out something that won't work
+                    email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
+            
         if len(message[2])>0:
-            text_for_email+= mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=message[2])+"<br><br>"
+            current_text = mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=message[2])+"<br><br>"
+            text_for_email += current_text
+            for el in text_for_email.split("<br>"):
+                cont_names = re.findall("named (.+)",el,re.MULTILINE)
+                if len(cont_names) > 0: # filters out something that won't work
+                    email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
+            
         if len(message[3])>0:
             text_for_email+= message[3] + '<br><br>'
+            email_data.append({"subject":os.getenv("platform-url","unseturl") + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":message[3]})
         if len(message[4])>0:
             text_for_email+= message[4] + '<br><br>'
+            email_data.append({"subject":os.getenv("platform-url","unseturl") + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":message[4]})
         if len(message[5])>0:
             prepare_text = "<br>These cronjobs failed:"
             for failed_cron in message[5]:
@@ -1635,16 +1653,22 @@ def send_advanced_alerts(message):
             for overloaded_cpu_top in message[6]:
                 try:
                     prepare_text_top_cpu += f"<br>Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"
+                    email_data.append({"subject":overloaded_cpu_top['host'] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Host named {overloaded_cpu_top['host']} ({overloaded_cpu_top['description']}) had load averages above {overloaded_cpu_top['threshold_cpu']}: {json.loads(overloaded_cpu_top['result'])['system_info']['load_average']}</br>"})
                 except:
                     prepare_text_top_cpu += f"<br>Issue while interpreting cpu top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_cpu_top)}</br>"
+                    email_data.append({"subject":overloaded_cpu_top['host'] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Issue while interpreting cpu top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_cpu_top)}</br>"})
+                
             text_for_email += prepare_text_top_cpu + "<br><br>"
         if len(message[7])>0:
             prepare_text_top_mem = "<br>These hosts are overloaded on memory:"
             for overloaded_mem_top in message[7]:
                 try:
                     prepare_text_top_mem += f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"
+                    email_data.append({"subject":overloaded_mem_top['host'] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Host named {overloaded_mem_top['host']} ({overloaded_mem_top['description']}) had memory load above {overloaded_mem_top['threshold_mem']}%: {json.loads(overloaded_mem_top['result'])['memory_usage']}</br>"})
                 except:
                     prepare_text_top_mem += f"<br>Issue while interpreting mem top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_mem_top)}</br>"
+                    email_data.append({"subject":overloaded_mem_top['host'] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Issue while interpreting mem top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_mem_top)}</br>"})
+                
 
             text_for_email += prepare_text_top_mem + "<br><br>"
         if len(message[8])>0:
@@ -1652,11 +1676,14 @@ def send_advanced_alerts(message):
             for error_top in message[8]:
                 try:
                     prepare_text_top_error += f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}</br>"
+                    email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}</br>"})
                 except:
                     prepare_text_top_error += f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br><br> Original object: {str(error_top)}</br>"
+                    email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br><br> Original object: {str(error_top)}</br>"})
+                
             text_for_email += prepare_text_top_error + "<br><br>"
         try:
-            if len(text_for_email) > 15:
+            if len(text_for_email) > 15 or len(email_data)>0:
                 print("Will send email with text:")
                 print(text_for_email)
                 
@@ -1688,7 +1715,7 @@ def send_advanced_alerts(message):
                                 else:       # didn't read the top for some reason
                                     subject+=f"Host {instance['host']} wasn't readable, "
                     subject = subject[:-2]
-                send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), subject, text_for_email)
+                #send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), subject, text_for_email)
                 send_emails(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), email_data)
             else:
                 print("No mail was sent because no problem was detected")
@@ -2042,7 +2069,6 @@ def create_app():
                 else:
                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
                     cursor.execute(query, (ran_command.stdout.strip(),cronjob_id,))
-                cursor.execute(query,(cronjob_id,session['username'],ran_command.stdout+"\n"+ran_command.stderr))
                 conn.commit()
             if len(ran_command.stderr)>0:
                 return "Error in running the cronjob: "+ran_command.stderr, 500
