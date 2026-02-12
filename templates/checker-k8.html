@@ -39,7 +39,7 @@
 	};
 
 	const lookupTable_cronjobs = {
-		{%for item in cronjobs%}'{{item[0]}}': '{{item[1]}}',
+		{%for item in cronjobs%}'{{item[0]}}': ['{{item[1]}}', '{{item[2]}}'],
 		{% endfor %}'nothing': 'nothing'
 	};
 	
@@ -911,22 +911,17 @@ function makeCronJobTable(data) { // disabled
 				var testresults = document.createElement("td");
 				testresults.setAttribute('id',Number(elements[2].match(/\d+/)[0])+'-cronjob-result');
 
-				var some_value;
-				for (const key in lookupTable) {
-					if (rowValues["Name"].startsWith(key.replace('*', ''))) {
-						some_value = lookupTable[key];
-					break;
-					}
-				}
-				if (!some_value) some_value = ["","Not applicable", "Not applicable"];
+				var some_value = [lookupTable_cronjobs[rowValues["Name"]][1], lookupTable_cronjobs[rowValues["Name"]][1]];
+				
+				if (!some_value) some_value = ["Not applicable", "Not applicable"];
 				
 
 				var in_case_of_problems = document.createElement("td");
-				in_case_of_problems.innerHTML=some_value[1];
+				in_case_of_problems.innerHTML=some_value[0];
 				
 				var location_of_component = document.createElement("td");
-				location_of_component.innerHTML=some_value[2];
-				in_case_of_problems.innerHTML=some_value[1];
+				location_of_component.innerHTML=some_value[1];
+				in_case_of_problems.innerHTML=some_value[0];
 
 				row.appendChild(testresults);
 				row.appendChild(in_case_of_problems);
@@ -1104,10 +1099,10 @@ function makeCronJobTable(data) { // disabled
 		containerdata.forEach(item => {
 			let category = 'Unknown';
 			if (item.Labels === "Cronjob") {
-				if (!categorizedData[lookupTable_cronjobs[item.Name]]) {
-					categorizedData[lookupTable_cronjobs[item.Name]] = [];
+				if (!categorizedData[lookupTable_cronjobs[item.Name][0]]) {
+					categorizedData[lookupTable_cronjobs[item.Name][0]] = [];
 				}
-				categorizedData[lookupTable_cronjobs[item.Name]].push(item);
+				categorizedData[lookupTable_cronjobs[item.Name][0]].push(item);
 			}
 			else { // kuber/docker container
 				const name = item.Name;

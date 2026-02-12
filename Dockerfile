@@ -18,8 +18,18 @@ COPY /./image /app/image
 
 RUN pip install -r image/requirements.txt 
 
-COPY /. /app
+#COPY /. /app
 
-RUN chmod +x /app/scripts/*.sh
+COPY /./flask_app_unified.py /app/flask_app_unified.py
+
+COPY /./static /app/static
+
+COPY /./scripts /app/scripts
+
+COPY /./templates /app/templates
+
+COPY /./conf.json /app/conf.json
+
+RUN chmod -R +x /app/scripts/*.sh
 
 CMD ["waitress-serve", "--port", "9080", "--threads=30", "--call", "flask_app_unified:create_app"]

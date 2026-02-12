@@ -1742,7 +1742,7 @@ def send_advanced_alerts(message):
                 raw_result = failed_cron[1]
                 raw_error = failed_cron[2]
                 timestamp = failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')
-                target = cron_name if not (failed_cron[8]==None or failed_cron[8]=="") else failed_cron[8]
+                target = cron_name if (failed_cron[8]==None or failed_cron[8]=="") else failed_cron[8]
 
                 # Handle the result logic and escaping outside the f-string
                 if len(raw_result) < 1:
@@ -1836,7 +1836,7 @@ scheduler.add_job(job_wrapper_notifications, trigger='interval', max_instances=5
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
-scheduler.add_job(clean_old_db_entries, 'cron',week=1)
+scheduler.add_job(clean_old_db_entries, 'cron',days=1)
 scheduler.start()
 auto_alert_status()
 
@@ -1877,7 +1877,7 @@ def create_app():
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        query_3 = "SELECT name,categories.category FROM categories join cronjobs on categories.idcategories=cronjobs.category;"
+                        query_3 = "SELECT name,categories.category,contacts FROM categories join cronjobs on categories.idcategories=cronjobs.category;"
                         cursor.execute(query_3)
                         results_cronjobs = cursor.fetchall()
                         return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),cronjobs=results_cronjobs,admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"),multi=os.getenv("is-multi","False"), column_string=column_string)
@@ -2195,19 +2195,19 @@ def create_app():
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
-                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`, `timeout_time`, `retries`, `retries_wait`, `ip`, `target`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'''
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`, `timeout_time`, `retries`, `retries_wait`, `ip`, `target`, `contacts`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,
                                                request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['Timeout_timeAdd'],
                                                request.form.to_dict()['RetriesAdd'], request.form.to_dict()['Retries_waitAdd'], 
-                                               request.form.to_dict()['IPAdd'],request.form.to_dict()['TargetAdd'],))
+                                               request.form.to_dict()['IPAdd'],request.form.to_dict()['TargetAdd'],request.form.to_dict()['contacts'],))
                     else:
-                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`, `timeout_time`, `retries`, `retries_wait`, `ip`, `target`) VALUES (%s, %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s, %s);'''
+                        query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`, `timeout_time`, `retries`, `retries_wait`, `ip`, `target`, `contacts`) VALUES (%s, %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],
                                                request.form.to_dict()['description'], request.form.to_dict()['Timeout_timeAdd'],
                                                request.form.to_dict()['RetriesAdd'], request.form.to_dict()['Retries_waitAdd'], 
-                                               request.form.to_dict()['IPAdd'],request.form.to_dict()['TargetAdd'],))
+                                               request.form.to_dict()['IPAdd'],request.form.to_dict()['TargetAdd'],request.form.to_dict()['contacts'],))
                     
                     conn.commit()
                     return "ok", 201
@@ -2230,22 +2230,21 @@ def create_app():
                     if request.form.to_dict()['where_to_run'] != "":
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s, 
                                     `restart_logic`= %s, `description`= %s, `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s, 
-                                    `target`= %s WHERE (`idcronjobs` = %s);'''
+                                    `target`= %s, `contacts` = %s WHERE (`idcronjobs` = %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,
                                                request.form.to_dict()['restart'],request.form.to_dict()['description'],
                                                request.form.to_dict()['Timeout_timeEdit'],request.form.to_dict()['RetriesEdit'],request.form.to_dict()['Retries_waitEdit'],
-                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['id'],)) 
+                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],)) 
                         
-                        # Timeout_timeAdd: Timeout_timeAdd, RetriesAdd: RetriesAdd, Retries_waitAdd: Retries_waitAdd, IPAdd: IPAdd, TargetEdit: TargetEdit
                     else:
-                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL, `disabled` = %s, `reatart_logic` = %s,
-                        `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s, `target`= %s WHERE (`idcronjobs` = %s);'''
+                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL, `disabled` = %s, `restart_logic` = %s, `description`= %s,
+                        `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s, `target`= %s, `contacts` = %s WHERE (`idcronjobs` = %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],
                                                request.form.to_dict()['description'], request.form.to_dict()['Timeout_timeEdit'],
                                                request.form.to_dict()['RetriesEdit'], request.form.to_dict()['Retries_waitEdit'], 
-                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['id'],)) 
+                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],)) 
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
