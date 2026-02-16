@@ -49,7 +49,8 @@ function deleteHost(host) {
                     location.reload();
                 },
                 error: function(error) {
-                    alert("Host was not deleted because of: " + error);
+                    alert("Host was not deleted because of: " + error.status);
+                    console.log(JSON.parse(error.statusText).error);
                 }
             });
         }
@@ -62,6 +63,18 @@ function deleteHost(host) {
 
 $('#button_add').on('click', function(e) {
     e.preventDefault();
+    const ids = ['psw', 'host', 'user', 'mem', 'cpu'];
+    const isAnyEmpty = ids.some(id => {
+        const element = document.getElementById(id);
+        return element ? element.value.trim() === "" : false;
+    });
+
+    if (isAnyEmpty) {
+        console.log("Validation failed: One or more fields are empty.");
+        return;
+    } else {
+        console.log("All fields are filled!");
+    }
     try {
         $.ajax({
             url: './connect_host',
@@ -72,7 +85,8 @@ $('#button_add').on('click', function(e) {
                 location.reload();
             },
             error: function(error) {
-                alert("Host was not added because of: " + error);
+                alert("Host was not added because of: " + error.status);
+                console.log(JSON.parse(error.statusText).error);
             }
         });
     }

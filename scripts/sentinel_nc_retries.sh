@@ -4,7 +4,7 @@
 HOST=$1
 PORT=$2
 TIMEOUT=${3:-10}
-RERTIES=${4:-3}
+RETRIES=${4:-3}
 RETRIES_TIMEOUT=${5:-10}
 
 # Basic validation to ensure Host and Port are provided

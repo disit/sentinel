@@ -2,6 +2,11 @@ reanimate certification
 add tops, snmp tops to full logs
 readd emails
 add to telegram
-update previous cronjobs
 make advanced configuration certificator mk3
 find a way to register winrar
+make it so registering host answers better
+ensure that first connection to host works (ssh -o)
+try overloaded hosts
+extend psw confirmation from cronjbo to register
+close old window when opening confirmation
+add another sentinel host for tests

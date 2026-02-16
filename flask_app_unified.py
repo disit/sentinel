@@ -755,12 +755,13 @@ def populate_tops_entries():
                 error_json = {}
                 error_json['host'] = row['host']
                 error_json['user'] = row['user']
+                error_json['source'] = row['source']
                 error_json['error'] = traceback.format_exc()
                 errors.append(error_json)
         for result in outs:
             conn = mysql.connector.connect(**db_conn_info)
             cursor = conn.cursor(dictionary=True)
-            query = '''INSERT INTO `host_data` (`result`, `host`) VALUES (%s, %s);'''
+            query = '''INSERT INTO `host_data` (`data`, `host`) VALUES (%s, %s);'''
             cursor.execute(query, (json.dumps(result), result['source']))
             cursor.close()
             conn.commit()
@@ -1129,8 +1130,10 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
     top_errors = []
     for top_r in top_results:
         try:
-            if len(top_r["error"]) > 0:
-                top_errors.append(top_r["error"])
+            if top_r[3] == None:
+                continue
+            if len(top_r[3]) > 0:
+                top_errors.append(top_r[3])
                 continue
             regex = r"load average:\s+(\d*,\d*), (\d*,\d*), (\d*,\d*)"
             matches = re.finditer(regex, json.loads(top_r["result"])["system_info"]["load_average"], re.MULTILINE)
@@ -1140,7 +1143,8 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                         problematic_tops_cpu.append(top_r)
             if float(json.loads(top_r["result"])["memory_usage"]["used"])/float(json.loads(top_r["result"])["memory_usage"]["total"]) > float(top_r["threshold_mem"]):
                 problematic_tops_ram.append(top_r)
-        except:
+        except Exception as E:
+            print_debug_log("Top error:"+traceback.format_exc())
             top_errors.append(top_r)
                     
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
@@ -1646,7 +1650,7 @@ def send_advanced_alerts(message):
                 name_to_call=failed_cron[3] if (failed_cron[7]==None or failed_cron[7]=="") else failed_cron[7]
                 error_string = f'''<br>{name_to_call} assigned to category {failed_cron[5]} with code <code>{ran_command}</code> gave {'no result and' if len(failed_cron[1])<1 else 'result of: <div style="color:green;">' + stdout_msg + '</div> but'} error: <div style='color:red;'>{stderr_msg}</div> at {failed_cron[0].strftime('%Y-%m-%d %H:%M:%S')}'''
                 prepare_text += error_string
-                email_data.append({"subject":name_to_call + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This cronjob failed: "+prepare_text})
+                email_data.append({"subject":name_to_call + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This cronjob failed: "+error_string})
             text_for_email += prepare_text + "<br><br>"
         if len(message[6])>0:
             prepare_text_top_cpu = "<br>These hosts are overloaded on cpu:"
@@ -1675,47 +1679,15 @@ def send_advanced_alerts(message):
             prepare_text_top_error = "<br>Couldn't load the tops for these hosts:"
             for error_top in message[8]:
                 try:
-                    prepare_text_top_error += f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}</br>"
-                    email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}</br>"})
+                    prepare_text_top_error += f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])}</br>"
+                    email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Host named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])}</br>"})
                 except:
-                    prepare_text_top_error += f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br><br> Original object: {str(error_top)}</br>"
-                    email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br><br> Original object: {str(error_top)}</br>"})
+                    prepare_text_top_error += f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br>"
+                    email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br>"})
                 
             text_for_email += prepare_text_top_error + "<br><br>"
         try:
             if len(text_for_email) > 15 or len(email_data)>0:
-                print("Will send email with text:")
-                print(text_for_email)
-                
-                #TODO make descriptive logic for subject
-                subject = ""
-                amount_of_errors = sum([len(message[i]) for i in range(len(message))])
-                if amount_of_errors>3:
-                    subject = "Many issues detected"
-                else:
-                    for i in range(len(message)):
-                        if len(message[i]) > 0:
-                            for instance in message[i]:
-                                if i == 0:  # wrong container status
-                                    subject+=f"Container {instance['Name']} has a wrong status, "
-                                elif i==1:  # is alive fails
-                                    subject+=f"Container {instance['Name']} fails on isalive, "
-                                elif i==2:  # not found
-                                    subject+=f"Container {instance['Name']} not found, "
-                                elif i==3:  # cpu overloaded
-                                    subject+= "CPU load issues, "
-                                elif i==4:  # memory overloaded
-                                    subject+= "Memory load issues, "
-                                elif i==5:  # cronjob failed
-                                    subject+=f"Cronjob {instance[4]} gave an error, "  # maybe replace with description, later
-                                elif i==6:  # other host overloaded on cpu
-                                    subject+=f"Host {instance['host']} overloaded on CPU, "
-                                elif i==7:  # other host overloaded on memory
-                                    subject+=f"Host {instance['host']} overloaded on memory, "
-                                else:       # didn't read the top for some reason
-                                    subject+=f"Host {instance['host']} wasn't readable, "
-                    subject = subject[:-2]
-                #send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), subject, text_for_email)
                 send_emails(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), email_data)
             else:
                 print("No mail was sent because no problem was detected")
@@ -1783,9 +1755,9 @@ def send_advanced_alerts(message):
             prepare_text_top_error = "\nCouldn't load the tops for these hosts:"
             for error_top in message[8]:
                 try:
-                    prepare_text_top_error += f"\nHost named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])['error']}"
+                    prepare_text_top_error += f"\nHost named {error_top[0]} couldn't have resources collected because: {json.loads(error_top[3])}"
                 except:
-                    prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n Original object: {str(error_top)}</br>"
+                    prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n"
 
             text_for_telegram.append(prepare_text_top_error)
         print_debug_log(str(text_for_telegram))
@@ -1836,7 +1808,7 @@ scheduler.add_job(job_wrapper_notifications, trigger='interval', max_instances=5
 scheduler.add_job(isalive, 'cron', hour=8, minute=0)
 scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
-scheduler.add_job(clean_old_db_entries, 'cron',days=1)
+scheduler.add_job(clean_old_db_entries, 'cron',day=1)
 scheduler.start()
 auto_alert_status()
 
@@ -3976,6 +3948,34 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         return send_file(f'snap4city-clustered-certification-{password}.rar')
             except Exception:
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
+        return redirect(url_for('login'))
+            
+    certlock = Lock()
+    @app.route("/certification_mk3", methods=['GET'])
+    def certification_mk3():
+        if 'username' in session:
+            if session['username'] != "admin":
+                return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT b.host, a.user, b.path, b.what FROM checker.certification_retrieval as b join host as a on a.host = b.host;'''
+                cursor.execute(query)
+                conn.commit()
+                results = cursor.fetchall()
+                subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                with certlock:
+                    for r in results:
+                        all_out=subprocess.run(f'mkdir /confs_here/{subfolder} && cd /confs_here/{subfolder} && ssh -o -i /ssh_keys/{r[1]}_{r[0]} {r[1]}@{r[0]} "tar -cz -C {r[2]} {r[3]}" > {r[1]}_{r[0]}_{r[3]}.tar.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
+                        if len(all_out.stderr)>0:
+                            print(f"Error in retrieving {r[1]}_{r[0]}_{r[3]}.tar.gz: {all_out.stderr}")
+                    archiving = subprocess.run(f'cd /confs_here/{subfolder} && rar a -k snap4city-certification-mk3-{subfolder}.rar *.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
+                    if len(archiving.stderr)>0:
+                        print(f"Error in generating snap4city-certification-mk3-{subfolder}.rar: "+archiving.stderr)
+                return send_file(f'/confs_here/{subfolder}/snap4city-certification-mk3-{subfolder}.rar')
+
+        else:
+            return redirect(url_for('login'))
+        
     # hosts stuff        
     @app.route('/hosts_control_panel')
     def hosts_control_panel():
