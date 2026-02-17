@@ -1,0 +1,296 @@
+{% extends "main.html" %}
+{% block title %}Snap4Sentinel{% endblock %}
+{% block head %}
+{{ super() }}
+{% endblock %}
+{% block content %}
+<table id="retrievals">
+  <thead>
+      <tr>
+        <th>ID</th>
+        <th>Path</th>
+        <th>What to retrieve</th>
+        <th>Host</th>
+        <th>Edit</th>
+        <th>Delete</th>
+      </tr>
+  </thead>
+  <tbody>
+{%for item in certification_rows%}
+    <tr>
+      <td>{{item[2]}}</td>
+      <td>{{item[1]}}</td>
+      <td>{{item[3]}}</td>
+      <td>{{item[0]}}</td>
+      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteRetrieval" data-component="{{item[2]}}" id="deleteRetrieval{{item[2]}}" onClick="$('#addRetrievalModal').modal('hide')">Delete</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editRetrieval" data-retrievalid="{{item[0]}}" data-path="{{item[1] | e}}" data-what="{{item[2] | e}}" data-host="{{item[0] | e}}" onClick="$('#addRetrievalModal').modal('hide')">Edit</button></td>
+    </tr>
+{% endfor %}
+  </tbody>
+</table>
+<button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addRetrievalModal" id="addRetrievaljob">Add</button>
+<div class="modal fade" id="addRetrievalModal" tabindex="-1" role="dialog" aria-labelledby="addRetrievalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addRetrievalLabel">Add a new retrieval</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#addRetrievalModal').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addretrievalForm">
+                    <label for="retrievalHostAdd">Select host:</label>
+                    <select id="retrievalHostAdd" name="category-selection" class="form-select">
+                        {%for item in rows_hosts %}<option value="{{item[0]}}">{{item[0]}}</option>{% endfor %}
+                    </select>
+                    <div class="form-group">
+                        <label for="retrievalPathAdd">Path</label>
+                        <input type="text" class="form-control" id="retrievalPathAdd" placeholder="/some/path" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="whatRetrievalAdd">What</label>
+                        <input type="text" class="form-control" id="whatRetrievalAdd" placeholder="file.txt" required>               
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addRetrievalModal').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="addretrievalButton" onClick="confirm_add()">Add retrieval</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editRetrievalModal" tabindex="-1" role="dialog" aria-labelledby="editRetrievalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editRetrievalLabel">Edit a retrieval</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editRetrievalModal').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="editretrievalForm">
+                    <label for="retrievalHostEdit">Select host:</label>
+                    <select id="retrievalHostEdit" name="category-selection" class="form-select">
+                        {%for item in rows_hosts %}<option value="{{item[0]}}">{{item[0]}}</option>{% endfor %}
+                    </select>
+                    <div class="form-group">
+                        <label for="retrievalPathEdit">Path</label>
+                        <input type="text" class="form-control" id="retrievalPathEdit" placeholder="/some/path" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="whatRetrievalEdit">What</label>
+                        <input type="text" class="form-control" id="whatRetrievalEdit" placeholder="file.txt" required>
+                    </div>
+                    <input type="text" class="form-control" id="retrievalidEdit" hidden>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editRetrievalModal').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="editretrievalButton" onClick="confirm_edit()">Edit retrieval</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="deleteretrieval" tabindex="-1" role="dialog" aria-labelledby="deleteretrievalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteComponentLabel">Confirmation for deleting retrieval</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#deleteretrieval').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="deleteComponentForm">
+                    <div class="form-group">
+                        <label for="passwordInputDelete">Password</label>
+                        <input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="retrievalDeleteId">Retrieval ID</label>
+                        <input type="text" class="form-control" id="retrievalDelete" readonly>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#deleteretrieval').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="deleteretrievalButton" >Delete retrieval</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="confirmEditModal" tabindex="-1" role="dialog" aria-labelledby="confirmEditModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmEditModalLabel">Confirmation for deleting retrieval</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#confirmEditModal').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="confirmEditForm">
+                    <div class="form-group">
+                        <label for="passwordInputEdit">Password</label>
+                        <input type="password" class="form-control" id="passwordInputEdit" autocomplete="current-password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#confirmEditModal').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmEditButton" >Edit retrieval</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="confirmAddretrieval" tabindex="-1" role="dialog" aria-labelledby="confirmAddretrievalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmAddretrievalLabel">Confirmation for creating retrieval</h5>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#confirmAddretrieval').modal('hide')">
+                    <span aria-hidden="true">X</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="confirmAddretrievalForm">
+                    <div class="form-group">
+                        <label for="passwordInputAdd">Password</label>
+                        <input type="password" class="form-control" id="passwordInputAdd" autocomplete="current-password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#confirmAddretrieval').modal('hide')">Close</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmAddretrievalButton" >Add retrieval</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $('.open-modal').on('click', function() {
+        $('#addRetrievalModal').modal('show');
+    });
+    $('.open-modal-m').on('click', function() {
+        var id = $(this).data('component');
+        $('#retrievalDeleteId').val(id);
+        $('#deleteretrieval').modal('show');
+    });
+        $('.open-modal-e').on('click', function() {
+        var path = $(this).data('path');
+        var what = $(this).data('what');
+        var host = $(this).data('host');
+        var retrievalid = $(this).data('retrievalid');
+        $('#retrievalPathEdit').val(path);
+        $('#whatRetrievalEdit').val(what);
+        $('#retrievalidEdit').val(retrievalid);
+        let select = document.getElementById('retrievalHostEdit');
+        select.value=host;
+        $('#editRetrievalModal').modal('show');
+    });
+    function confirm_add(){
+        $('#addretrievalModal').modal('hide');
+        $('#confirmAddretrieval').modal('show');
+    }
+    function confirm_edit(){
+        $('#confirmEditModal').modal('show');
+        $('#editretrieval').modal('hide')
+
+    }
+    $('#confirmEditButton').on('click', function() {
+        
+        var path = $('#retrievalPathEdit').val();
+        var what = $('#whatRetrievalEdit').val();
+        var id = $('#retrievalidEdit').val();
+        var host = $('#retrievalHostEdit').val();
+        var password = $('#passwordInputEdit').val();
+        if (password) {
+            try {
+                $.ajax({
+                    url: './edit_configuration_retrieval',
+                    data: {psw: password, path: path, id: id, host: host, what: what},
+                    type: 'POST',
+                    success: function(response) {
+                        alert("Retrieval was edited!");
+                        window.location = window.location.href.split("?")[0];
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert("Retrieval was not edited because of: " + error.statusText);
+                    },
+                    timeout: {{timeout}}
+                });
+            }
+            catch (exception_var) {
+                console.log(exception_var);
+            }
+        }
+        else {
+            alert('Please enter a password');
+        }
+    });
+    $('#confirmAddButton').on('click', function() {
+        var path = $('#retrievalPathAdd').val();
+        var what = $('#whatRetrievalAdd').val();
+        var host = $('#retrievalHostAdd').val();
+        var password = $('#passwordInputAdd').val();
+        if (password) {
+            try {
+                $.ajax({
+                    url: './add_configuration_retrieval',
+                    data: {psw: password, path: path, host: host, what: what},
+                    type: 'POST',
+                    success: function(response) {
+                        alert("Retrieval was added!");
+                        window.location = window.location.href.split("?")[0];
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert("Retrieval was not added because of: " + error.statusText);
+                    },
+                    timeout: {{timeout}}
+                });
+            }
+            catch (exception_var) {
+                console.log(exception_var);
+            }
+        }
+        else {
+            alert('Please enter a password');
+        }
+    });
+    $('#deleteretrievalButton').on('click', function() {
+        var password = $('#passwordInputDelete').val();
+        var id = $('#retrievalDelete').val();
+        if (password) {
+            try {
+                $.ajax({
+                    url: './delete_configuration_retrieval',
+                    data: {psw: password, id: id},
+                    type: 'POST',
+                    success: function(response) {
+                        alert("Retrieval was deleted!");
+                        window.location = window.location.href.split("?")[0];
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert("Retrieval was not deleted because of: " + error.statusText);
+                    },
+                    timeout: {{timeout}}
+                });
+            }
+            catch (exception_var) {
+                console.log(exception_var);
+            }
+        }
+        else {
+            alert('Please enter a password');
+        }
+    })
+    $("#retrievals").DataTable();
+</script>
+{% endblock %}
