@@ -139,7 +139,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#addCronJobModal').modal('hide')">Close</button>
-                <button type="button" class="btn btn-primary" data-dismiss="modal" id="addCronJobButton" onClick="$('#confirmAddCronjob').modal('show')">Add cronjob</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="addCronJobButton" onClick="confirm_add()">Add cronjob</button>
             </div>
         </div>
     </div>
@@ -243,7 +243,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJob').modal('hide')">Cancel</button>
-                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton" onClick="$('#confirmEditModal').modal('show')">Save changes</button>
+                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton" onClick="editCronJob()">Save changes</button>
             </div>
         </div>
     </div>
@@ -497,6 +497,17 @@
         alert('Please enter a password');
     }
     });
+
+    function confirm_add(){
+        $('#addCronJobModal').modal('hide');
+        $('#confirmAddCronjob').modal('show');
+    }
+
+    function confirm_edit(){
+        $('#confirmEditModal').modal('show');
+        $('#editCronJob').modal('hide')
+
+    }
 
     function update_add(){
         const container = document.getElementById('additional-params-add');

@@ -67,7 +67,7 @@ async def safe_snmp_walk(host_data):
     if host_data['safe']:
         snmpEngine = SnmpEngine()
         transport = await UdpTransportTarget.create((host_data["host"], 161))
-        
+
         user = host_data["user"]
         json_details=json.loads(host_data["details"])
         auth_pass = json_details["auth_pass"]
@@ -86,8 +86,8 @@ async def safe_snmp_walk(host_data):
         for base_oid in ["1.3.6.1.2.1.25.2.3.1", "1.3.6.1.2.1.25.3.3.1.2", "1.3.6.1.4.1.2021.10.1.3"]: # hrStorageTable (memory & disk), hrProcessorLoad (CPU), load values
             current_oid = ObjectIdentity(base_oid)
             last_oid = None
-            
-            
+
+
 
             while True:
                 errorIndication, errorStatus, errorIndex, varBinds = await next_cmd(
@@ -145,7 +145,7 @@ async def safe_snmp_walk(host_data):
 
                 if errorIndication or errorStatus or not varBinds:
                     break
-                
+
                 stop_walk = False  # <--- flag to break the while loop
 
                 for varBind in varBinds:
@@ -294,7 +294,7 @@ class Snap4SentinelTelegramBot:
         if self._chat_id == None or force is True:
             self._chat_id = chat_id
             return True
-    
+
     def send_message_new(self, message, chat_id=None):
         print_debug_log("Sending telegram message")
         if not self._actually_send:
@@ -326,7 +326,7 @@ class Snap4SentinelTelegramBot:
                     print_debug_log(f"Failed to send unformatted message as well due to {response_2.text}")
                     return False, f"Failed to send (complete) message: {response_2.text}"
         return True, "Message was sent"
-        
+
 
 f = open("conf.json")
 config = json.load(f)
@@ -351,7 +351,7 @@ db_conn_info = {
 
 def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
     # split containers for naming reasons
-    
+
     container_names = [c["container"] for c in containers]
     container_names = '|'.join('^{0}'.format(w).strip() for w in container_names if len(w)>0)
     with mysql.connector.connect(**db_conn_info) as conn:
@@ -361,7 +361,7 @@ def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, b
             query = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(container_names)
             cursor.execute(query)
             matches = cursor.fetchall()
-        
+
         if len(matches) ==0:
             return ""  #found nothing
         newstr=""
@@ -369,7 +369,7 @@ def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, b
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the container named " + a[1] + " " + instance_of_problem
             if because:
                 reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
-                
+
                 if len(reason) == 1:
                     use_this_reason=because[reason[0]]
                 else:
@@ -393,7 +393,7 @@ def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, b
             else:
                 newstr += curstr+"<br>"
         return newstr
-        
+
 
 def mixed_format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
     # split containers for naming reasons
@@ -419,7 +419,7 @@ def mixed_format_error_to_send(instance_of_problem, containers, because = None, 
             curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
             if because:
                 reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
-                
+
                 if len(reason) == 1:
                     use_this_reason=because[reason[0]]
                 else:
@@ -446,7 +446,7 @@ def mixed_format_error_to_send(instance_of_problem, containers, because = None, 
             curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
             if because:
                 reason=[c for _,c in enumerate([a for a in because.keys()]) if c==a[1]]
-                
+
                 if len(reason) == 1:
                     use_this_reason=because[reason[0]]
                 else:
@@ -477,10 +477,10 @@ def parse_top(data):
         'processes': [],
         'memory_measuring_unit': "B"
     }
-    
+
     # Split output into lines
     lines = data.splitlines()
-    
+
     # Parse system information (first line typically)
     system_info_line = lines[0]
     parsed_data['system_info'] = {
@@ -551,7 +551,7 @@ def send_telegram(chat_id, message):
 def linkify(text):
     # This regex looks for patterns starting with http://, https://, or www.
     url_pattern = r'(https?://[^\s]+|www\.[^\s]+)'
-    
+
     def replace_with_link(match):
         url = match.group(0)
         href = url
@@ -611,16 +611,16 @@ def send_emails(sender_email, sender_password, receiver_emails, data_to_be_sent)
         server.send_message(msg)
     server.quit()
     print("Email(s) was (were) sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
-    
+
 
 def filter_out_muted_containers_for_telegram(containers):
     print_debug_log("Filtering out muted containers")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS ( 
+            query = '''WITH RankedEntries AS (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY component ORDER BY until DESC) AS row_num FROM telegram_alert_pauses
-                    ) 
+                    )
                     SELECT component, until FROM RankedEntries WHERE row_num = 1;'''
             cursor.execute(query)
             results = cursor.fetchall()
@@ -639,9 +639,9 @@ def filter_out_muted_failed_are_alive_for_telegram(tests):
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS ( 
+            query = '''WITH RankedEntries AS (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY component ORDER BY until DESC) AS row_num FROM telegram_alert_pauses
-                    ) 
+                    )
                     SELECT component, until FROM RankedEntries WHERE row_num = 1;'''
             cursor.execute(query)
             results = cursor.fetchall()
@@ -672,9 +672,9 @@ def filter_out_wrong_status_containers_for_telegram(containers):
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS ( 
+            query = '''WITH RankedEntries AS (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY component ORDER BY until DESC) AS row_num FROM telegram_alert_pauses
-                    ) 
+                    )
                     SELECT component, until FROM RankedEntries WHERE row_num = 1;'''
             cursor.execute(query)
             results = cursor.fetchall()
@@ -719,8 +719,8 @@ DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdat
     except:
         print("Couldn't delete old logs because: "+traceback.format_exc())
         send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" didn't delete old logs.", os.getenv("platform-url","unseturl")+" didn't delete old logs because of "+traceback.format_exc())
-    
-        
+
+
 def populate_tops_entries():
     print_debug_log("Populating top entries")
     try:
@@ -826,7 +826,7 @@ async def auto_run_tests():
                     conn.commit()
                 except Exception:
                     print(f"ERROR: failed to insert the result of a test for container {test_ran['container']}")
-                            
+
             return completed
     except Exception:
         print("Something went wrong during tests running because of:",traceback.format_exc())
@@ -851,16 +851,16 @@ async def run_shell_command(name, command):
             if not process_return_code:
                 process_return_code = "Timed out"
             print("run_shell_command: end "+name+" exception elapsed "+str(end-start)+"s result: "+str(process_return_code))
-            return {"container":name, "result": f"Command {command} timed out after 10 seconds.", "command": command} 
+            return {"container":name, "result": f"Command {command} timed out after 10 seconds.", "command": command}
         end = time.time()
         #print("run_shell_command: end "+name+" elapsed "+str(end-start)+"s result:"+str(process.returncode))
 
         output = stdout.decode("cp437") if stdout else ""
         error = stderr.decode("cp437") if stderr else ""
-        
+
         if process.returncode != 0:
             return {"container":name, "result": error, "command": command}
-        
+
         return {"container":name, "result": output, "command": command}
 
     except Exception:
@@ -870,9 +870,9 @@ async def run_shell_command(name, command):
 def auto_alert_status():
     print_debug_log("Starting auto alert status")
     if os.getenv("is-master","False") == "False": #slaves don't send status
-        return 
+        return
     if "False" == os.getenv("running-as-kubernetes","False"):
-        
+
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_merged = []
@@ -883,7 +883,7 @@ def auto_alert_status():
                         if key1 == "Name" and key2 == "Names":
                             if value1 == value2:
                                 containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-        
+
         new_containers_merged = []
         source = os.getenv("platform-url","")
         for current in new_containers_merged:
@@ -911,7 +911,7 @@ def auto_alert_status():
             td["Namespace"] = "Docker - " + source
             new_containers_merged.append(td)
     else:
-        
+
         raw_jsons = []
         for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
             raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
@@ -970,13 +970,13 @@ def auto_alert_status():
                         temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
                         del temp_vols[vol_num]["name"]
                         temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
-                        
+
                     conversion["Volumes"] = temp_str
                 except KeyError:
                     conversion["Volumes"] = "No volumes"
                 conversion["Namespace"] = item["metadata"]["namespace"]
-                
-                
+
+
                 conversions.append(conversion)
         containers_merged = conversions
     if os.getenv("is-multi","True") == "True":
@@ -1000,7 +1000,7 @@ def auto_alert_status():
                             print(f"Received {obtained[:100]}... from {r[0]}")
                         except Exception as E:
                             print("Error on multi reading container data:", str(E))
-            except requests.exceptions.ConnectionError as E: 
+            except requests.exceptions.ConnectionError as E:
                 print("Error on multi reading container data:", str(E))
         containers_merged = containers_merged + total_answer
         new_containers_merged = []
@@ -1033,7 +1033,7 @@ def auto_alert_status():
             td["Namespace"] = "Docker - " + source
             new_containers_merged.append(td)
         containers_merged = new_containers_merged
-        
+
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -1049,18 +1049,18 @@ def auto_alert_status():
     # begin mixed dealing with docker/kubernetes, if not multi this fails and crashes
     containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
     containers_merged_kubernetes = [a for a in containers_merged if not a["Namespace"].startswith("Docker - ")]
-    
+
     components_docker = [a[0] for a in results if a[4]=="docker"]
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=="kubernetes"]
     components_original_docker = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="docker"]
     components_original_kubernetes = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="kubernetes"]
-    
+
     containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components_docker) and not ("running" in c["State"])]
     [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in components_kubernetes) and not ("running" in c["State"])]]
-    
+
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
-    
+
     containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components_docker) and "unhealthy" in c["Status"]]
     for c_m in containers_merged_kubernetes:
         if any(c_m["Names"].startswith(value) for value in components_kubernetes):
@@ -1074,7 +1074,7 @@ def auto_alert_status():
                     containers_which_are_running_but_are_not_healthy.append(c_m)
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
     names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-    
+
     containers_which_are_not_expected = list(set(tuple(item) for item in components_original_docker)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged_docker)))
     containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
     missing_containers_k = dict(components_original_kubernetes)
@@ -1088,7 +1088,7 @@ def auto_alert_status():
                 except ValueError:
                     pass
     [containers_which_are_not_expected.append(a) for a in og_conts]
-    
+
     if "False" == os.getenv("running-as-kubernetes","False"):
         top = get_top()
         load_averages = re.findall(r"(\d+\.\d+)", top["system_info"]["load_average"])[-3:]
@@ -1106,7 +1106,7 @@ def auto_alert_status():
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+            query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
 SELECT datetime,result,errors,name,command,categories.category,restart_logic,description,target FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
             cursor.execute(query)
             conn.commit()
@@ -1126,7 +1126,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
         pass
     problematic_tops_cpu = []
     problematic_tops_ram = []
-    
+
     top_errors = []
     for top_r in top_results:
         try:
@@ -1146,7 +1146,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
         except Exception as E:
             print_debug_log("Top error:"+traceback.format_exc())
             top_errors.append(top_r)
-                    
+
     if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
             issues = ["","","","","","","","",""]
@@ -1187,8 +1187,8 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
             return
     return
     # end mixed dealing with docker/kubernetes
-    
-        
+
+
 def get_top():
     print_debug_log("Getting a top")
     if os.getenv("running-as-kubernetes", "True") == "True":
@@ -1245,10 +1245,10 @@ def get_top():
             'processes': [],
             'memory_measuring_unit': "B"
         }
-        
+
         # Split output into lines
         lines = stdout.splitlines()
-        
+
         # Parse system information (first line typically)
         system_info_line = lines[0]
         parsed_data['system_info'] = {
@@ -1311,11 +1311,11 @@ def send_alerts(message):
         send_telegram(int(os.getenv("telegram-channel","0")), [message])
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
-        
+
 def update_container_state_db():
     print_debug_log("Populating database with container data")
     if os.getenv("is-master","False") == "False": #slaves don't write to db
-        return 
+        return
     if "False" == os.getenv("running-as-kubernetes","False"):
         containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
         containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -1395,7 +1395,7 @@ def update_container_state_db():
             query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
             cursor.execute(query,(json.dumps(containers_merged),))
             conn.commit()
-        
+
     else:
         raw_jsons = []
         for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
@@ -1421,7 +1421,7 @@ def update_container_state_db():
                     conversion["Labels"] = ", ".join([f"{label}: {value}" for label, value in item["metadata"]["labels"].items()])
                 except KeyError:
                     conversion["Labels"] = "No labels"
-                try: 
+                try:
                     conversion["Mounts"] = ", ".join([f"{a['mountPath']}: {a['name']}" for a in item["spec"]["containers"][0]["volumeMounts"]])
                 except KeyError:
                     conversion["Mounts"] = "No mounts"
@@ -1456,9 +1456,9 @@ def update_container_state_db():
                     conversion["Volumes"] = temp_str
                 except KeyError:
                     conversion["Volumes"] = "No volumes"
-                
+
                 conversion["Namespace"] = item["metadata"]["namespace"]
-                
+
                 conversions.append(conversion)
         if os.getenv("is-multi","False") == "True":
             with mysql.connector.connect(**db_conn_info) as conn:
@@ -1492,7 +1492,7 @@ def update_container_state_db():
             query = '''INSERT INTO `checker`.`container_data` (`containers`) VALUES (%s);'''
             cursor.execute(query,(json.dumps(conversions),))
             conn.commit()
-        
+
 mutex = Lock()
 def queued_running(command):
     answer = None
@@ -1516,7 +1516,7 @@ def runcronjobs():
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
-            for r in list(results): 
+            for r in list(results):
                 print(f"{datetime.now()} Running {r[1]} cronjob")
                 try:
                     if int(r[5]) == 1:
@@ -1553,7 +1553,7 @@ def runcronjobs_parallel():
             results = cursor.fetchall()
             with ThreadPoolExecutor(max_workers=10) as executor:
                 executor.map(task_wrapper, results)
-                
+
     except Exception:
         print("Something went wrong during cronjobs running because of:",traceback.format_exc())
 
@@ -1616,7 +1616,7 @@ def send_advanced_alerts(message):
                 cont_names = re.findall("named (.+)",el,re.MULTILINE)
                 if len(cont_names) > 0: # filters out something that won't work
                     email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
-            
+
         if len(message[1])>0:
             #containers = ", ".join([a["container"] for a in message[1]])
             becauses = dict([[a["container"],a["command"]] for a in message[1]])
@@ -1626,7 +1626,7 @@ def send_advanced_alerts(message):
                 cont_names = re.findall("named (.+)",el,re.MULTILINE)
                 if len(cont_names) > 0: # filters out something that won't work
                     email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
-            
+
         if len(message[2])>0:
             current_text = mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=message[2])+"<br><br>"
             text_for_email += current_text
@@ -1634,7 +1634,7 @@ def send_advanced_alerts(message):
                 cont_names = re.findall("named (.+)",el,re.MULTILINE)
                 if len(cont_names) > 0: # filters out something that won't work
                     email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
-            
+
         if len(message[3])>0:
             text_for_email+= message[3] + '<br><br>'
             email_data.append({"subject":os.getenv("platform-url","unseturl") + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":message[3]})
@@ -1661,7 +1661,7 @@ def send_advanced_alerts(message):
                 except:
                     prepare_text_top_cpu += f"<br>Issue while interpreting cpu top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_cpu_top)}</br>"
                     email_data.append({"subject":overloaded_cpu_top['host'] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Issue while interpreting cpu top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_cpu_top)}</br>"})
-                
+
             text_for_email += prepare_text_top_cpu + "<br><br>"
         if len(message[7])>0:
             prepare_text_top_mem = "<br>These hosts are overloaded on memory:"
@@ -1672,7 +1672,7 @@ def send_advanced_alerts(message):
                 except:
                     prepare_text_top_mem += f"<br>Issue while interpreting mem top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_mem_top)}</br>"
                     email_data.append({"subject":overloaded_mem_top['host'] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Issue while interpreting mem top: ({traceback.format_exc()})</br><br> Original object: {str(overloaded_mem_top)}</br>"})
-                
+
 
             text_for_email += prepare_text_top_mem + "<br><br>"
         if len(message[8])>0:
@@ -1684,7 +1684,6 @@ def send_advanced_alerts(message):
                 except:
                     prepare_text_top_error += f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br>"
                     email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br>"})
-                
             text_for_email += prepare_text_top_error + "<br><br>"
         try:
             if len(text_for_email) > 15 or len(email_data)>0:
@@ -1725,16 +1724,17 @@ def send_advanced_alerts(message):
 
                 # Escape the error text
                 escaped_err = raw_error.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                prepare_text += (
+                generated_text = (
                     f"<b>{target}</b>\n"
                     f"with code <code>{bash_code}</code>\n"
                     f"gave {result_text}\n"
                     f"Error: <code>{escaped_err}</code> at {timestamp}\n\n"
                 )
-                all_msgs.append(prepare_text)
+                prepare_text += generated_text
+                all_msgs.append(generated_text)
             [text_for_telegram.append(msg) for msg in all_msgs]
-            
-            
+
+
         if len(message[6])>0:
             prepare_text_top_cpu = "\nThese hosts are overloaded on cpu:"
             for overloaded_cpu_top in message[6]:
@@ -1767,7 +1767,7 @@ def send_advanced_alerts(message):
             print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
-        
+
 def job_wrapper_updatedb(timeout_seconds):
     # Create a process to run the task
     p = multiprocessing.Process(target=update_container_state_db)
@@ -1782,7 +1782,7 @@ def job_wrapper_updatedb(timeout_seconds):
         p.join()       # Clean up the zombie process
     else:
         pass  # all is fine
-    
+
 def job_wrapper_notifications(timeout_seconds):
     # Create a process to run the task
     p = multiprocessing.Process(target=auto_alert_status)
@@ -1797,7 +1797,7 @@ def job_wrapper_notifications(timeout_seconds):
         p.join()       # Clean up the zombie process
     else:
         pass  # all is fine
-        
+
 update_container_state_db() #on start, populate immediately
 scheduler = BackgroundScheduler()
 scheduler.add_job(job_wrapper_updatedb, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")), args=[120])
@@ -1828,7 +1828,7 @@ def create_app():
                     # basis for making a better mobile ui, if mobile then make main ui with far less columns
                     user_agent_string = request.headers.get('User-Agent')
                     user_agent = parse(user_agent_string)
-                    
+
                     if user_agent.is_mobile: # maybe remove 19/20
                         column_string = """{columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 8, visible: false},{target: 10, visible: false},{target: 11, visible: false},{target: 12, visible: false},{target: 14, visible: false},{target: 15, visible: false},{target: 19, visible: false},{target: 20, visible: false}]}""" # less columns
                     else:
@@ -1863,14 +1863,14 @@ def create_app():
         if 'username' in session:
             return get_top()
         return render_template("error_showing.html", r = "You are not authenticated"), 403
-    
+
 
     @app.route("/get_top", methods=["GET"])
     def get_top_single():  #TODO doesn't do multi yet
         if 'username' in session:
             return get_local_top()
         return render_template("error_showing.html", r = "You are not authenticated"), 403
-        
+
 
     @app.route("/organize_containers", methods=["GET"])
     def organize_containers():
@@ -1890,12 +1890,12 @@ def create_app():
                     conn.commit()
                     results_2 = cursor.fetchall()
                     return render_template("organize_containers_unified.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
-                    
+
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/add_container", methods=["POST"])
     def add_container():
         print_debug_log("Adding container")
@@ -1918,7 +1918,7 @@ def create_app():
                 print("Something went wrong during the addition of a new container because of",traceback.format_exc())
                 return f"Something went wrong during the addition of a new container because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-    
+
     @app.route("/edit_container", methods=["POST"])
     def edit_container(): #add position if only if docker
         print_debug_log("Editing container")
@@ -1939,7 +1939,7 @@ def create_app():
                     else:
                         query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s where (`component` = %s)'''
                         cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['id'],))
-                    
+
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -1949,7 +1949,7 @@ def create_app():
                 print("Something went wrong during the editing of a container because of",traceback.format_exc())
                 return f"Something went wrong during the editing of a container because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-        
+
     @app.route("/delete_container", methods=["POST"])
     def delete_container():
         print_debug_log("Deleting container")
@@ -1966,9 +1966,9 @@ def create_app():
                 conn.commit()
                 return "ok", 201
         return redirect(url_for('login'))
-    
+
     ## start add cronjob
-    
+
     restart_cronjob_lock = Lock()
     @app.route("/restart_logic_cronjob", methods=["POST"])
     def restart_logic_cronjob():
@@ -2009,11 +2009,11 @@ def create_app():
                             return "Restarting the service behind the cronjob returned " + restart_result.stderr, 500
                     else: # too soon
                         return "This cronjob restart was called very recently, wait a minute", 500
-    
+
     # end restart cronjob
-    
+
     # start run specific cronjob
-        
+
     restart_cronjob_lock = Lock()
     @app.route("/run_specific_cronjob", methods=["POST"])
     def run_specific_cronjob():
@@ -2047,7 +2047,7 @@ def create_app():
             else:
                 return "Restarting the service behind the cronjob returned " + ran_command.stderr, 500
     # end run specific cronjob
-    
+
     @app.route("/organize_cronjobs", methods=["GET"])
     def organize_cronjobs():
         if 'username' in session:
@@ -2067,13 +2067,13 @@ def create_app():
                     conn.commit()
                     results_2 = cursor.fetchall()
                     return render_template("organize_cronjobs.html",cronjobs=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
-                    
+
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-    
-        
+
+
     @app.route("/organize_cronjobs_new", methods=["GET"])
     def organize_cronjobs_new():
         if 'username' in session:
@@ -2097,12 +2097,12 @@ def create_app():
                     conn.commit()
                     results_3 = cursor.fetchall()
                     return render_template("organize_cronjobs_new.html",cronjobs=results, categories=results_2, timeout=int(os.getenv("requests-timeout","15000")), cronjobs_prototypes=results_3)
-                    
+
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/add_cronjob", methods=["POST"])
     def add_cronjob():
         print_debug_log("Adding cronjob")
@@ -2120,16 +2120,16 @@ def create_app():
                     else:
                         query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`) VALUES (%s, %s, %s, NULL, %s, %s, %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'], 0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description']))
-                    
+
                     conn.commit()
                     return "ok", 201
             except Exception:
                 print("Something went wrong during the addition of a new cronjob because of",traceback.format_exc())
                 return f"Something went wrong during the addition of a new cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-    
+
     @app.route("/edit_cronjob", methods=["POST"])
-    def edit_cronjob(): 
+    def edit_cronjob():
         print_debug_log("Editing cronjob: "+str(request.form.to_dict()))
         if 'username' in session:
             try:
@@ -2141,10 +2141,10 @@ def create_app():
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s, `restart_logic`= %s, `description`= %s WHERE (`idcronjobs` = %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['id'],)) 
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['id'],))
                     else:
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL, `disabled` = %s, `restart_logic`= %s, `description`= %s WHERE (`idcronjobs` = %s);'''
-                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['id'],)) 
+                        cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['id'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2154,7 +2154,7 @@ def create_app():
                 print("Something went wrong during the editing of a cronjob because of",traceback.format_exc())
                 return f"Something went wrong during the editing of a cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-    
+
     @app.route("/add_cronjob_new", methods=["POST"])
     def add_cronjob_new():
         print_debug_log("Adding cronjob (new)")
@@ -2171,25 +2171,25 @@ def create_app():
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,
                                                request.form.to_dict()['restart'],request.form.to_dict()['description'],request.form.to_dict()['Timeout_timeAdd'],
-                                               request.form.to_dict()['RetriesAdd'], request.form.to_dict()['Retries_waitAdd'], 
+                                               request.form.to_dict()['RetriesAdd'], request.form.to_dict()['Retries_waitAdd'],
                                                request.form.to_dict()['IPAdd'],request.form.to_dict()['TargetAdd'],request.form.to_dict()['contacts'],))
                     else:
                         query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`, `timeout_time`, `retries`, `retries_wait`, `ip`, `target`, `contacts`) VALUES (%s, %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],
                                                request.form.to_dict()['description'], request.form.to_dict()['Timeout_timeAdd'],
-                                               request.form.to_dict()['RetriesAdd'], request.form.to_dict()['Retries_waitAdd'], 
+                                               request.form.to_dict()['RetriesAdd'], request.form.to_dict()['Retries_waitAdd'],
                                                request.form.to_dict()['IPAdd'],request.form.to_dict()['TargetAdd'],request.form.to_dict()['contacts'],))
-                    
+
                     conn.commit()
                     return "ok", 201
             except Exception:
                 print("Something went wrong during the addition of a new cronjob because of",traceback.format_exc())
                 return f"Something went wrong during the addition of a new cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-    
+
     @app.route("/edit_cronjob_new", methods=["POST"])
-    def edit_cronjob_new(): 
+    def edit_cronjob_new():
         print_debug_log("Editing cronjob (new): "+str(request.form.to_dict()))
         if 'username' in session:
             try:
@@ -2200,23 +2200,23 @@ def create_app():
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
-                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s, 
-                                    `restart_logic`= %s, `description`= %s, `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s, 
+                        query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s,
+                                    `restart_logic`= %s, `description`= %s, `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s,
                                     `target`= %s, `contacts` = %s WHERE (`idcronjobs` = %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,
                                                request.form.to_dict()['restart'],request.form.to_dict()['description'],
                                                request.form.to_dict()['Timeout_timeEdit'],request.form.to_dict()['RetriesEdit'],request.form.to_dict()['Retries_waitEdit'],
-                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],)) 
-                        
+                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],))
+
                     else:
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL, `disabled` = %s, `restart_logic` = %s, `description`= %s,
                         `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s, `target`= %s, `contacts` = %s WHERE (`idcronjobs` = %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],
                                                request.form.to_dict()['description'], request.form.to_dict()['Timeout_timeEdit'],
-                                               request.form.to_dict()['RetriesEdit'], request.form.to_dict()['Retries_waitEdit'], 
-                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],)) 
+                                               request.form.to_dict()['RetriesEdit'], request.form.to_dict()['Retries_waitEdit'],
+                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2226,7 +2226,7 @@ def create_app():
                 print("Something went wrong during the editing of a cronjob because of",traceback.format_exc())
                 return f"Something went wrong during the editing of a cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-        
+
     @app.route("/delete_cronjob", methods=["POST"])
     def delete_cronjob():
         print_debug_log("Deleting cronjob")
@@ -2244,8 +2244,8 @@ def create_app():
                 conn.commit()
                 return "ok", 201
         return redirect(url_for('login'))
-    
-    
+
+
     @app.route("/organize_extra_resources", methods=["GET"])
     def organize_extra_resources():
         if 'username' in session:
@@ -2265,12 +2265,12 @@ def create_app():
                     conn.commit()
                     results_2 = cursor.fetchall()
                     return render_template("organize_extra_resources.html",extra_resources=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
-                    
+
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/add_extra_resource", methods=["POST"])
     def add_extra_resource():
         print_debug_log("Adding extra resource")
@@ -2281,7 +2281,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`extra_resources` ( `resource_address`, `resource_information`, `resource_description`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['address'],request.form.to_dict()['information'],request.form.to_dict()['description'],))
@@ -2291,7 +2291,7 @@ def create_app():
                 print("Something went wrong during the addition of a new extra resource because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-    
+
     @app.route("/edit_extra_resource", methods=["POST"])
     def edit_extra_resource():
         print_debug_log("Editing extra resource")
@@ -2302,10 +2302,10 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`extra_resources` SET `resource_address` = %s, `resource_information` = %s, `resource_description` = %s WHERE (`id_category` = %s) and (`resource_address` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['address'],request.form.to_dict()['information'],request.form.to_dict()['description'],request.form.to_dict()['id'],request.form.to_dict()['address'],)) 
+                    cursor.execute(query, (request.form.to_dict()['address'],request.form.to_dict()['information'],request.form.to_dict()['description'],request.form.to_dict()['id'],request.form.to_dict()['address'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2315,7 +2315,7 @@ def create_app():
                 print("Something went wrong during the editing of a new extra resource because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/delete_extra_resource", methods=["POST"])
     def delete_extra_resource():
         print_debug_log("Deleting extra resource")
@@ -2325,7 +2325,7 @@ def create_app():
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 cursor = conn.cursor(buffered=True)
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
@@ -2334,8 +2334,8 @@ def create_app():
                 conn.commit()
                 return "ok", 201
         return redirect(url_for('login'))
-    
-    
+
+
     @app.route("/organize_tests", methods=["GET"])
     def organize_tests():
         if 'username' in session:
@@ -2345,19 +2345,19 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''SELECT * FROM checker.tests_table;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
                     return render_template("organize_tests.html",tests=results, timeout=int(os.getenv("requests-timeout","15000")))
-                    
+
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/add_test", methods=["POST"])
     def add_test():
         print_debug_log("Adding test")
@@ -2368,7 +2368,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`tests_table` (`container_name`, `command`, `command_explained`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['container_name'],request.form.to_dict()['command'],request.form.to_dict()['command_explained'],))
@@ -2378,7 +2378,7 @@ def create_app():
                 print("Something went wrong during the addition of a new test because of",traceback.format_exc())
                 return f"Something went wrong during the addition of a new test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-    
+
     @app.route("/edit_test", methods=["POST"])
     def edit_test():
         print_debug_log("Editing test")
@@ -2389,10 +2389,10 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`tests_table` SET `container_name` = %s, `command` = %s, `command_explained` = %s WHERE (`id` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['container_name'],request.form.to_dict()['command'],request.form.to_dict()['command_explained'],request.form.to_dict()['id'],)) 
+                    cursor.execute(query, (request.form.to_dict()['container_name'],request.form.to_dict()['command'],request.form.to_dict()['command_explained'],request.form.to_dict()['id'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2402,7 +2402,7 @@ def create_app():
                 print("Something went wrong during the editing of a test because of",traceback.format_exc())
                 return f"Something went wrong during the editing of a test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-        
+
     @app.route("/delete_test", methods=["POST"])
     def delete_test():
         print_debug_log("Deleting test")
@@ -2412,7 +2412,7 @@ def create_app():
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 cursor = conn.cursor(buffered=True)
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
@@ -2421,8 +2421,8 @@ def create_app():
                 conn.commit()
                 return "ok", 201
         return redirect(url_for('login'))
-    
-    
+
+
     @app.route("/organize_complex_tests", methods=["GET"])
     def organize_complex_tests():
         if 'username' in session:
@@ -2432,7 +2432,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''SELECT * FROM checker.complex_tests;'''
                     query2 = '''SELECT * from categories;'''
@@ -2443,12 +2443,12 @@ def create_app():
                     conn.commit()
                     results_2 = cursor.fetchall()
                     return render_template("organize_complex_tests.html",complex_tests=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
-                    
+
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/add_complex_test", methods=["POST"])
     def add_complex_test():
         print_debug_log("Adding compelx test")
@@ -2459,7 +2459,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],))
@@ -2469,7 +2469,7 @@ def create_app():
                 print("Something went wrong during the addition of a new complex test because of",traceback.format_exc())
                 return f"Something went wrong during the addition of a new complex test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-    
+
     @app.route("/edit_complex_test", methods=["POST"])
     def edit_complex_test():
         print_debug_log("Editing complex test")
@@ -2480,10 +2480,10 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],request.form.to_dict()['id'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2493,7 +2493,7 @@ def create_app():
                 print("Something went wrong during the editing of a complex_test because of",traceback.format_exc())
                 return f"Something went wrong during the editing of a complex test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-        
+
     @app.route("/delete_complex_test", methods=["POST"])
     def delete_complex_test():
         print_debug_log("Deleting complex test")
@@ -2503,7 +2503,7 @@ def create_app():
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 cursor = conn.cursor(buffered=True)
                 if not check_password_hash(users[username], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
@@ -2512,8 +2512,8 @@ def create_app():
                 conn.commit()
                 return "ok", 201
         return redirect(url_for('login'))
-    
-    
+
+
     @app.route("/organize_categories", methods=["GET"])
     def organize_categories():
         if 'username' in session:
@@ -2529,12 +2529,12 @@ def create_app():
                     conn.commit()
                     results_2 = cursor.fetchall()
                     return render_template("organize_categories.html",categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
-                    
+
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/add_category", methods=["POST"])
     def add_category():
         print_debug_log("Adding category")
@@ -2554,7 +2554,7 @@ def create_app():
                 print("Something went wrong during the addition of a new category because of",traceback.format_exc())
                 return f"Something went wrong during the addition of a new category because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-    
+
     @app.route("/edit_category", methods=["POST"])
     def edit_category():
         print_debug_log("Editing category")
@@ -2567,7 +2567,7 @@ def create_app():
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`categories` SET `category` = %s (`idcategories` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['category'],request.form.to_dict()['id'],)) 
+                    cursor.execute(query, (request.form.to_dict()['category'],request.form.to_dict()['id'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -2577,7 +2577,7 @@ def create_app():
                 print("Something went wrong during the editing of a category because of",traceback.format_exc())
                 return f"Something went wrong during the editing of a category because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
-        
+
     @app.route("/delete_category", methods=["POST"])
     def delete_category():
         print_debug_log("Deleting category")
@@ -2598,10 +2598,10 @@ def create_app():
             except Exception:
                 print("Something went wrong during the deletion of an old category because of",traceback.format_exc())
                 return f"Something went wrong during the deletion of an old category because of {traceback.format_exc()}", 500
-        
+
         return redirect(url_for('login'))
-    
-    
+
+
     @app.route("/login", methods=['GET', 'POST'])
     def login():
         if os.getenv("is-master","False") == "True":
@@ -2642,7 +2642,7 @@ def create_app():
             except Exception:
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-    
+
     @app.route("/get_complex_test_buttons")
     def get_complex_test_buttons():
         print_debug_log("Getting complex tests")
@@ -2659,7 +2659,7 @@ def create_app():
             except Exception:
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/container_is_okay", methods=['POST'])
     def make_category_green():
         if 'username' in session:
@@ -2675,7 +2675,7 @@ def create_app():
                     send_alerts("Can't reach db due to",traceback.format_exc())
                     return render_template("error_showing.html", r =  "There was a problem: "+traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/read_containers", methods=['POST'])
     def check():
         print_debug_log("Reading containers")
@@ -2694,10 +2694,10 @@ def create_app():
         elif 'username' in session:
             return get_container_data()
         return redirect(url_for('login'))
-            
+
     def send_request(url, headers):
         return requests.post(url, headers=headers)
-    
+
     @app.route("/read_containers_db", methods=['GET'])
     def check_container_db():
         print_debug_log("Reading container's database")
@@ -2717,7 +2717,7 @@ def create_app():
                     return tobereturned_answer
             with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
 SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled,where_to_run,target,ip,createtime FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
@@ -2758,7 +2758,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
         except Exception:
             print("Something went wrong because of:",traceback.format_exc())
             return render_template("error_showing.html", r = traceback.format_exc()), 500
-    
+
     def get_extra_data():
         try:
             with mysql.connector.connect(**db_conn_info) as conn:
@@ -2771,7 +2771,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
         except Exception:
             print("Something went wrong because of:",traceback.format_exc())
             return "Error in get extra data!"
-        
+
     @app.route("/run_test", methods=['POST'])
     def run_test():
         print_debug_log("Running test")
@@ -2781,7 +2781,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''select command, command_explained, id from tests_table where container_name =%s;'''
-                    
+
                     if "False" == os.getenv("running-as-kubernetes","False"):
                         container = request.form.to_dict()['container']
                     else:
@@ -2809,8 +2809,8 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 print("Something went wrong during tests running because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-    
-        
+
+
     @app.route("/run_test_complex", methods=['POST'])
     def run_test_complex():
         print_debug_log("Running complex test")
@@ -2844,8 +2844,8 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             except Exception:
                 print("Something went wrong during tests running because of",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
-        return redirect(url_for('login'))        
-        
+        return redirect(url_for('login'))
+
     @app.route("/test_all_ports", methods=['GET'])
     async def test_all_ports():
         print_debug_log("Testing all ports")
@@ -2862,14 +2862,14 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 completed = await asyncio.gather(*tasks)
                 return completed
         return redirect(url_for('login'))
-            
+
     @app.route("/deauthenticate", methods=['POST','GET'])
     def deauthenticate():
         # FIXME there is this and logout??
         print_debug_log("Deautheticated")
         session.clear()
         return "You have been deauthenticated", 401
-        
+
     @app.route("/reboot_container", methods=['POST'])
     def reboot_container():
         print_debug_log("Rebooting container")
@@ -2886,7 +2886,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 pass
             else:
                 return "An incorrect password was provided", 400
-        
+
         if os.getenv("is-multi","False") == "False":
             if "False" == os.getenv("running-as-kubernetes","False"):
                 og_result = queued_running('docker restart '+request.form.to_dict()['id'])
@@ -2958,7 +2958,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                         return result.stdout
                     except Exception:
                         return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
-            
+
     @app.route("/get_muted_components", methods=['GET'])
     def get_muted_components():
         print_debug_log("Getting muted containers")
@@ -2978,8 +2978,8 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 print("Something went wrong during getting the muted components because:",traceback.format_exc())
                 return traceback.format_exc(), 500
         return redirect(url_for('login'))
-    
-            
+
+
     @app.route("/mute_component_by_hours", methods=['POST'])
     def mute_component_by_hours():
         print_debug_log("Getting muted containers by hout")
@@ -2996,7 +2996,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 print("Something went wrong during muting a component because of:",traceback.format_exc())
                 return traceback.format_exc(), 500
         return redirect(url_for('login'))
-    
+
     @app.route("/cronjobs", methods=['POST', 'GET'])
     def get_cron_jobs():
         print_debug_log("Getting cronjob results")
@@ -3004,7 +3004,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
 SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled,description,restart_logic FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
@@ -3014,7 +3014,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 print("Something went wrong during getting a cronjob because of:",traceback.format_exc())
                 return traceback.format_exc(), 500
         return redirect(url_for('login'))
-        
+
     @app.route("/tests_results", methods=['POST'])
     def get_tests():
         print_debug_log("Getting tests results")
@@ -3022,9 +3022,9 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''WITH RankedEntries AS ( 
+                    query = '''WITH RankedEntries AS (
                         SELECT *, ROW_NUMBER() OVER (PARTITION BY container ORDER BY datetime DESC) AS row_num FROM tests_results
-                        ) 
+                        )
                         SELECT * FROM RankedEntries WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
@@ -3035,7 +3035,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 print("Something went wrong because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-        
+
     # this is only called serverside
     def log_to_db(table, log, which_test="", user_op=""):
         try:
@@ -3052,7 +3052,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 conn.commit()
         except Exception:
             print("Something went wrong during db logging because of:",traceback.format_exc(), "- in:",table)
-            
+
     @app.route("/get_complex_tests", methods=["GET"])
     def get_complex_tests():
         print_debug_log("Getting complex test results")
@@ -3060,9 +3060,9 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''WITH RankedEntries AS ( 
+                    query = '''WITH RankedEntries AS (
                         SELECT *, ROW_NUMBER() OVER (PARTITION BY container ORDER BY datetime DESC) AS row_num FROM tests_results
-                        ) 
+                        )
                         SELECT * FROM RankedEntries WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
@@ -3073,7 +3073,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 print("Something went wrong because of:",traceback.format_exc())
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-    
+
     @app.route("/container/<podname>", methods=['POST'])
     def get_container_logs(podname):
         print_debug_log("Getting container logs")
@@ -3142,7 +3142,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                         out.append(line[:-1])
                 for line in iter(process.stdout.readline, ''):
                     out.append(line[:-1])
-                
+
                 process.stdout.close()
                 r = '<br>'.join(out)
                 if "raw" not in request.form.to_dict().keys():
@@ -3207,7 +3207,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                             out.append(line[:-1])
                     for line in iter(process.stdout.readline, ''):
                         out.append(line[:-1])
-                    
+
                     process.stdout.close()
                     r = '<br>'.join(out)
                     if "raw" not in request.form.to_dict().keys():
@@ -3274,7 +3274,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                                 out.append(line[:-1])
                         for line in iter(process.stdout.readline, ''):
                             out.append(line[:-1])
-                        
+
                         process.stdout.close()
                         r = '<br>'.join(out)
                         if "raw" not in request.form.to_dict().keys():
@@ -3295,7 +3295,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                         return f"Issue while rebooting pod: {traceback.format_exc()}", 500
             except:
                 return f"Issue while getting logs of container/pod: {traceback.format_exc()}", 500
-        
+
     @app.route("/cronjobs_logs", methods=["POST", "GET"])
     def get_cronjobs_logs():
         if 'username' not in session:
@@ -3318,8 +3318,8 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             else:
                 logs = "This cronjob doesn't exists or it has no logs yet"
             return render_template('log_show.html', r = logs, container_name=f"cronjob #{cronjob_id}")
-        
-    
+
+
     @app.route("/advanced-container/<container_name>")
     def get_container_logs_advanced(container_name):
         if 'username' in session: # probably unneeded
@@ -3329,7 +3329,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             except Exception:
                 print("Something went wrong during reading because of:",traceback.format_exc())
         return redirect(url_for('login'))
-    
+
     @app.route("/get_summary_status")
     def get_summary_status():
         if 'username' in session:
@@ -3342,7 +3342,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             except Exception:
                 print("Something went wrong during db logging because of:",traceback.format_exc())
         return redirect(url_for('login'))
-    
+
     def get_container_data(do_not_jsonify=False):
         if "False" == os.getenv("running-as-kubernetes","False"):
             containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
@@ -3386,7 +3386,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 return containers_merged
             return jsonify(containers_merged)
         else:
-            
+
             raw_jsons = []
             for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
                 raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
@@ -3443,18 +3443,18 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                         temp_str += f"{item['spec']['volumes'][vol_num]['name']}: "
                         del temp_vols[vol_num]["name"]
                         temp_str += str(list(temp_vols[vol_num].keys())[0]) + ", "
-                        
+
                     conversion["Volumes"] = temp_str
                 except KeyError:
                     conversion["Volumes"] = "No volumes"
                 conversion["Namespace"] = item["metadata"]["namespace"]
-                
+
                 conversions.append(conversion)
         if do_not_jsonify:
             return conversions
         return jsonify(conversions)
 
-    
+
     @app.route("/generate_pdf", methods=['GET'])
     async def generate_pdf(): # TODO no multi yet
         print_debug_log("Generating a pdf")
@@ -3471,7 +3471,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     print(traceback.format_exc())
             for key, value in containers.items():
                 data_stored.append({"header": key, "string": value})
-            
+
             # Create a PDF document
             subfolder = "pdf"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             pdf_output_path = subfolder+"/logs.pdf"
@@ -3485,13 +3485,13 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             cronjobs_out = None
             extra_tests = []
             cronjobs = []
-            
+
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''WITH RankedEntries AS ( 
+                    query = '''WITH RankedEntries AS (
                         SELECT *, ROW_NUMBER() OVER (PARTITION BY container ORDER BY datetime DESC) AS row_num FROM tests_results
-                        ) 
+                        )
                         SELECT * FROM RankedEntries WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
@@ -3500,11 +3500,11 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     tests_out = results
             except Exception:
                 print("Something went wrong because of:",traceback.format_exc())
-                
+
             try: # cronjobs
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history) 
+                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
 SELECT datetime,result,errors,name,command,categories.category FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
                     cursor.execute(query)
                     conn.commit()
@@ -3528,19 +3528,19 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     extra_logs.append(Paragraph(f'<b><a name="iot-directory-log"></a>iot-directory-log</b>', styles["Heading1"]))
                     extra_logs.append(Paragraph(log_output.replace("\n","<br></br>"), styles["Normal"]))
                     break  # Stop searching after finding the first occurrence
-            
-           
+
+
             for test in tests_out:
                 if not test:
                     break
                 content.append(Paragraph(f'<a href="#t-{test[3]}" color="blue">Test of {test[3]}</a>', styles["Normal"]))
-                extra_tests.append(test)            
+                extra_tests.append(test)
             for cronjob in cronjobs_out:
                 if not cronjob:
                     break
                 content.append(Paragraph(f'<a href="#t-{cronjob[3]}" color="blue">Cronjob {cronjob[3]}</a>', styles["Normal"]))
                 cronjobs.append(cronjob)
-                
+
             # start host_data
             hosts_data=[]
             ok_hosts=False
@@ -3575,11 +3575,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         hosts_data.append({"host":host,"output":"", "text_errors":"", "errors":traceback.format_exc()})
                 for i in range(len(rows)):
                     content.append(Paragraph(f'<a href="#host-{rows[i]["host"]}" color="blue">Host {rows[i]["host"]}</a>', styles["Normal"]))
-                    
+
             except:
                 print_debug_log(f"Failed to get host data because of {traceback.format_exc()}\nContinuing with generating pdf...")
             # end host_data
-            
+
             # start snmp
             snmp_data=[]
             ok_snmp=False
@@ -3605,8 +3605,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 print_debug_log(f"Failed to get snmp data because of {traceback.format_exc()}\nContinuing with generating pdf...")
             # end snmp
             content.append(PageBreak())
-            
-            
+
+
             # Iterate over pairs
             for pair in data_stored:
                 if any(pair["header"].startswith(prefix) for prefix in ['dashboard-backend','myldap']):
@@ -3834,13 +3834,13 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             return response
         return redirect(url_for('login'))
 
-        
+
     @app.route("/download")
     def redirect_to_download():
         if 'username' in session:
             return redirect('/downloads/')
         return redirect(url_for('login'))
-    
+
     @app.route("/downloads/")
     @app.route("/downloads/<path:subpath>")
     def list_files(subpath=''):
@@ -3870,8 +3870,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             else:
                 return render_template("error_showing.html", r = "No certification was ever produced"), 500
         return redirect(url_for('login'))
-          
-    
+
+
     @app.route("/certification", methods=['GET'])
     def certification():
         if 'username' in session:
@@ -3887,7 +3887,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     return jsonify({'error': 'Invalid token'}), 401
                 except Exception:
                     return render_template("error_showing.html", r = "Something bad happened: " + traceback.format_exc()), 401
-                
+
             try:
                 subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 password = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(16))
@@ -3903,7 +3903,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return render_template("error_showing.html", r = f"Fatal error while generating configuration: {traceback.format_exc()}"), 401
         return redirect(url_for('login'))
-            
+
     @app.route("/clustered_certification", methods=['GET'])
     def clustered_certification():
         if 'username' in session:
@@ -3949,7 +3949,6 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
-            
     certlock = Lock()
     @app.route("/certification_mk3", methods=['GET'])
     def certification_mk3():
@@ -3965,21 +3964,26 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 with certlock:
                     for r in results:
-                        all_out=subprocess.run(f'mkdir /confs_here/{subfolder} && cd /confs_here/{subfolder} && ssh -o -i /ssh_keys/{r[1]}_{r[0]} {r[1]}@{r[0]} "tar -cz -C {r[2]} {r[3]}" > {r[1]}_{r[0]}_{r[3]}.tar.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
+                        all_out=subprocess.run(f'mkdir /confs_here/{subfolder} && cd /confs_here/{subfolder} && ssh -i /ssh_keys/{r[1]}_{r[0]} {r[1]}@{r[0]} "tar -cz -C {r[2]} {r[3]}" > {r[1]}_{r[0]}_{r[3]}.tar.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
                         if len(all_out.stderr)>0:
                             print(f"Error in retrieving {r[1]}_{r[0]}_{r[3]}.tar.gz: {all_out.stderr}")
                     archiving = subprocess.run(f'cd /confs_here/{subfolder} && rar a -k snap4city-certification-mk3-{subfolder}.rar *.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
                     if len(archiving.stderr)>0:
-                        print(f"Error in generating snap4city-certification-mk3-{subfolder}.rar: "+archiving.stderr)
+                        print(f"Error in generating snap4city-certification-mk3-{subfolder}.rar")
                 return send_file(f'/confs_here/{subfolder}/snap4city-certification-mk3-{subfolder}.rar')
 
         else:
             return redirect(url_for('login'))
-        
-    # hosts stuff        
+
+    # hosts stuff
     @app.route('/hosts_control_panel')
     def hosts_control_panel():
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
@@ -3995,6 +3999,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route('/connect_host', methods=['POST'])
     def connect_and_store():
         if 'username' in session:
+
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             host = request.form.get('host')
             user = request.form.get('user')
             password = request.form.get('psw')
@@ -4039,10 +4048,14 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
-    
+
     @app.route('/run_command_host', methods=['POST'])
     def run_command():
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             host = request.form.get('host')
 
             try:
@@ -4077,10 +4090,14 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return jsonify({"error": str(e)}), 500
         return redirect(url_for('login'))
 
-    
+
     @app.route('/delete_saved_host', methods=['POST'])
     def delete_host():
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             host = request.form.get('host')
 
             try:
@@ -4117,6 +4134,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route('/get_host_tops', methods=['GET'])
     def get_tops():
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             try:
                 # Fetch user from DB
                 conn = mysql.connector.connect(**db_conn_info)
@@ -4153,16 +4174,20 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
-    
+
     # end host stuff
-    
+
     # begin sentinel host stuff
-        
+
     @app.route('/sentinel_hosts_control_panel')
     def sentinel_hosts_control_panel():
         if not os.getenv("is-multi","False") == "True":
             return "Disabled for non-clustered environments", 500
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
@@ -4180,11 +4205,15 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         if not os.getenv("is-multi","False") == "True":
             return "Disabled for non-clustered environments", 500
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             hostname = request.form.get('hostname')
             ip = request.form.get(key='ip')
 
             try:
-                
+
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO ip_table (hostname, ip) VALUES (%s, %s)", (hostname, ip))
@@ -4197,13 +4226,17 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
-    
-    
+
+
     @app.route('/delete_sentinel_host', methods=['POST'])
     def delete_sentinel_host():
         if not os.getenv("is-multi","False") == "True":
             return "Disabled for non-clustered environments", 500
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             hostname = request.form.get('hostname')
 
             try:
@@ -4228,15 +4261,19 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
-    
-    
-    # end sentinel host stuff 
-    
-    
+
+
+    # end sentinel host stuff
+
+
     # begin snmp stuff
     @app.route('/snmp_control_panel', methods=['GET'])
     def snmp_control_panel():
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             try:
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor(dictionary=True)
@@ -4248,10 +4285,14 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except Exception:
                 return f"Error loading hosts: {traceback.format_exc()}"
         return redirect(url_for('login'))
-    
+
     @app.route('/add_snmp', methods=['POST'])
     def add_snmp():
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             user = request.form.get('user', None)
             description = request.form.get('description', None)
             details = request.form.get('details', None)
@@ -4262,7 +4303,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             PrivKey = request.form.get('PrivKey', None)
             AuthKey = request.form.get('AuthKey', None)
             try:
-                
+
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor()
                 if protocol=="True":
@@ -4286,6 +4327,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     def delete_snmp_host():
         if 'username' in session:
             host = request.form.get('host')
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
 
             try:
                 # Fetch user from DB
@@ -4313,6 +4358,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     @app.route("/snmp_info", methods=["GET"])
     def snmp_info():
         if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             host = request.args.get("host", None)
             if host is None:
                 return render_template("error_showing.html", r = "No SNMP host was selected, please ensure to provide it in the body of the request under 'host'"), 400
@@ -4330,9 +4379,91 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template("snmp_shower.html", host=host, data=data)
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
-        
+
         return redirect(url_for('login'))
+
+    @app.route("/organize_configuration_retrieval", methods=["GET"])
+    def organize_configuration_retrieval():
+        if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+            try:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(dictionary=True, buffered=True)
+                    query = '''SELECT host FROM host'''
+                    query2 = '''SELECT * FROM certification_retrieval;'''
+                    cursor.execute(query)
+                    conn.commit()
+                    results = cursor.fetchall()
+                    cursor.execute(query2)
+                    conn.commit()
+                    results_2 = cursor.fetchall()
+                    return render_template("organize-configuration-retrieval.html", rows_hosts=results, certification_rows=results_2, timeout=int(os.getenv("requests-timeout","15000")))
+            except Exception:
+                return f"Error loading configuration retrievals: {traceback.format_exc()}", 500
+        return redirect(url_for('login'))
+
+    @app.route("/add_configuration_retrieval", methods=["POST"])
+    def organize_configuration_retrieval_add():
+        if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                return "An incorrect password was provided", 400
+            with mysql.connector.connect(**db_conn_info) as conn:
+                try:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''INSERT INTO `checker`.`certification_retrieval` (`host`, `path`, `what`) VALUES (%s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'],))
+                    conn.commit()
+                    return "ok", 201
+                except:
+                    return traceback.format_exc(), 500
+
+    @app.route("/edit_configuration_retrieval", methods=["POST"])
+    def organize_configuration_retrieval_edit():
+        if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                return "An incorrect password was provided", 400
+            with mysql.connector.connect(**db_conn_info) as conn:
+                try:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''UPDATE `checker`.`certification_retrieval` SET `host` = %s, `path` = %s, `what` = %s WHERE (`id` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'], request.form.to_dict()['id'],))
+                    conn.commit()
+                    return "ok", 201
+                except:
+                    return traceback.format_exc(), 500
+
+    @app.route("/delete_configuration_retrieval", methods=["POST"])
+    def organize_configuration_retrieval_delete():
+        if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                return "An incorrect password was provided", 400
+            with mysql.connector.connect(**db_conn_info) as conn:
+                try:
+                    cursor = conn.cursor(buffered=True)
+                    query = '''DELETE FROM `checker`.`certification_retrieval` WHERE (`id` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['id'],))
+                    conn.commit()
+                    return "ok", 201
+                except:
+                    return traceback.format_exc(), 500
+                
+
     return app
-    
+
 if __name__ == "__main__":
     create_app().run(host='localhost', port=4080)
