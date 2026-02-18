@@ -335,7 +335,7 @@ for key, value in config.items():
     if not os.getenv(key):
         os.environ[key] = value
 
-bot_2 = Snap4SentinelTelegramBot(os.getenv("telegram-api-token","0"), int(os.getenv("telegram-channel","0")))
+bot_2 = Snap4SentinelTelegramBot(os.getenv("telegram-api-token","0"), int(os.getenv("telegram-channel","0")),True if os.getenv("send-telegram-notifications","True") == "True" else False)
 greendot = """&#128994"""
 reddot = """&#128308"""
 
@@ -3956,6 +3956,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if session['username'] != "admin":
                 return render_template("error_showing.html", r = "User is not authorized to perform the operation"), 401
             with mysql.connector.connect(**db_conn_info) as conn:
+                print_debug_log("Generating a certification (new)")
                 cursor = conn.cursor(buffered=True)
                 query = '''SELECT b.host, a.user, b.path, b.what FROM checker.certification_retrieval as b join host as a on a.host = b.host;'''
                 cursor.execute(query)
@@ -3963,11 +3964,22 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 results = cursor.fetchall()
                 subfolder = "cert"+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 with certlock:
+                    stdouts=[]
+                    stderrs=[]
                     for r in results:
-                        all_out=subprocess.run(f'mkdir /confs_here/{subfolder} && cd /confs_here/{subfolder} && ssh -i /ssh_keys/{r[1]}_{r[0]} {r[1]}@{r[0]} "tar -cz -C {r[2]} {r[3]}" > {r[1]}_{r[0]}_{r[3]}.tar.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
+                        # make dir, move to dir, copy conf files across ssh as a tarball, using premade ssh keys and automatically add new hosts (otherwise fails unless has been accepted once)
+                        all_out=subprocess.run(f'mkdir -p /confs_here/{subfolder} && cd /confs_here/{subfolder} && ssh -i /ssh_keys/{r[1]}_{r[0]} -o StrictHostKeyChecking=accept-new {r[1]}@{r[0]} "tar -cz -C {r[2]} {r[3]}" > {r[1]}_{r[0]}_{r[3]}.tar.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
                         if len(all_out.stderr)>0:
                             print(f"Error in retrieving {r[1]}_{r[0]}_{r[3]}.tar.gz: {all_out.stderr}")
-                    archiving = subprocess.run(f'cd /confs_here/{subfolder} && rar a -k snap4city-certification-mk3-{subfolder}.rar *.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
+                        stdouts.append(all_out.stdout)
+                        stderrs.append(all_out.stderr)
+                    with open(f"/confs_here/{subfolder}/stdout.txt","w") as f_out, open(f"/confs_here/{subfolder}/stderr.txt","w") as f_err:
+                        for oo in stdouts:
+                            f_out.write(oo+"\n")
+                        for ee in stderrs:
+                            f_err.write(ee+"\n")
+                    # rar all tarballs and outputs for troubleshooting
+                    archiving = subprocess.run(f'cd /confs_here/{subfolder} && rar a -k snap4city-certification-mk3-{subfolder}.rar *.gz *.txt', shell=True, capture_output=True, text=True, encoding="utf_8")
                     if len(archiving.stderr)>0:
                         print(f"Error in generating snap4city-certification-mk3-{subfolder}.rar")
                 return send_file(f'/confs_here/{subfolder}/snap4city-certification-mk3-{subfolder}.rar')
@@ -4392,7 +4404,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(dictionary=True, buffered=True)
-                    query = '''SELECT host FROM host'''
+                    query = '''SELECT host FROM host;'''
                     query2 = '''SELECT * FROM certification_retrieval;'''
                     cursor.execute(query)
                     conn.commit()
@@ -4416,7 +4428,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return "An incorrect password was provided", 400
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
-                    cursor = conn.cursor(buffered=True)
+                    cursor = conn.cursor(dictionary=True, buffered=True)
                     query = '''INSERT INTO `checker`.`certification_retrieval` (`host`, `path`, `what`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'],))
                     conn.commit()
@@ -4435,7 +4447,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return "An incorrect password was provided", 400
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
-                    cursor = conn.cursor(buffered=True)
+                    cursor = conn.cursor(dictionary=True, buffered=True)
                     query = '''UPDATE `checker`.`certification_retrieval` SET `host` = %s, `path` = %s, `what` = %s WHERE (`id` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'], request.form.to_dict()['id'],))
                     conn.commit()
@@ -4454,7 +4466,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return "An incorrect password was provided", 400
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
-                    cursor = conn.cursor(buffered=True)
+                    cursor = conn.cursor(dictionary=True, buffered=True)
                     query = '''DELETE FROM `checker`.`certification_retrieval` WHERE (`id` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['id'],))
                     conn.commit()

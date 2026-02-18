@@ -18,12 +18,12 @@
   <tbody>
 {%for item in certification_rows%}
     <tr>
-      <td>{{item[2]}}</td>
-      <td>{{item[1]}}</td>
-      <td>{{item[3]}}</td>
-      <td>{{item[0]}}</td>
-      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteRetrieval" data-component="{{item[2]}}" id="deleteRetrieval{{item[2]}}" onClick="$('#addRetrievalModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editRetrieval" data-retrievalid="{{item[0]}}" data-path="{{item[1] | e}}" data-what="{{item[2] | e}}" data-host="{{item[0] | e}}" onClick="$('#addRetrievalModal').modal('hide')">Edit</button></td>
+      <td>{{item['id']}}</td>
+      <td>{{item['path']}}</td>
+      <td>{{item['what']}}</td>
+      <td>{{item['host']}}</td>
+      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteRetrieval" data-component="{{item['id']}}" id="deleteRetrieval{{item['id']}}" onClick="$('#addRetrievalModal').modal('hide')">Delete</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editRetrieval" data-retrievalid="{{item['id']}}" data-path="{{item['path'] | e}}" data-what="{{item['what'] | e}}" data-host="{{item['host'] | e}}" onClick="$('#addRetrievalModal').modal('hide')">Edit</button></td>
     </tr>
 {% endfor %}
   </tbody>
@@ -42,7 +42,7 @@
                 <form id="addretrievalForm">
                     <label for="retrievalHostAdd">Select host:</label>
                     <select id="retrievalHostAdd" name="category-selection" class="form-select">
-                        {%for item in rows_hosts %}<option value="{{item[0]}}">{{item[0]}}</option>{% endfor %}
+                        {%for item in rows_hosts %}<option value="{{item['host']}}">{{item['host']}}</option>{% endfor %}
                     </select>
                     <div class="form-group">
                         <label for="retrievalPathAdd">Path</label>
@@ -75,7 +75,7 @@
                 <form id="editretrievalForm">
                     <label for="retrievalHostEdit">Select host:</label>
                     <select id="retrievalHostEdit" name="category-selection" class="form-select">
-                        {%for item in rows_hosts %}<option value="{{item[0]}}">{{item[0]}}</option>{% endfor %}
+                        {%for item in rows_hosts %}<option value="{{item['host']}}">{{item['host']}}</option>{% endfor %}
                     </select>
                     <div class="form-group">
                         <label for="retrievalPathEdit">Path</label>
@@ -111,7 +111,7 @@
                         <input type="password" class="form-control" id="passwordInputDelete" autocomplete="current-password" required>
                     </div>
                     <div class="form-group">
-                        <label for="retrievalDeleteId">Retrieval ID</label>
+                        <label for="retrievalDelete">Retrieval ID</label>
                         <input type="text" class="form-control" id="retrievalDelete" readonly>
                     </div>
                 </form>
@@ -177,7 +177,7 @@
     });
     $('.open-modal-m').on('click', function() {
         var id = $(this).data('component');
-        $('#retrievalDeleteId').val(id);
+        $('#retrievalDelete').val(id);
         $('#deleteretrieval').modal('show');
     });
         $('.open-modal-e').on('click', function() {
@@ -193,12 +193,12 @@
         $('#editRetrievalModal').modal('show');
     });
     function confirm_add(){
-        $('#addretrievalModal').modal('hide');
+        $('#addRetrievalModal').modal('hide');
         $('#confirmAddretrieval').modal('show');
     }
     function confirm_edit(){
         $('#confirmEditModal').modal('show');
-        $('#editretrieval').modal('hide')
+        $('#editRetrievalModal').modal('hide')
 
     }
     $('#confirmEditButton').on('click', function() {
@@ -233,7 +233,7 @@
             alert('Please enter a password');
         }
     });
-    $('#confirmAddButton').on('click', function() {
+    $('#confirmAddretrievalButton').on('click', function() {
         var path = $('#retrievalPathAdd').val();
         var what = $('#whatRetrievalAdd').val();
         var host = $('#retrievalHostAdd').val();

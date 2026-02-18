@@ -136,6 +136,8 @@ spec:
           value: "5"
         - name: cron-timeout
           value: "120"
+        - name: send-telegram-notifications
+          value: "True"
         ### for kubernetes envirnoments, this is supposed to be left unset ###
         #- name: is-multi
         #  value: "False"

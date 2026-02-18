@@ -24,5 +24,6 @@
 	"debug": "True",
 	"cron-timeout":"10",
 	"cron-frequency-minutes":"5",
-	"secret-key": ""
+	"secret-key": "",
+	"send-telegram-notifications":"True"
 }
