@@ -28,6 +28,9 @@
 {% endfor %}
   </tbody>
 </table>
+<div id="explanation">
+    Retrieves data fron the host when generating a certification, starting from the path and collecting "what" (as wildcards, so '*.txt gets all text files', and may be multiple). Hosts are retrieved from previous host connections.
+</div>
 <button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addRetrievalModal" id="addRetrievaljob">Add</button>
 <div class="modal fade" id="addRetrievalModal" tabindex="-1" role="dialog" aria-labelledby="addRetrievalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">

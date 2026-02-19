@@ -3846,7 +3846,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
     def list_files(subpath=''):
         if 'username' in session:
             # Determine the full path relative to the base directory
-            full_path = os.path.join(os.path.join(os.getcwd(), "data/"), subpath)
+            #full_path = os.path.join(os.path.join(os.getcwd(), "data/"), subpath)
+            full_path = os.path.join("/confs_here/", subpath)
             if ".." in subpath:
                 return render_template("error_showing.html", r = "Issues during the retrieving of the resource: illegal path"), 500
             # If it's a directory, list contents
