@@ -3461,6 +3461,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
         if 'username' in session:
             data_stored = []
             data = check_container_db()["result"]
+            data = [datum for datum in data if datum["Labels"] != "Cronjob"]
             containers = {}
             for container in data:
                 try:
@@ -3538,12 +3539,14 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             for cronjob in cronjobs_out:
                 if not cronjob:
                     break
-                content.append(Paragraph(f'<a href="#t-{cronjob[3]}" color="blue">Cronjob {cronjob[3]}</a>', styles["Normal"]))
+                
+                cronjob_id = re.sub(r'[^a-zA-Z0-9]', '-', cronjob[3])
+                content.append(Paragraph(f'<a href="#c-{cronjob_id}" color="blue">Cronjob {cronjob[3]}</a>', styles["Normal"]))
                 cronjobs.append(cronjob)
 
             # start host_data
             hosts_data=[]
-            ok_hosts=False
+            ok_hosts=True
             try:
                 # Fetch user from DB
                 conn = mysql.connector.connect(**db_conn_info)
@@ -3611,7 +3614,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             for pair in data_stored:
                 if any(pair["header"].startswith(prefix) for prefix in ['dashboard-backend','myldap']):
                     continue
-                print(f"doing {pair['header']} with {pair['string'][:200]}")
+                print(f"doing {pair['header']}")
                 header = pair["header"]
                 string = pair["string"]
                 string = html.escape(string)
@@ -3634,21 +3637,22 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 content.append(Paragraph(test[2].replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
                 content.append(PageBreak())
             for cronjob in cronjobs:
-                content.append(Paragraph(f'<b><a name="c-{cronjob[3]}"></a>{cronjob[3]}</b>', styles["Heading1"]))
+                cronjob_id = re.sub(r'[^a-zA-Z0-9]', '-', cronjob[3])
+                content.append(Paragraph(f'<b><a name="c-{cronjob_id}"></a>{cronjob[3]}</b>', styles["Heading1"]))
                 content.append(Paragraph(html.escape(cronjob[1]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
                 if cronjob[2]:
-                    content.append(Paragraph(f'<br><b><a name="c-{cronjob[3]}-errors"></a>Errors</b>', styles["Heading2"]))
+                    content.append(Paragraph(f'<b><a name="c-{cronjob_id}-errors"></a>Errors</b>', styles["Heading2"]))
                     content.append(Paragraph(html.escape(cronjob[2]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
                 content.append(PageBreak())
             try:
                 if ok_hosts:
                     for host_data_element in hosts_data:
-                        content.append(Paragraph(f'<b><a name="host-{host_data_element["host"]}"></a>{host_data_element} data</b>', styles["Heading1"]))
+                        content.append(Paragraph(f'<b><a name="host-{host_data_element["host"]}"></a>{host_data_element["host"]} data</b>', styles["Heading1"]))
                         if host_data_element["output"]=="": # something failed code-wise
                             content.append(Paragraph(html.escape(host_data_element["errors"]).replace("\n","<br>").replace("<br>","<br></br>"), styles["Normal"]))
                         else:
                             # --- System Info ---
-                            si = host_data_element["system_info"]
+                            si = host_data_element["output"]["system_info"]
 
                             content.append(Paragraph("System Information", styles["Heading2"]))
                             content.append(Paragraph(f"Time: {si['time']}", styles["Normal"]))
@@ -3658,7 +3662,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             content.append(Spacer(1, 12))
 
                             # --- CPU Usage ---
-                            cpu = host_data_element["cpu_usage"]
+                            cpu = host_data_element["output"]["cpu_usage"]
 
                             content.append(Paragraph("CPU Usage", styles["Heading2"]))
 
@@ -3680,8 +3684,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             content.append(Spacer(1, 12))
 
                             # --- Memory Usage ---
-                            mem = host_data_element["memory_usage"]
-                            unit = host_data_element["memory_measuring_unit"]
+                            mem = host_data_element["output"]["memory_usage"]
+                            unit = host_data_element["output"]["memory_measuring_unit"]
 
                             content.append(Paragraph("Memory Usage", styles["Heading2"]))
 
@@ -3704,7 +3708,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                             content.append(Paragraph("Processes", styles["Heading2"]))
 
                             proc_rows = [["PID","USER","PR","NI","VIRT","RES","SHR","S","CPU","MEM","TIME","COMMAND"]]
-                            for p in host_data_element["processes"]:
+                            for p in host_data_element["output"]["processes"]:
                                 proc_rows.append([
                                     p["pid"], p["user"], p["pr"], p["ni"], p["virt"],
                                     p["res"], p["shr"], p["s"], p["cpu"], p["mem"],
@@ -3828,6 +3832,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             except:
                 print_debug_log("Something happened while generating snmp/host data: "+traceback.format_exc())
             # Add content to the PDF document
+            #print("Content: \n" + "\n".join([str(c) for c in content])+"\nEnd Content\n")
             doc.build(content)
             # Send the PDF file as a response
             response = send_file(pdf_output_path)
