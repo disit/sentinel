@@ -5,6 +5,7 @@ find a way to register winrar
 
 scopri perché 0.33 salta
 rendi evidenti host resources usage
+add self to top tab
 
 aggingi proxy1 e proxy2
 0.44
@@ -29,8 +30,10 @@ broker 6
 
 ntp
 0.218
+
 VEEAM
 0.131
+
 DisitORG
 1.180
 
@@ -61,3 +64,7 @@ Servicemap
 Dashboard
 0.24
 1.20
+
+
+
+https://docs.google.com/spreadsheets/d/1NphAYe7GHYzO6Fc0p3Nduh759dzja_6f2JCPACBUbsU/edit?usp=sharing

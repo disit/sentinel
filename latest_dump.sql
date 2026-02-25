@@ -58,7 +58,7 @@ CREATE TABLE `categories` (
   `idcategories` int(11) NOT NULL AUTO_INCREMENT,
   `category` varchar(45) NOT NULL,
   PRIMARY KEY (`idcategories`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -67,7 +67,7 @@ CREATE TABLE `categories` (
 
 LOCK TABLES `categories` WRITE;
 /*!40000 ALTER TABLE `categories` DISABLE KEYS */;
-INSERT INTO `categories` VALUES (1,'Dashboard'),(2,'Authorization and Authentication'),(3,'HLT'),(4,'Knowledge Base'),(5,'Process Logic'),(6,'Real Time Dash'),(7,'Broker'),(8,'Data Storage'),(9,'System');
+INSERT INTO `categories` VALUES (1,'Dashboard'),(2,'Authorization and Authentication'),(3,'HLT'),(4,'Knowledge Base'),(5,'Process Logic'),(6,'Real Time Dash'),(7,'Broker'),(8,'Data Storage'),(9,'System'),(10,'AI');
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
