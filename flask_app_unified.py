@@ -4187,6 +4187,13 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                         outs.append(generated_json)
                     except:
                         errors.append(traceback.format_exc())
+                if os.getenv("retrieve-self-top","TRUE") == "TRUE":
+                    try:
+                        localtop = get_top()
+                        localtop["source"] = os.getenv("platform-url","Sentinel host")
+                        outs.append(parse_top(localtop))
+                    except:
+                        errors.append(traceback.format_exc())
                 data_to_send={"result":outs,"error":errors}
                 return render_template("top-viewer.html",data=data_to_send)
 
