@@ -2699,7 +2699,7 @@ def create_app():
         return requests.post(url, headers=headers)
 
     @app.route("/read_containers_db", methods=['GET'])
-    def check_container_db():
+    def check_container_db(send_cronjobs=True):
         print_debug_log("Reading container's database")
         if 'username' in session:
             if not os.getenv("is-master","False") == "True":
@@ -2715,35 +2715,36 @@ def create_app():
                 except Exception as E:
                     tobereturned_answer = {"result": {}, "error":["Couldn't load container data because of "+str(E)]}
                     return tobereturned_answer
-            with mysql.connector.connect(**db_conn_info) as conn:
-                    cursor = conn.cursor(buffered=True)
-                    query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
+            if send_cronjobs:
+                with mysql.connector.connect(**db_conn_info) as conn:
+                        cursor = conn.cursor(buffered=True)
+                        query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
 SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjobs,cronjobs.disabled,where_to_run,target,ip,createtime FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1;'''
-                    cursor.execute(query)
-                    conn.commit()
-                    results = cursor.fetchall()
-                    for result in results:
-                        createtime = result[11]
-                        cronjob_dict = {
-                            "Container": result[3],
-                            "CreatedAt": createtime,
-                            "ID": "Cronjob "+str(result[6]),
-                            "Image": "Not applicable",
-                            "Labels": "Cronjob",
-                            "Mounts": "Not applicable",
-                            "Name": result[3],
-                            "Names": result[3],
-                            "Namespace": result[3],
-                            "Node": result[9],
-                            "Ports": "Not applicable",
-                            "RunningFor": calculate_timedelta(createtime),
-                            "Source": result[10] if result[10] is not None else (os.getenv("platform-url","") if result[8] else "Nonlocal"),
-                            "State": ("running - "+str(result[1]) if result[2]==None else result[2]) if result[7]==0 else "This cronjob is disabled",
-                            "Status": "Enabled" if result[7]==0 else "Disabled",
-                            "Volumes": "Not applicable"
-                        }
-                        tobereturned_answer["result"].append(cronjob_dict)
-                    return tobereturned_answer
+                        cursor.execute(query)
+                        conn.commit()
+                        results = cursor.fetchall()
+                        for result in results:
+                            createtime = result[11]
+                            cronjob_dict = {
+                                "Container": result[3],
+                                "CreatedAt": createtime,
+                                "ID": "Cronjob "+str(result[6]),
+                                "Image": "Not applicable",
+                                "Labels": "Cronjob",
+                                "Mounts": "Not applicable",
+                                "Name": result[3],
+                                "Names": result[3],
+                                "Namespace": result[3],
+                                "Node": result[9],
+                                "Ports": "Not applicable",
+                                "RunningFor": calculate_timedelta(createtime),
+                                "Source": result[10] if result[10] is not None else (os.getenv("platform-url","") if result[8] else "Nonlocal"),
+                                "State": ("running - "+str(result[1]) if result[2]==None else result[2]) if result[7]==0 else "This cronjob is disabled",
+                                "Status": "Enabled" if result[7]==0 else "Disabled",
+                                "Volumes": "Not applicable"
+                            }
+                            tobereturned_answer["result"].append(cronjob_dict)
+            return tobereturned_answer
         return redirect(url_for('login'))
 
     def get_container_categories():
@@ -3460,12 +3461,12 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
         print_debug_log("Generating a pdf")
         if 'username' in session:
             data_stored = []
-            data = check_container_db()["result"]
+            data = check_container_db(send_cronjobs=False)["result"]
             data = [datum for datum in data if datum["Labels"] != "Cronjob"]
             containers = {}
             for container in data:
                 try:
-                    request=requests.post(os.getenv("platform-url")+"/container/"+container["Name"], data={"id":container["Name"], "source":container["Source"],"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM), "raw":"True"})
+                    request=requests.post(container["Source"]+"/container/"+container["Name"], data={"id":container["Name"], "source":container["Source"],"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM), "raw":"True"})
                     request.raise_for_status()
                     containers[container["Name"]+"-"+container["Source"]]=request.text
                 except Exception:
