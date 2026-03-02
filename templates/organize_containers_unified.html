@@ -12,6 +12,7 @@
 		<th>Contacts</th>
 		<th>Position</th>
 		<th>Kind</th>
+		<th>Severity</th>
 		<th>Delete</th>
 		<th>Edit</th>
 	  </tr>
@@ -24,8 +25,9 @@
 	  <td>{{item[2]}}</td>
 	  <td>{{item[3]}}</td>
 	  <td>{{item[4]}}</td>
+	  <td>{{item[5]}}</td>
 	  <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteComponent" data-component="{{item[0]}}" id="deleteComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Delete</button></td>
-	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" data-category="{{item[1] | e}}" data-contacts="{{item[2] | e}}" data-position="{{item[3] | e}}" data-kind="{{item[4] | e}}" id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
+	  <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editComponent" data-component="{{item[0]}}" data-category="{{item[1] | e}}" data-contacts="{{item[2] | e}}" data-position="{{item[3] | e}}" data-kind="{{item[4] | e}}" data-severity="{{item[5] | e}}" id="editComponent{{item[0]}}" onClick="$('#addComponentModal').modal('hide')">Edit</button></td>
 	</tr>
 {% endfor %}
   </tbody>
@@ -75,6 +77,13 @@
 						<option value="kubernetes">Kubernetes</option>
 						<option value="cronjob">Cronjob</option>
 					</select>
+                    
+                    <label for="severity-selection">Select severity:</label>
+                    <select id="severity-selection" name="severity-selection" class="form-select">
+                        <option value="Critical">Critical</option>
+                        <option value="Relevant">Relevant</option>
+                        <option value="Warning">Warning</option>
+                    </select>
 				</form>
 			</div>
 			<div class="modal-footer">
@@ -129,6 +138,14 @@
 						<option value="kubernetes">Kubernetes</option>
 						<option value="cronjob">Cronjob</option>
 					</select>
+					
+                    
+                    <label for="severity-selection-edit">Select severity:</label>
+                    <select id="severity-selection-edit" name="severity-selection-edit" class="form-select">
+                        <option value="Critical">Critical</option>
+                        <option value="Relevant">Relevant</option>
+                        <option value="Warning">Warning</option>
+                    </select>
 				</form>
 			</div>
 			<div class="modal-footer">
@@ -206,6 +223,8 @@
 		$('#containeridmodalEdit').val(id);
 		let select = document.getElementById('category-selection-edit');
 		let select_k = document.getElementById('kind-selection-edit');
+		let select_severity = document.getElementById('severity-selection-edit');
+		select_severity.value = select_severity;
 
 		for (let i = 0; i < select.options.length; i++) {
 			if (select.options[i].text === category) {
@@ -255,6 +274,7 @@
 		var password = $('#passwordInputAdd').val();
 		var id = $('#containeridmodalAdd').val();
 		var category = $('#category-selection').val();
+		var severity = $('#severity-selection').val();
 		var kind = $('#kind-selection').val();
 		var contacts = $('#ContactsAdd').val();
 		var position = $('#PositionAdd').val();
@@ -263,7 +283,7 @@
 			try {
 				$.ajax({
 					url: './add_container',
-					data: {id: id, psw: password, category: category, contacts: contacts, position: position, kind: kind, namespace: namespace},
+					data: {id: id, psw: password, category: category, contacts: contacts, position: position, kind: kind, namespace: namespace, severity: severity},
 					type: 'POST',
 					success: function(response) {
 						alert(id + " was added!");
@@ -287,6 +307,7 @@
 	var password = $('#passwordInputEdit').val();
 	var id = $('#containeridmodalEdit').val();
 	var category = $('#category-selection-edit').val();
+	var severity = $('#severity-selection-edit').val();
 	var kind = $('#kind-selection-edit').val();
 	var contacts = $('#ContactsEdit').val();
 	var position = $('#PositionEdit').val();
@@ -295,7 +316,7 @@
 		try {
 			$.ajax({
 				url: './edit_container',
-				data: {id: id, psw: password, category: category, contacts: contacts, kind: kind, position: position, namespace: namespace},
+				data: {id: id, psw: password, category: category, contacts: contacts, kind: kind, position: position, namespace: namespace, severity: severity},
 				type: 'POST',
 				success: function(response) {
 					alert(id + " was edited!");

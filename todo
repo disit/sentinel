@@ -1,70 +1,23 @@
-add tops, snmp tops to full logs
-readd emails
-add to telegram
+snmp tops to full logs
 find a way to register winrar
 
-scopri perché 0.33 salta
-rendi evidenti host resources usage
-add self to top tab
-
-aggingi proxy1 e proxy2
-0.44
-1.82
 
 
-nas 1, 2, 3
-1.39
-1.79
-1.59
-
-
-broker 6
-1.12
-1.17
-1.11
-1.46
-1.8
-1.9
-1.4
-
-
-ntp
-0.218
-
-VEEAM
-0.131
-
-DisitORG
-1.180
-
-Log
-0.25
-
-PYTHON (gruppo separato chiamato "AI")
-1.150
+clearml
+0.175
+1.181
+1.182
+1.183
+1.41
+1.42
+0.57
+0.7 & 1.13
 1.61
-1.51
-1.21
-1.64
-1.71
-1.10
-1.37
-1.89
 
-Servicemap
-0.205
-0.206
-0.207
-0.208
-1.160
-0.88
-1.107
-0.90
 
-Dashboard
-0.24
-1.20
-
+add ui to deal with container, cronjob severity new column - to be tested
+add ui to deal with showing severity of problem in main page (yellow, orange, red) - telegram okay in terms of having data available
+have backend be able to determine what to skip in terms of severity notification wise - cronjobs ok
 
 
 https://docs.google.com/spreadsheets/d/1NphAYe7GHYzO6Fc0p3Nduh759dzja_6f2JCPACBUbsU/edit?usp=sharing

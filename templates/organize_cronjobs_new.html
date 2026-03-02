@@ -20,6 +20,7 @@
         <th>IP</th>
         <th>Target</th>
         <th>Contacts</th>
+        <th>Severity</th>
 		<th>Is Enabled?</th>
         <th>Delete</th>
         <th>Edit</th>
@@ -41,13 +42,14 @@
       <td>{{item[11]}}</td>
       <td>{{item[12]}}</td>
       <td>{{item[14]}}</td>
+      <td>{{item[15]}}</td>
 	  {%if item[5] == 1%}
 	  <td>Disabled</td>
 	  {%else%}
 	  <td>Enabled</td>
 	  {%endif%}
       <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[14] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[14] | e}}" data-severity="{{item[15] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
     </tr>
 {% endfor %}
   </tbody>
@@ -128,6 +130,13 @@
                         <label for="ContactsAdd">Contacts</label>
                         <input type="text" class="form-control" id="ContactsAdd" placeholder="Insert the contacts of the cronjob">
                     </div>
+                    
+                    <label for="severity-selection">Select severity:</label>
+                    <select id="severity-selection" name="severity-selection" class="form-select">
+                        <option value="Critical">Critical</option>
+                        <option value="Relevant">Relevant</option>
+                        <option value="Warning">Warning</option>
+                    </select>
 
 					<div class="form-check">
 						<input class="form-check-input" type="checkbox" value="" id="createEnabled" checked>
@@ -232,6 +241,14 @@
                         <label for="ContactsEdit">Contacts</label>
                         <input type="text" class="form-control" id="ContactsEdit" placeholder="Insert the contacts of the cronjob">
                     </div>
+
+                    
+                    <label for="severity-selection-edit">Select severity:</label>
+                    <select id="severity-selection-edit" name="severity-selection-edit" class="form-select">
+                        <option value="Critical">Critical</option>
+                        <option value="Relevant">Relevant</option>
+                        <option value="Warning">Warning</option>
+                    </select>
                     
 					<div class="form-check">
 						<input class="form-check-input" type="checkbox" value="" id="editEnabled" checked>
@@ -358,6 +375,7 @@
         var name = $(this).data('name');
         var command = $(this).data('command');
         var category = $(this).data('category');
+        var severity = $(this).data('severity');
         var where_to_run = $(this).data('where');
         var restart = $(this).data('restart');
         var description = $(this).data('description');
@@ -382,7 +400,9 @@
         if (where_to_run==="master") {$('#WhereToRunEdit').val("");} else {$('#WhereToRunEdit').val(where_to_run);}
         $('#editEnabled')[0].checked=1^enabled;
         let select = document.getElementById('category-selection-edit');
+        let select_severity = document.getElementById('severity-selection-edit');
         select.value=category;
+        select_severity.value=severity;
         $('#editCronJob').modal('show');
     });
     $('.open-modal').on('click', function() {
@@ -419,6 +439,7 @@
     $('#confirmAddCronjobButton').on('click', function() {
         var password = $('#passwordInputAdd').val();
         var category = $('#category-selection').val();
+        var severity = $('#severity-selection').val();
         var command = $('#CommandAdd').val();
         var name = $('#NameCronJobAdd').val();
         var where = $('#WhereToRunAdd').val();
@@ -435,7 +456,7 @@
             try {
                 $.ajax({
                     url: './add_cronjob_new',
-                    data: {psw: password, category: category, command: command, name: name, where_to_run: where, disabled: disabled, restart: restart, description: description, Timeout_timeAdd: Timeout_timeAdd, RetriesAdd: RetriesAdd, Retries_waitAdd: Retries_waitAdd, IPAdd: IPAdd, TargetAdd: TargetAdd, contacts: contacts},
+                    data: {psw: password, category: category, command: command, name: name, where_to_run: where, disabled: disabled, restart: restart, description: description, Timeout_timeAdd: Timeout_timeAdd, RetriesAdd: RetriesAdd, Retries_waitAdd: Retries_waitAdd, IPAdd: IPAdd, TargetAdd: TargetAdd, contacts: contacts, severity: severity},
                     type: 'POST',
                     success: function(response) {
                         alert("Cronjob was added!");
@@ -460,6 +481,7 @@
     var id = $('#CronJobEditId').val();
     var password = $('#passwordInputEdit').val();
     var category = $('#category-selection-edit').val();
+    var severity = $('#severity-selection-edit').val();
     var command = $('#CommandEdit').val();
     var name = $('#NameCronJobEdit').val();
     var where = $('#WhereToRunEdit').val();

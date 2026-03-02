@@ -39,7 +39,7 @@
 	};
 
 	const lookupTable_cronjobs = {
-		{%for item in cronjobs%}'{{item[0]}}': ['{{item[1]}}', '{{item[2]}}'],
+		{%for item in cronjobs%}'{{item[0]}}': ['{{item[1]}}', '{{item[2]}}', '{{item[2]}}'],
 		{% endfor %}'nothing': 'nothing'
 	};
 	
@@ -670,8 +670,10 @@ function makeCronJobTable(data) { // disabled
 		catch (exception_var) {
 			console.log("Failed to write to category log due to: "+exception_var)
 		}
+		//this fixes the "undefined" text in logs in certain scenarios
 		if (document.getElementById(log_destination).innerHTML.startsWith("undefined")) document.getElementById(log_destination).innerHTML = document.getElementById(log_destination).innerHTML.slice(9);
 
+		if (logs_for_categories[log_destination].startsWith("undefined")) logs_for_categories[log_destination] = logs_for_categories[log_destination].slice(9);
 		logs_for_categories[log_destination] = logs_for_categories[log_destination] + new Date().toLocaleString() + ' - ' + logging_str + "<br>";
 		
 		if (log_destination!="see_logs") { 
