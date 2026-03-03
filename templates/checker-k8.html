@@ -32,6 +32,7 @@
 				<div class="col" id="{{element[1]}}-result">No data yet...</div></div>`, 'type':`{{element[7]|safe}}`},
 		{%endfor%}
 	];
+	var container_severity;
 	
 	const lookupTable = {
 		{%for item in categories%}'{{item[0]}}': ['{{item[1]}}','{{item[2]|safe}}','{{item[3]|safe}}'],
@@ -39,7 +40,7 @@
 	};
 
 	const lookupTable_cronjobs = {
-		{%for item in cronjobs%}'{{item[0]}}': ['{{item[1]}}', '{{item[2]}}', '{{item[2]}}'],
+		{%for item in cronjobs%}'{{item[0]}}': ['{{item[1]}}', '{{item[2]}}', '{{item[3]|safe}}'],
 		{% endfor %}'nothing': 'nothing'
 	};
 	
@@ -429,9 +430,9 @@ function makeCronJobTable(data) { // disabled
 				data.forEach(el => {
 					let cronjobmsg = "";
 					try {
-						if (el[2]) {
+						if (el[2]) { // color here given severity, use lookupTable_cronjobs
 							cronjobmsg = "At " + el[0] + " cronjob named " + el[3] + " resulted in: " + el[1].replaceAll('\n','<br>') + "<br>With some errors: <div style='color: red;'>" + el[2] + "</div>";
-							document.getElementById(el[5]+"-status").innerHTML+='<svg viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Cronjob Failure"><title>Cronjob Failure '+el[3]+'</title><g fill="red"><rect x="10.5" y="3" width="3" height="12" rx="1"/><circle cx="12" cy="19.5" r="1.5"/></g></svg>';
+							document.getElementById(el[5]+"-status").innerHTML+='<svg viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Cronjob Failure"><title>Cronjob Failure '+el[3]+'</title><g fill="'+get_severity_of_cronjob(el[3])+'"><rect x="10.5" y="3" width="3" height="12" rx="1"/><circle cx="12" cy="19.5" r="1.5"/></g></svg>';
 							add_alert(cronjobmsg);
 						}
 						else {
@@ -581,27 +582,7 @@ function makeCronJobTable(data) { // disabled
 		}
 		element.value = "Run cronjob";
 	};
-	
-	function load_db() {
-		try {
-			$.ajax({
-				url: './load_db',
-				type: 'POST',
-				success: function(response) {
-					logging(response);
-				},
-				error: function(error) {
-					add_alert("Failed to contact the backend for loading the db with reason: "+error.statusText);
-					logging("Failed to contact the backend for loading the db with reason: "+error.statusText);
-				},
-				timeout: {{timeout}}
-			});
-		}
-		catch (exception_var) {
-			logging(exception_var);
-			add_alert(exception_var);
-		}
-	};
+
 	
 	async function runComplexTests(test_element, category) {
 		const currentTime = Date.now();
@@ -890,7 +871,7 @@ function makeCronJobTable(data) { // disabled
 						if (cellData.startsWith("running - ") || cellData.startsWith("This cronjob is disabled")){
 							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/><title>Everything runs as expected</title></svg>';
 						}
-						else {
+						else { //severity
 							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/><title>Something is not running as expected</title></svg>';
 						}
 						
@@ -964,8 +945,8 @@ function makeCronJobTable(data) { // disabled
 							if (elements[4] === "Cronjob") {
 								if (cellData.startsWith("running - " || cellData.startsWith("This cronjob is disabled"))){
 									content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
-								}
-								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';}
+								} //severity
+								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="'+get_severity_of_cronjob(elements[6])+'"/></svg>';}
 							}
 							else if (cellData === "running" || cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
 								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
@@ -1357,18 +1338,24 @@ function makeCronJobTable(data) { // disabled
 		$.each(allTables, function(index, table) {
 			if (index===0) return;
 			var dataTable = $(table).DataTable();
-			var hasFailure = false;
+			var hasFailure = false; //severity, edit so that it gives a color over true/false
 			var columnData = dataTable.column(17).data().toArray();
+			var color = "green";
 			for (var i = 0; i < columnData.length; i++)
 				{
 				if (typeof columnData[i] === 'string' && columnData[i].includes("Failure")) {
 					document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").setAttribute("title", document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").getAttribute("title") + "Issue with " + dataTable.column(7).data().toArray()[i]);
 					hasFailure = true;
+					var current_severity = get_severity_of_container(dataTable.column(6).data());
+					if (color == current_severity) pass;
+					else if (color == "green") color = current_severity;
+					else if (color == "yellow" && (current_severity == "red" || current_severity == "orange")) color = current_severity;
+					else if (color == "orange" && current_severity == "red") color = current_severity;
 					break;
 				}
 			}
 			if (hasFailure) {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="red" /><title>Issues in test execution</title></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="'+color+'" /><title>Issues in test execution</title></svg>';
 			} else {
 				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12"><rect width="12" height="12" fill="green" /><title>No issues in test execution</title></svg>';
 			}
@@ -1384,18 +1371,23 @@ function makeCronJobTable(data) { // disabled
 			var dataTable = $(table).DataTable();
 			var isNotRunning = true;
 			var columnData = dataTable.column(13).data().toArray();
+			var color = "green";
 			for (var i = 0; i < columnData.length; i++)  // maybe check if too many restarts
 				{
 				if (typeof columnData[i] === 'string' && (!columnData[i].includes("running") && !columnData[i].includes("enabled") && !columnData[i].includes("disabled"))) {
 					isNotRunning = false;
-					break;
+					var current_severity = get_severity_of_container(dataTable.column(6).data());
+					if (color == current_severity) pass;
+					else if (color == "green") color = current_severity;
+					else if (color == "yellow" && (current_severity == "red" || current_severity == "orange")) color = current_severity;
+					else if (color == "orange" && current_severity == "red") color = current_severity;
 				}
-			}
+			} //severity
 			if (isNotRunning) {
 				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/><title>No issues in execution</title></svg>';
 			} 
 			else {
-				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/><title>Issues in execution</title></svg>';
+				document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").innerHTML+=' <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="'+color+'"/><title>Issues in execution</title></svg>';
 			}
 		});
 	};
@@ -1475,6 +1467,42 @@ function makeCronJobTable(data) { // disabled
 			index++;
 		}
 	};
+
+	function convert_severity(severity) {
+		if (severity === "Critical") return 3;
+		else if (severity === "Relevant") return 2;
+		else if (severity === "Warning") return 1;
+		else return 3; // in doubt it's the worst case
+	}
+
+	function get_severity_of_cronjob(cronjob_name){
+		try {
+			var color_to_return = convert_severity(lookupTable_cronjobs[cronjob_name][2])
+			if (color_to_return == 1) return "yellow";
+			else if (color_to_return == 2) return "orange";
+			else if (color_to_return == 3) return "red";
+			else return "red"
+		}
+		catch (exception_var) {
+			console.log("Failed to convert cronjob to severity: "+exception_var)
+
+		}
+	}
+
+	function get_severity_of_container(container_name){
+		try {
+			var color_to_return = convert_severity(container_severity["container_name"])
+			if (color_to_return == 1) return "yellow";
+			else if (color_to_return == 2) return "orange";
+			else if (color_to_return == 3) return "red";
+			else return "red"
+		}
+		catch (exception_var) {
+			console.log("Failed to convert container to severity: "+exception_var)
+
+		}
+	}
+	
 	
 	{% block additional_content_code %}{% endblock %}
 
@@ -1483,6 +1511,22 @@ function makeCronJobTable(data) { // disabled
 			setTimeout(async () => {
 				await update_routine();
 			}, 500);
+			try {
+			$.ajax({
+				url: './get_containers_severity',
+				type: 'GET',
+				success: function(response) {
+					container_severity = response;
+				},
+				error: function(error) {
+					console.log("Didn't get severity for containers because: "+error.statusText);
+				},
+				timeout: {{timeout}}
+			});
+		}
+		catch (exception_var) {
+			console.log("Didn't set severity for containers because: "+exception_var);
+		}
 		});
 </script>
 <nav id="navbar" class="navbar navbar-custom sticky-top navbar-expand-lg navbar-light bg-light" style="flex-direction: column; transition: transform 0.3s ease-in-out; ">

@@ -1107,7 +1107,7 @@ def auto_alert_status():
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
-SELECT datetime,result,errors,name,command,categories.category,restart_logic,description,target,severity FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
+SELECT datetime,result,errors,name,command,categories.category,restart_logic,description,target,cast(severity as char) as severity FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 and errors is not NULL;'''
             cursor.execute(query)
             conn.commit()
             cron_results = cursor.fetchall()
@@ -1854,7 +1854,7 @@ def create_app():
                         cursor.execute(query_2, (int(os.getenv("admin-log-length","1000")),))
                         conn.commit()
                         results_log = cursor.fetchall()
-                        query_3 = "SELECT name,categories.category,contacts FROM categories join cronjobs on categories.idcategories=cronjobs.category;"
+                        query_3 = "SELECT name,categories.category,contacts,cast(severity as char) as severity FROM categories join cronjobs on categories.idcategories=cronjobs.category;"
                         cursor.execute(query_3)
                         results_cronjobs = cursor.fetchall()
                         return render_template("checker-admin-k8.html",extra=results,categories=get_container_categories(),extra_data=get_extra_data(),cronjobs=results_cronjobs,admin_log=results_log,timeout=int(os.getenv("requests-timeout","15000")),user=session['username'],platform=os.getenv("platform-url","unseturl"),multi=os.getenv("is-multi","False"), column_string=column_string)
@@ -4155,6 +4155,20 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
 
+    @app.route('/get_containers_severity', methods=['GET'])
+    def get_containers_severity():
+        if 'username' in session:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                query = '''SELECT component, cast(severity as char) as severity FROM checker.component_to_category;;'''
+                cursor.execute(query)
+                conn.commit()
+                results = cursor.fetchall()
+                output = {r[0]:r[1] for r in results}
+                return jsonify(output)
+        return redirect(url_for('login'))
+           
+
     @app.route('/get_host_tops', methods=['GET'])
     def get_tops():
         if 'username' in session:
@@ -4196,7 +4210,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     try:
                         localtop = get_top()
                         localtop["source"] = os.getenv("platform-url","Sentinel host")
-                        outs.append(parse_top(localtop))
+                        outs.append(localtop)
                     except:
                         errors.append(traceback.format_exc())
                 data_to_send={"result":outs,"error":errors}
