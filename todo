@@ -15,9 +15,9 @@ clearml
 1.61
 
 
-add ui to deal with container, cronjob severity new column - to be tested
-add ui to deal with showing severity of problem in main page (yellow, orange, red) - telegram okay in terms of having data available
-have backend be able to determine what to skip in terms of severity notification wise - cronjobs ok
+cronjobs ok
+containers to be tested
+in terms of notifications/severity
 
 
 https://docs.google.com/spreadsheets/d/1NphAYe7GHYzO6Fc0p3Nduh759dzja_6f2JCPACBUbsU/edit?usp=sharing

@@ -1611,8 +1611,29 @@ def send_advanced_alerts(message):
         email_data = []
         for a in range(len(message)):
             print(f"Element {a}: "+str(message[a])[:100])
+        cont_sevr = {}
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            query = '''SELECT component, cast(severity as char) as severity FROM checker.component_to_category;;'''
+            cursor.execute(query)
+            conn.commit()
+            results = cursor.fetchall()
+            for r in results:
+                cont_sevr[r[0]] = r[1]
         if len(message[0])>0:
-            text_for_email = mixed_format_error_to_send("is not in the correct status ",containers=message[0],because=dict([(a["Name"],a["State"]) for a in message[0]]),explain_reason="as its status currently is: ")+"<br><br>"
+            containers_filtered = []
+            for c in message[0]:
+                try:
+                    if cont_sevr[c["Name"]]=="Warning":
+                        pass
+                    else:
+                        containers_filtered.append(c)
+                except KeyError: # just make it maximum severity in doubt
+                    containers_filtered.append(c)
+                except Exception:
+                    print_debug_log(f"Something failed while determinging if {c["Name"]} should be sent as a notification")
+                    containers_filtered.append(c)
+            text_for_email = mixed_format_error_to_send("is not in the correct status ",containers=containers_filtered,because=dict([(a["Name"],a["State"]) for a in containers_filtered]),explain_reason="as its status currently is: ")+"<br><br>"
             for el in text_for_email.split("<br>"):
                 cont_names = re.findall("named (.+)",el,re.MULTILINE)
                 if len(cont_names) > 0: # filters out something that won't work
@@ -1620,8 +1641,20 @@ def send_advanced_alerts(message):
 
         if len(message[1])>0:
             #containers = ", ".join([a["container"] for a in message[1]])
-            becauses = dict([[a["container"],a["command"]] for a in message[1]])
-            current_text = mixed_format_error_to_send_tests_test_ran("is not answering correctly to its 'is alive' test ",containers=message[1],because=becauses,explain_reason="given the failure of: ")+"<br><br>"
+            containers_filtered = []
+            for c in message[1]:
+                try:
+                    if cont_sevr[c["Name"]]=="Warning":
+                        pass
+                    else:
+                        containers_filtered.append(c)
+                except KeyError: # just make it maximum severity in doubt
+                    containers_filtered.append(c)
+                except Exception:
+                    print_debug_log(f"Something failed while determinging if {c["Name"]} should be sent as a notification")
+                    containers_filtered.append(c)
+            becauses = dict([[a["container"],a["command"]] for a in containers_filtered])
+            current_text = mixed_format_error_to_send_tests_test_ran("is not answering correctly to its 'is alive' test ",containers=containers_filtered,because=becauses,explain_reason="given the failure of: ")+"<br><br>"
             text_for_email+= current_text
             for el in current_text.split("<br>"):
                 cont_names = re.findall("named (.+)",el,re.MULTILINE)
@@ -1629,7 +1662,19 @@ def send_advanced_alerts(message):
                     email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
 
         if len(message[2])>0:
-            current_text = mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=message[2])+"<br><br>"
+            containers_filtered = []
+            for c in message[2]:
+                try:
+                    if cont_sevr[c["Name"]]=="Warning":
+                        pass
+                    else:
+                        containers_filtered.append(c)
+                except KeyError: # just make it maximum severity in doubt
+                    containers_filtered.append(c)
+                except Exception:
+                    print_debug_log(f"Something failed while determinging if {c["Name"]} should be sent as a notification")
+                    containers_filtered.append(c)
+            current_text = mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=containers_filtered)+"<br><br>"
             text_for_email += current_text
             for el in text_for_email.split("<br>"):
                 cont_names = re.findall("named (.+)",el,re.MULTILINE)
@@ -1645,7 +1690,8 @@ def send_advanced_alerts(message):
         if len(message[5])>0:
             prepare_text = "<br>These cronjobs failed:"
             for failed_cron in message[5]:
-                if failed_cron[8] == "Warning":
+                if failed_cron[9] == "Warning":
+                    print_debug_log("Shouldn't send "+failed_cron[9])
                     continue
                 stdout_msg=failed_cron[1].replace('\n','<br>')
                 stderr_msg=failed_cron[2].replace('\n','<br>')
@@ -1767,7 +1813,10 @@ def send_advanced_alerts(message):
             text_for_telegram.append(prepare_text_top_error)
         print_debug_log(str(text_for_telegram))
         try:
-            send_telegram(int(os.getenv("telegram-channel","0")), text_for_telegram)
+            if len(text_for_telegram)>1:
+                send_telegram(int(os.getenv("telegram-channel","0")), text_for_telegram)
+            else:
+                print_debug_log("After severity checking there were no messages.")
         except:
             print("[ERROR] while sending telegram:",text_for_telegram,"\nDue to",traceback.format_exc())
     except Exception:
