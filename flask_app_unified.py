@@ -1631,7 +1631,7 @@ def send_advanced_alerts(message):
                 except KeyError: # just make it maximum severity in doubt
                     containers_filtered.append(c)
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c["Name"]} should be sent as a notification")
+                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification")
                     containers_filtered.append(c)
             text_for_email = mixed_format_error_to_send("is not in the correct status ",containers=containers_filtered,because=dict([(a["Name"],a["State"]) for a in containers_filtered]),explain_reason="as its status currently is: ")+"<br><br>"
             for el in text_for_email.split("<br>"):
@@ -1651,7 +1651,7 @@ def send_advanced_alerts(message):
                 except KeyError: # just make it maximum severity in doubt
                     containers_filtered.append(c)
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c["Name"]} should be sent as a notification")
+                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification")
                     containers_filtered.append(c)
             becauses = dict([[a["container"],a["command"]] for a in containers_filtered])
             current_text = mixed_format_error_to_send_tests_test_ran("is not answering correctly to its 'is alive' test ",containers=containers_filtered,because=becauses,explain_reason="given the failure of: ")+"<br><br>"
@@ -1672,7 +1672,7 @@ def send_advanced_alerts(message):
                 except KeyError: # just make it maximum severity in doubt
                     containers_filtered.append(c)
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c["Name"]} should be sent as a notification")
+                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification")
                     containers_filtered.append(c)
             current_text = mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=containers_filtered)+"<br><br>"
             text_for_email += current_text
@@ -1757,7 +1757,7 @@ def send_advanced_alerts(message):
             all_msgs = []
             prepare_text = "This cronjob failed:\n"
             for failed_cron in message[5]:
-                if not failed_cron[8] == "Critical":
+                if not failed_cron[9] == "Critical":
                     continue
                 cron_name = failed_cron[3] if (failed_cron[7]==None or failed_cron[7]=="") else failed_cron[7]
                 bash_code = failed_cron[4]

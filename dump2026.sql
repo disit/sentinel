@@ -172,6 +172,7 @@ CREATE TABLE `component_to_category` (
   `references` varchar(200) NOT NULL DEFAULT 'Contact information not set',
   `position` varchar(45) NOT NULL DEFAULT 'localhost',
   `kind` set('kubernetes','docker','cronjob','other') NOT NULL DEFAULT 'docker',
+  `severity` set('Critical','Relevant','Warning') DEFAULT 'Critical',
   PRIMARY KEY (`component`,`position`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -280,6 +281,7 @@ CREATE TABLE `cronjobs` (
   `target` varchar(200) DEFAULT NULL,
   `createtime` datetime NOT NULL DEFAULT current_timestamp(),
   `contacts` varchar(200) NOT NULL,
+  `severity` set('Critical','Relevant','Warning') DEFAULT 'Critical',
   PRIMARY KEY (`idcronjobs`),
   KEY `category` (`category`),
   KEY `where_to_run` (`where_to_run`),
