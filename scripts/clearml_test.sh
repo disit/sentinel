@@ -15,34 +15,37 @@ if [ -z "$TOKEN" ]; then
     exit 1
 fi
 
+
 # 2. Query and Filter
+# Double heredoc first makes the code with the json within it, then runs it into python
 curl -s -X POST "$CLEARML_API/workers.get_all" \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
-     -d '{}' | python3 -c "
-import sys, json
+     -d '{}' | python3 <(cat <<'EOF'
+import json
+import datetime
+import sys
 
-try:
-    data = json.load(sys.stdin)
-    workers = data.get('data', {}).get('workers', [])
-except Exception as e:
-    sys.stderr.write(f'Error parsing JSON: {e}\n')
-    sys.exit(1)
+hosts = {"192.168.1.41", "192.168.1.13", "192.168.1.182", "192.168.0.175", "192.168.1.183", "192.168.1.181", "192.168.1.61", "192.168.1.42", "192.168.0.57"}
+og_msg = sys.stdin.read()
+og = json.loads(og_msg)
+for w in og["data"]["workers"]:
+    if w["ip"] in hosts:
+        hosts.remove(w["ip"])
+    else:
+        sys.stderr.write(f"It seems that {w['ip']} infiltrated the clearml cluster?\n")
+    provided_time = datetime.datetime.fromisoformat(w["last_activity_time"])
 
-down_count = 0
-for w in workers:
-    status = w.get('status', 'unknown')
-    worker_id = w.get('id', 'unknown')
-    ip = w.get('ip', 'unknown')
-    
-    if status == 'offline':
-        # Directing specific worker errors to stderr
-        sys.stderr.write(f'[DOWN] Agent: {worker_id} (IP: {ip})\n')
-        down_count += 1
+    # 3. Get the current time (UTC)
+    current_time = datetime.datetime.now(datetime.timezone.utc)
 
-if down_count == 0:
-    print('Status: All agents healthy.')
-else:
-    sys.stderr.write(f'Total Agents Down: {down_count}\n')
-    sys.exit(1)
-"
+    # 4. Compare them
+    time_diff = current_time - provided_time
+    if time_diff.seconds>90:
+        sys.stderr.write(f"{w['ip']} was alive {time_diff.seconds} seconds(s) ago")
+    else:
+        print(f"{w['ip']} was alive {time_diff.seconds} second(s) ago")
+for left_w in hosts:
+    sys.stderr.write(f"I didn't find {left_w}!\n")
+EOF
+)
