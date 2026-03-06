@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login</title>
+  </head>
+  <body class="bg-light d-flex justify-content-center align-items-center vh-100">
+    <div class="card shadow p-4" style="min-width: 300px;">
+      <h2 class="text-center mb-4">Login to Snap4Sentinel</h2>
+      <form method="post">
+        <div class="mb-3">
+          <input id="username" type="text" name="username" class="form-control" placeholder="Username" required>
+        </div>
+        <div class="mb-3">
+          <input id="password" type="password" name="password" class="form-control" placeholder="Password" required>
+        </div>
+        <div class="d-grid">
+          <button type="submit" class="btn btn-primary">Login</button>
+        </div>
+        {%if error != ""%}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <strong>Error</strong> {{error | safe}}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {%endif%}
+      </form>
+    </div>
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    
+  </body>
+</html>

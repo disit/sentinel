@@ -2672,6 +2672,26 @@ def create_app():
             return render_template('login.html')
         return "This instance is not a master and you can't log on to it", 400
 
+    @app.route("/login_2", methods=['GET', 'POST'])
+    def login_2():
+        if os.getenv("is-master","False") == "True":
+            if request.method == 'POST':
+                try:
+                    username = request.form['username']
+                    password = request.form['password']
+                    if username in users and check_password_hash(users[username], password):
+                        print_debug_log(f"{username} logged in")
+                        session.permanent = True
+                        session['username'] = username
+                        return redirect(url_for('main_page'))
+                    print_debug_log(f"{username} tried to login and failed due to wrong credentials")
+                    return render_template('login_copy.html',error="Invalid credentials"), 401
+                except Exception:
+                    print_debug_log(f"Failure on login: {traceback.format_exc()}")
+                    return render_template('login_copy.html',error=traceback.format_exc()), 401
+            return render_template('login_copy.html',error="")
+        return "This instance is not a master and you can't log on to it", 400
+
 
     @app.route("/get_data_from_source", methods=["GET"])
     def get_additional_data(): # this should call the db, not directly the webpage
