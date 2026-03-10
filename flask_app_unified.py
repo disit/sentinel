@@ -696,26 +696,47 @@ def filter_out_wrong_status_containers_for_telegram(containers):
 
 def isalive():
     print_debug_log("Sending 'is alive'")
-    send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is alive", os.getenv("platform-url","unseturl")+" is alive")
-    send_telegram(int(os.getenv("telegram-channel","0")), [os.getenv("platform-url","unseturl")+" is alive"])
+    with mysql.connector.connect(**db_conn_info) as conn:
+        cursor = conn.cursor(buffered=True)
+        query = '''WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id_cronjob ORDER BY datetime DESC) AS row_num FROM cronjob_history)
+SELECT count(name),categories.category,cast(severity as char) as severity, errors FROM RankedEntries join cronjobs on cronjobs.idcronjobs=RankedEntries.id_cronjob join categories on categories.idcategories=cronjobs.category WHERE row_num = 1 group by category, severity, errors;''' # get a past notification if it matches the hash, at best one day old
+        cursor.execute(query)
+        conn.commit()
+        cronjob_summary_results = cursor.fetchall()
+        str_to_send = ""
+        # for each group with errors
+        for csr in [a for a in cronjob_summary_results if a[3]!=None]:
+            current_error = f"{csr[0]} {csr[2]} issue{'es' if csr[0]>1 else ''} in category {csr[1]}: {csr[3][:50]}{'...' if len(csr[3])>50 else ''}\n"
+            str_to_send+=current_error
+        # get sum of count of all ok cronjobs
+        total_ok = sum([csr[0] for csr in cronjob_summary_results if csr[3] is None])
+        categories = set()
+        # get categories of all ok cronjobs
+        [categories.add([csr[1] for csr in cronjob_summary_results if csr[3] is None])]
+        ok_string = f"\n{total_ok} healthy cronjob{'s'if total_ok>1 else ''} across categor{'ies' if len(categories)>1 else 'y'} {', '.join(categories)[:-2]}."
+        str_to_send+=ok_string
+
+
+    send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" is alive", os.getenv("platform-url","unseturl")+" is alive\n"+str_to_send)
+    send_telegram(int(os.getenv("telegram-channel","0")), [os.getenv("platform-url","unseturl")+" is alive",str_to_send])
     return
 
 def clean_old_db_entries():
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            # to run malicious code, malicious code must be present in the db or the machine in the first place
-            query = '''DELETE FROM checker.cronjob_history WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
-DELETE FROM host_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
-DELETE FROM snmp_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;
-DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY;'''
+            # id != 0 and similar due to mysql not liking deletions which don't depend on primary key
+            query = '''DELETE FROM checker.cronjob_history WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_cronjob != 0;
+DELETE FROM host_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0;
+DELETE FROM snmp_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0;
+DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_test !=0;'''
 
             results=cursor.execute(query, multi=True) # multi for cursor reasons
             for result in results:
                 if result.with_rows:
                     result.fetchall() # sometimes multiple statements cause something to fail, this is an extra safety
             conn.commit()
-            print("Weekly deletion of old logs was successful")
+            print("Deletion of old logs was successful")
     except:
         print("Couldn't delete old logs because: "+traceback.format_exc())
         send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" didn't delete old logs.", os.getenv("platform-url","unseturl")+" didn't delete old logs because of "+traceback.format_exc())
@@ -2138,7 +2159,7 @@ def create_app():
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target FROM checker.cronjobs where where_to_run is null;'''
+                    query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, severity FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target FROM checker.cronjobs where where_to_run is null;'''
                     query2 = '''SELECT * from categories;'''
                     query3 = '''SELECT * from cronjob_prototypes;'''
                     cursor.execute(query)
