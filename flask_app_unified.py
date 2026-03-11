@@ -712,7 +712,7 @@ SELECT count(name),categories.category,cast(severity as char) as severity, error
         total_ok = sum([csr[0] for csr in cronjob_summary_results if csr[3] is None])
         categories = set()
         # get categories of all ok cronjobs
-        [categories.add([csr[1] for csr in cronjob_summary_results if csr[3] is None])]
+        categories.update(csr[1] for csr in cronjob_summary_results if csr[3] is None)
         ok_string = f"\n{total_ok} healthy cronjob{'s'if total_ok>1 else ''} across categor{'ies' if len(categories)>1 else 'y'} {', '.join(categories)[:-2]}."
         str_to_send+=ok_string
 
@@ -2159,7 +2159,7 @@ def create_app():
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, severity FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target FROM checker.cronjobs where where_to_run is null;'''
+                    query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, contacts, severity FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, contacts, severity FROM checker.cronjobs where where_to_run is null;'''
                     query2 = '''SELECT * from categories;'''
                     query3 = '''SELECT * from cronjob_prototypes;'''
                     cursor.execute(query)

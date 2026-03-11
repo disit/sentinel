@@ -41,15 +41,15 @@
       <td>{{item[10]}}</td>
       <td>{{item[11]}}</td>
       <td>{{item[12]}}</td>
+      <td>{{item[13]}}</td>
       <td>{{item[14]}}</td>
-      <td>{{item[15]}}</td>
 	  {%if item[5] == 1%}
 	  <td>Disabled</td>
 	  {%else%}
 	  <td>Enabled</td>
 	  {%endif%}
       <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[14] | e}}" data-severity="{{item[15] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
     </tr>
 {% endfor %}
   </tbody>
@@ -77,6 +77,13 @@
                     <div class="form-group">
                         <label for="CommandAdd">Command</label>
                         <input type="text" class="form-control" id="CommandAdd" placeholder="Insert a bash command" required disabled>               
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="toggleCommandAdd" 
+                            onchange="document.getElementById('CommandAdd').disabled = !this.checked;">
+                        <label class="form-check-label" for="toggleCommandAdd">
+                            Manual command edit
+                        </label>
                     </div>
 
                     
@@ -184,6 +191,14 @@
                     <div class="form-group">
                         <label for="CommandEdit">Command</label>
                         <input type="text" class="form-control" id="CommandEdit" placeholder="Insert a bash command" required disabled>
+                    </div>
+                    
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="toggleCommandEdit" 
+                            onchange="document.getElementById('CommandEdit').disabled = !this.checked;">
+                        <label class="form-check-label" for="toggleCommandEdit">
+                            Manual command edit
+                        </label>
                     </div>
 
 
