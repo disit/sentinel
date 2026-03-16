@@ -713,7 +713,7 @@ SELECT count(name),categories.category,cast(severity as char) as severity, error
         categories = set()
         # get categories of all ok cronjobs
         categories.update(csr[1] for csr in cronjob_summary_results if csr[3] is None)
-        ok_string = f"\n{total_ok} healthy cronjob{'s'if total_ok>1 else ''} across categor{'ies' if len(categories)>1 else 'y'} {', '.join(categories)[:-2]}."
+        ok_string = f"\n{total_ok} healthy cronjob{'s'if total_ok>1 else ''} across categor{'ies' if len(categories)>1 else 'y'} {', '.join(categories)}."
         str_to_send+=ok_string
 
 
@@ -1546,8 +1546,19 @@ def runcronjobs():
                     else:
                         command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
                         if len(command_ran.stderr) > 0:
-                            query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
-                            cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
+                            regex = re.compile(r"^.*(https?:\/\/)(.*?)(?::\d+| |\/).*$") # from the command, grab the first instance of the url up to the first \, if any, port included
+                            result = regex.findall(r[2])
+                            if result and r[11] is not None: # if we have a replaceable ip, replace to that ip and swap the protocol to http
+                                command_ran_2 = subprocess.run(r[2].replace("".join(result[0]),result[0][0].replace("https","http")+r[11]), shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
+                                if len(command_ran_2.stderr) > 0: # error even after attempted bypass?
+                                    query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                                    cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip()+"\nProxy bypass failed as well",))
+                                else:
+                                    query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+                                    cursor.execute(query, (command_ran.stdout.strip()+"\nProxy bypass succeeded",r[0],))
+                            else: # can't replace because not set
+                                query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                                cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
                         else:
                             query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
                             cursor.execute(query, (command_ran.stdout.strip(),r[0],))
