@@ -1548,8 +1548,9 @@ def runcronjobs():
                         if len(command_ran.stderr) > 0:
                             regex = re.compile(r"^.*(https?:\/\/)(.*?)(?::\d+| |\/).*$") # from the command, grab the first instance of the url up to the first \, if any, port included
                             result = regex.findall(r[2])
-                            if result and r[11] is not None: # if we have a replaceable ip, replace to that ip and swap the protocol to http
-                                command_ran_2 = subprocess.run(r[2].replace("".join(result[0]),result[0][0].replace("https","http")+r[11]), shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
+                            new_command = r[2].replace("".join(result[0]),result[0][0].replace("https","http")+r[11])
+                            if result and r[11] is not None and new_command !=r[2]: # if we have a replaceable ip, replace to that ip and swap the protocol to http, unless the resulting command results being identical to the previous one, in which case don't bother
+                                command_ran_2 = subprocess.run(new_command, shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
                                 if len(command_ran_2.stderr) > 0: # error even after attempted bypass?
                                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
                                     cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip()+"\nProxy bypass failed as well",))
