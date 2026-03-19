@@ -181,11 +181,6 @@ CREATE TABLE `component_to_category` (
 -- Dumping data for table `component_to_category`
 --
 
-LOCK TABLES `component_to_category` WRITE;
-/*!40000 ALTER TABLE `component_to_category` DISABLE KEYS */;
-INSERT INTO `component_to_category` VALUES ('keycloak','Authorization and Authentication','not set','https://sentinel.snap4city.org','cronjob'),('sentinel','System','not set','https://sentinel.snap4city.org','docker');
-/*!40000 ALTER TABLE `component_to_category` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `container_data`
@@ -683,5 +678,33 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+DELIMITER ;;
+CREATE DEFINER=`root`@`localhost` FUNCTION `GetHighContrastColor`(hexColor CHAR(7)) RETURNS char(7) CHARSET utf8mb4 
+    DETERMINISTIC
+BEGIN
+  DECLARE colorR INT;
+  DECLARE colorG INT;
+  DECLARE colorB INT;
+  DECLARE colorLuminance DECIMAL(10, 2);
+  DECLARE contrastColor CHAR(7);
+  DECLARE contrastThreshold INT;
+  SET colorR = CAST(CONV(SUBSTRING(hexColor, 2, 2), 16, 10) AS UNSIGNED);
+  SET colorG = CAST(CONV(SUBSTRING(hexColor, 4, 2), 16, 10) AS UNSIGNED);
+  SET colorB = CAST(CONV(SUBSTRING(hexColor, 6, 2), 16, 10) AS UNSIGNED);
+  SET contrastThreshold = 128;
+  SET colorLuminance = 0.2126 * colorR + 0.7152 * colorG + 0.0722 * colorB;
+  IF colorLuminance > contrastThreshold THEN
+    SET contrastColor = '#000000';
+  ELSE
+    SET contrastColor = '#ffffff';
+  END IF;
+
+  RETURN contrastColor;
+END ;;
+DELIMITER ;
+
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`%` SQL SECURITY DEFINER VIEW `all_logs` AS (select `test_ran`.`datetime` AS `datetime`,`test_ran`.`log` AS `log`,`test_ran`.`perpetrator` AS `perpetrator` from `test_ran`) union (select `rebooting_containers`.`datetime` AS `datetime`,`rebooting_containers`.`log` AS `log`,`rebooting_containers`.`perpetrator` AS `perpetrator` from `rebooting_containers`) union (select `telegram_alert_pauses`.`issued` AS `datetime`,concat('Paused ',`telegram_alert_pauses`.`component`,' until ',`telegram_alert_pauses`.`until`) AS `log`,'admin' AS `log` from `telegram_alert_pauses`) order by `datetime` desc;
 
 -- Dump completed on 2026-02-12 15:33:58
