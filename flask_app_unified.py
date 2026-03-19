@@ -3422,7 +3422,8 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             conn.commit()
             results = cursor.fetchall()
             if len(results) > 1:
-                logs = '<br>'.join([f"{result[0]}: {result[1]}" for result in results])
+                newline, br = "\n", "<br>"
+                logs = '<br>'.join([f"{result[0]}: {result[1].replace(newline,br)}" for result in results])
             else:
                 logs = "This cronjob doesn't exists or it has no logs yet"
             return render_template('log_show.html', r = logs, container_name=f"cronjob #{cronjob_id}")

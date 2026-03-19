@@ -944,7 +944,19 @@ function makeCronJobTable(data) { // disabled
 						try {
 							if (elements[4] === "Cronjob") {
 								if (cellData.startsWith("running - " || cellData.startsWith("This cronjob is disabled"))){
-									content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
+									var delimiterIndex = cellData.indexOf("--");
+
+									// 2. Slice and append if the delimiter exists
+									var truncatedData;
+
+									if (delimiterIndex !== -1) {
+										// Slice from start to the index of "--", then add the suffix
+										truncatedData = cellData.slice(0, delimiterIndex) + "[...]";
+									} else {
+										// If "--" isn't found, you might want to keep the original or handle it differently
+										truncatedData = cellData;
+									}
+									content_of_id_cell = truncatedData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 								} //severity
 								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="'+get_severity_of_cronjob(elements[6])+'"/></svg>';}
 							}
