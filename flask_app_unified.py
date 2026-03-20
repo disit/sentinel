@@ -3400,7 +3400,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                             r = requests.post(request.form.to_dict()['source']+"/container/"+podname, data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM), "raw":"True"})
                             return r.text, r.status_code
                     except:
-                        return f"Issue while rebooting pod: {traceback.format_exc()}", 500
+                        return f"Issue while getting logs of container/pod: {traceback.format_exc()}", 500
             except:
                 return f"Issue while getting logs of container/pod: {traceback.format_exc()}", 500
 
