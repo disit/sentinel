@@ -1,23 +1,8 @@
 snmp tops to full logs
 find a way to register winrar
 
-
-
-clearml
-0.175
-1.181
-1.182
-1.183
-1.41
-1.42
-0.57
-0.7 & 1.13
-1.61
-
-
-cronjobs ok
-containers to be tested
-in terms of notifications/severity
-
+rename hostname to base host path in backend
+remove ["Node"] or ["Source"], as they are equal in value at this point (remove them from UI as well!)
+email protocol doesn't work?
 
 https://docs.google.com/spreadsheets/d/1NphAYe7GHYzO6Fc0p3Nduh759dzja_6f2JCPACBUbsU/edit?usp=sharing

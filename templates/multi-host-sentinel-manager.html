@@ -7,7 +7,7 @@
 {% block content %}
 <h1>Sentinel Hosts</h1>
 <table border="1" cellpadding="5" id="hosts_table">
-<thead><tr><th>IP</th><th>Hostname</th><th>Delete Sentinel Host</th></tr></thead>
+<thead><tr><th>IP</th><th>Base Host Path</th><th>Delete Sentinel Host</th></tr></thead>
 {% for row in hosts %}
 <tr>
 <td>{{ row['ip'] }}</td>
@@ -19,7 +19,7 @@
 
 <h2>Add New Host</h2>
 <form id="addForm">
-Hostname: <input id="hostname" type="text" class="form-control" name="hostname" required><br>
+Base Host Path: <input id="hostname" type="text" class="form-control" name="hostname" required><br>
 IP: <input id="ip" type="text" class="form-control" name="ip" required><br>
 <button id="button_add" class="form-control" class="btn btn-info">Add Sentinel Host</button>
 </form>
@@ -28,7 +28,6 @@ IP: <input id="ip" type="text" class="form-control" name="ip" required><br>
 <script>
 $('#hosts_table').DataTable();
 function deleteHost(host) {
-    e.preventDefault();
         try {
             $.ajax({
                 url: './delete_sentinel_host',
