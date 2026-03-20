@@ -1993,7 +1993,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`, `severity`) VALUES (%s, %s, %s, %s, %s, %s);'''
+                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`) VALUES (%s, %s, %s, %s, %s, %s);'''
                     if request.form.to_dict()['kind'] == "Kubernetes":
                         cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],))
                     else:
@@ -2019,13 +2019,13 @@ def create_app():
                     if request.form.to_dict()['kind'] == "Kubernetes":
                         if request.form.to_dict()['position']=="": #if namespace left empty, just leave the old one
                             query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `kind` = %s, `severity` = %s where (`component` = %s)'''
-                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['kind'],request.form.to_dict()['id'],request.form.to_dict()['severity'],))
+                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
                         else:
                             query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s, `severity` = %s where (`component` = %s)'''
-                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['id'],request.form.to_dict()['severity'],))
+                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
                     else:
                         query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s, `severity` = %s where (`component` = %s)'''
-                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['id'],request.form.to_dict()['severity'],))
+                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
 
                     conn.commit()
                     if cursor.rowcount > 0:
@@ -3400,7 +3400,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                             r = requests.post(request.form.to_dict()['source']+"/container/"+podname, data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM), "raw":"True"})
                             return r.text, r.status_code
                     except:
-                        return f"Issue while getting logs of container/pod: {traceback.format_exc()}", 500
+                        return f"Issue while rebooting pod: {traceback.format_exc()}", 500
             except:
                 return f"Issue while getting logs of container/pod: {traceback.format_exc()}", 500
 

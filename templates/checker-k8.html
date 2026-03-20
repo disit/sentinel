@@ -1293,7 +1293,7 @@ function makeCronJobTable(data) { // disabled
 							}
 						},
 						error: function(error) {
-							logging('<b>' + id + "</b> was not restarted! Reason: " + error, category+"-logs");
+							logging('<b>' + id + "</b> was not restarted! Reason: " + error.responseText, category+"-logs");
 							$('#passwordModal').modal('hide');
 						},
 						timeout: {{timeout}}
@@ -1329,7 +1329,7 @@ function makeCronJobTable(data) { // disabled
 							}
 						},
 						error: function(error) {
-							logging('<b>' + id + "</b> was not restarted! Reason: " + error, category+"-logs");
+							logging('<b>' + id + "</b> was not restarted! Reason: " + error.responseText, category+"-logs");
 							$('#passwordModal').modal('hide');
 						},
 						timeout: {{timeout}}
