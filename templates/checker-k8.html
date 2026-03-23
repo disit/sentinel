@@ -944,7 +944,7 @@ function makeCronJobTable(data) { // disabled
 						try {
 							if (elements[4] === "Cronjob") {
 								if (cellData.startsWith("running - " || cellData.startsWith("This cronjob is disabled"))){
-									var delimiterIndex = cellData.indexOf("--");
+									var delimiterIndex = cellData.indexOf("#--#");
 
 									// 2. Slice and append if the delimiter exists
 									var truncatedData;

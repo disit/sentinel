@@ -64,14 +64,14 @@ async def safe_snmp_walk(host_data):
     Returns a dict {oid: value}.
     """
     print_debug_log("Performing walk for SNMP")
-    if host_data['safe']:
+    if host_data['protocol'] == "true":
         snmpEngine = SnmpEngine()
         transport = await UdpTransportTarget.create((host_data["host"], 161))
 
         user = host_data["user"]
         json_details=json.loads(host_data["details"])
-        auth_pass = json_details["auth_pass"]
-        priv_pass = json_details["priv_pass"]
+        auth_pass = json_details["AuthKey"]
+        priv_pass = json_details["PrivKey"]
 
         user_data = UsmUserData(
             userName=user,
@@ -1634,6 +1634,33 @@ def calculate_timedelta(first_time: str):
         final_string = f"{days} days, " + final_string
     return final_string
 
+def slave_attempt_self_register():
+    if os.getenv("is-master","True") == "False" and os.getenv("self-register-ip","") != "" and os.getenv("self-register-host","") != "":
+        try:
+            with mysql.connector.connect(**db_conn_info) as conn:
+                cursor = conn.cursor(buffered=True)
+                # to run malicious code, malicious code must be present in the db or the machine in the first place
+                query = '''SELECT * FROM ip_table where hostname = %s and ip = %s'''
+                cursor.execute(query,(os.getenv("self-register-ip",""),os.getenv("self-register-host","")))
+                conn.commit()
+                results = cursor.fetchall()
+                if len(results) == 0: # now attempt self registration
+                    query_2 = '''INSERT INTO `checker`.`ip_table` (`ip`, `hostname`) VALUES (%s, %s);'''
+                    cursor.execute(query_2,(os.getenv("self-register-ip",""),os.getenv("self-register-host","")))
+                    cursor.fetchall()
+                    if cursor.rowcount > 0:
+                        print_debug_log("Successfully self registered as slave")
+                        return 
+                    else:
+                        raise Exception("Unsuccessfully self registered as slave, wasn't in the db but failed to insert")
+                else:
+                    print_debug_log("Self registration not needed, already in db")
+                    return 
+        except Exception:
+            print("Something went wrong during attempted slave self registration because of:",traceback.format_exc())
+            return
+    print("Given conf parameters seem to indicate there is no need to self register")
+
 def send_advanced_alerts(message):
     # TODO filter out warnings from email, only keep criticals for telegram
     print_debug_log("Preparing the content of an alert")
@@ -1899,6 +1926,8 @@ scheduler.add_job(clean_old_db_entries, 'cron',day=1)
 scheduler.start()
 auto_alert_status()
 
+slave_attempt_self_register()
+
 runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
     app = Flask(__name__)
@@ -1968,7 +1997,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''SELECT component, category, `references`, position, cast(kind as char) as kind FROM checker.component_to_category;'''
+                    query = '''SELECT component, category, `references`, position, cast(kind as char) as kind, cast(severity as char) as severity FROM checker.component_to_category;'''
                     query2 = '''SELECT category from categories;'''
                     cursor.execute(query)
                     conn.commit()
@@ -1993,7 +2022,7 @@ def create_app():
                         return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
-                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`) VALUES (%s, %s, %s, %s, %s, %s);'''
+                    query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`, `severity`) VALUES (%s, %s, %s, %s, %s, %s);'''
                     if request.form.to_dict()['kind'] == "Kubernetes":
                         cursor.execute(query, (request.form.to_dict()['id'],request.form.to_dict()['category'],request.form.to_dict()['contacts'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],))
                     else:
@@ -2045,7 +2074,7 @@ def create_app():
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                 cursor = conn.cursor(buffered=True)
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 query = '''DELETE FROM `checker`.`component_to_category` WHERE (`component` = %s);'''
@@ -2324,7 +2353,7 @@ def create_app():
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 cursor = conn.cursor(buffered=True)
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 query = '''DELETE FROM `checker`.`cronjobs` WHERE (`idcronjobs` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['id'],))
@@ -2414,7 +2443,7 @@ def create_app():
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
 
                 cursor = conn.cursor(buffered=True)
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 query = '''DELETE FROM `checker`.`extra_resources` WHERE (`id_category` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['id'],))
@@ -2501,7 +2530,7 @@ def create_app():
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
 
                 cursor = conn.cursor(buffered=True)
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 query = '''DELETE FROM `checker`.`tests_table` WHERE (`id` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['id'],))
@@ -2592,7 +2621,7 @@ def create_app():
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
 
                 cursor = conn.cursor(buffered=True)
-                if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 query = '''DELETE FROM `checker`.`complex_tests` WHERE (`id` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['id'],))
@@ -2676,7 +2705,7 @@ def create_app():
                     if os.getenv('unsafe-mode') != "True":
                         return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
-                    if not check_password_hash(users[username], request.form.to_dict()['psw']):
+                    if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                         return "An incorrect password was provided", 400
                     query = '''DELETE FROM `checker`.`categories` WHERE (`idcategories` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['id'],))
@@ -2987,7 +3016,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
             except:
                 return redirect(url_for('login'))
         try:
-            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+            if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                 return "An incorrect password was provided", 400
         except KeyError: # no psw found
             if os.getenv("is-multi","False") == "True" and "auth" in request.form.to_dict(): # on multi not having the psw is allowed if it has a token, because it is a intracluster call
@@ -4423,13 +4452,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             if os.getenv('unsafe-mode') != "True":
                 return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             try:
-                conn = mysql.connector.connect(**db_conn_info)
-                cursor = conn.cursor(dictionary=True)
-                cursor.execute("SELECT host, user, description, threshold_cpu, protocol, details, threshold_mem FROM snmp_host")
-                rows = cursor.fetchall()
-                cursor.close()
-                conn.close()
-                return render_template("control_panel_snmp.html", hosts_snmp=rows)
+                with mysql.connector.connect(**db_conn_info) as conn:
+                    cursor = conn.cursor(buffered=True)
+                    cursor.execute("SELECT host, user, description, threshold_cpu, protocol, details, threshold_mem FROM snmp_host")
+                    rows = cursor.fetchall()
+                    return render_template("control_panel_snmp.html", hosts=rows)
             except Exception:
                 return f"Error loading hosts: {traceback.format_exc()}"
         return redirect(url_for('login'))
@@ -4454,13 +4481,13 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
                 conn = mysql.connector.connect(**db_conn_info)
                 cursor = conn.cursor()
-                if protocol=="True":
+                if protocol=="true":
                     details = json.dumps({"PrivKey":PrivKey, "AuthKey":AuthKey})
-                elif protocol=="False":
+                elif protocol=="false":
                     details = None
                 else:
-                    return jsonify({"error": "Illegal protocol detected"}), 500
-                cursor.execute("INSERT INTO snmp_host (host, user, description, threshold_cpu, threshold_mem, details, protocol) VALUES (%s, %s, %s, %s, %s)", (host, user, description, cpu, mem, details, protocol))
+                    return jsonify({"error": "Illegal protocol detected", "data":str(request.form)}), 500
+                cursor.execute("INSERT INTO snmp_host (host, user, description, threshold_cpu, threshold_mem, details, protocol) VALUES (%s, %s, %s, %s, %s, %s, %s)", (host, user, description, cpu, mem, details, protocol))
                 conn.commit()
                 cursor.close()
                 conn.close()
@@ -4522,11 +4549,11 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 conn.close()
                 if not row:
                     return render_template("error_showing.html", r = "The provided host wasn't found in the db"), 404
-                received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],}
+                received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
                 data = asyncio.run(gather_snmp_info(received_data))
                 return render_template("snmp_shower.html", host=host, data=data)
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
 
         return redirect(url_for('login'))
 
@@ -4560,7 +4587,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
             if os.getenv('unsafe-mode') != "True":
                 return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+            if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                 return "An incorrect password was provided", 400
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
@@ -4579,7 +4606,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
             if os.getenv('unsafe-mode') != "True":
                 return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+            if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                 return "An incorrect password was provided", 400
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
@@ -4598,7 +4625,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
             if os.getenv('unsafe-mode') != "True":
                 return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-            if not check_password_hash(users[username], request.form.to_dict()['psw']):
+            if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                 return "An incorrect password was provided", 400
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:

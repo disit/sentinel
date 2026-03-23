@@ -26,6 +26,8 @@
 	"requests-timeout": "15000",
     "running-as-kubernetes": "False",
 	"secret-key": "",
+	"self-register-ip": "",
+	"self-register-host": "", 
 	"send-notifications": "True",
 	"send-telegram-notifications":"True",
 	"sender-email": "change@at.me",
