@@ -17,7 +17,7 @@
 <td>{{ row[3] }}</td>
 <td>{{ row[4] }}</td>
 <td>{{ row[5] }}</td>
-{%if row['protocol'] == "True"%}
+{%if row[6] == "true"%}
 <td>Secure (v3)</td>{%else%}<td>Insecure (v2)</td>
 {%endif%}
 <td><button class="btn btn-danger" onclick="deleteSNMPHost('{{ row[0] }}')">Delete</button></td>
@@ -33,7 +33,7 @@ Description: <input id="description" type="text" class="form-control" name="desc
 CPU: <input id="cpu" type="number" step="0.01" min="0" class="form-control" name="cpu" required><br>
 MEM: <input id="mem" type="number" step="0.01" min="0" class="form-control" name="mem" required><br>
 Protocol: <select id="protocol" name="protocol" class="form-select"><option value="false">Insecure (v2)</option><option value="true">Secure (v3)</option></select><br>
-The following are needed only if a secure protocol was chosen.<br>
+The following are needed only if a secure protocol was chosen. These will be hidden in the Web UI to the third char of the string.<br>
 PrivKey: <input id="PrivKey" type="password" class="form-control" name="PrivKey"><br>
 AuthKey: <input id="AuthKey" type="password" class="form-control" name="AuthKey"><br>
 <button id="button_add" class="form-control" class="btn btn-info">Add SNMP</button>
@@ -43,7 +43,6 @@ AuthKey: <input id="AuthKey" type="password" class="form-control" name="AuthKey"
 <script>
 $('#hosts_table').DataTable();
 function deleteSNMPHost(host) {
-    e.preventDefault();
         try {
             $.ajax({
                 url: './delete_snmp_host',

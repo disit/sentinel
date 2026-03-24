@@ -34,6 +34,8 @@
 	"sender-email-password": "replacethispassword",
 	"smtp-port":"587",
 	"smtp-server": "change.me.com",
+	"smtp-type": "ssl",
+	"smnp-auth-protocol": "",
 	"telegram-api-token": "replaceme",
 	"telegram-channel":"123456789",
     "unsafe-mode": "True"

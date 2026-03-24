@@ -38,7 +38,6 @@ Password: <input id="psw" type="password" class="form-control" name="password" r
 <script>
 $('#hosts_table').DataTable();
 function deleteHost(host) {
-    e.preventDefault();
         try {
             $.ajax({
                 url: './delete_saved_host',

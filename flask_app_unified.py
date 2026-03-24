@@ -72,12 +72,17 @@ async def safe_snmp_walk(host_data):
         json_details=json.loads(host_data["details"])
         auth_pass = json_details["AuthKey"]
         priv_pass = json_details["PrivKey"]
-
+        if os.getenv("smnp-auth-protocol","SHA-512") == "SHA-512":
+            auth_protocol = usmHMAC384SHA512AuthProtocol
+        elif os.getenv("smnp-auth-protocol","SHA-512") == "SHA":
+            auth_protocol = usmHMACSHAAuthProtocol
+        else:
+            auth_protocol = usmHMAC384SHA512AuthProtocol
         user_data = UsmUserData(
             userName=user,
             authKey=auth_pass,
             privKey=priv_pass,
-            authProtocol=usmHMAC384SHA512AuthProtocol, #hardcoded
+            authProtocol=auth_protocol, #hardcoded
             privProtocol=usmAesCfb128Protocol #hardcoded
         )
 
@@ -231,7 +236,7 @@ async def gather_snmp_info(host):
     }
 
     # Memory
-    for row, info in memory.items():
+    for _, info in memory.items():
         used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
         total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
         result["memory"].append({
@@ -241,7 +246,7 @@ async def gather_snmp_info(host):
         })
 
     # Disks
-    for row, info in disk.items():
+    for _, info in disk.items():
         used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
         total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
         result["disks"].append({
@@ -576,7 +581,9 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     else:
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
-    server.login(sender_email, sender_password)
+    
+    if os.getenv("authenticate-email", "True") == "True":
+        server.login(sender_email, sender_password)
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = ','.join(receiver_emails)
@@ -600,7 +607,8 @@ def send_emails(sender_email, sender_password, receiver_emails, data_to_be_sent)
     else:
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
-    server.login(sender_email, sender_password)
+    if os.getenv("authenticate-email", "True") == "True":
+        server.login(sender_email, sender_password)
     for dict_element in data_to_be_sent:
         composite_message = dict_element["text"] + f"<br><a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a>"
         msg = MIMEMultipart()
@@ -1067,7 +1075,6 @@ def auto_alert_status():
         return
     is_alive_with_ports = asyncio.run(auto_run_tests()) # check namespace here if k8s
     is_alive_with_ports = [a for a in is_alive_with_ports if "Failure" in a["result"]] # only keep those who failed
-    # begin mixed dealing with docker/kubernetes, if not multi this fails and crashes
     containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
     containers_merged_kubernetes = [a for a in containers_merged if not a["Namespace"].startswith("Docker - ")]
 
@@ -1546,20 +1553,23 @@ def runcronjobs():
                     else:
                         command_ran = subprocess.run(r[2], shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
                         if len(command_ran.stderr) > 0:
-                            regex = re.compile(r"^.*(https?:\/\/)(.*?)(?::\d+| |\/).*$") # from the command, grab the first instance of the url up to the first \, if any, port included
-                            result = regex.findall(r[2])
-                            new_command = r[2].replace("".join(result[0]),result[0][0].replace("https","http")+r[11])
-                            if result and r[11] is not None and new_command !=r[2]: # if we have a replaceable ip, replace to that ip and swap the protocol to http, unless the resulting command results being identical to the previous one, in which case don't bother
-                                command_ran_2 = subprocess.run(new_command, shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
-                                if len(command_ran_2.stderr) > 0: # error even after attempted bypass?
+                            try:
+                                regex = re.compile(r"^.*(https?:\/\/)(.*?)(?::\d+| |\/).*$") # from the command, grab the first instance of the url up to the first \, if any, port included
+                                result = regex.findall(r[2])
+                                new_command = r[2].replace("".join(result[0]),result[0][0].replace("https","http")+r[11])
+                                if result and r[11] is not None and new_command !=r[2]: # if we have a replaceable ip, replace to that ip and swap the protocol to http, unless the resulting command results being identical to the previous one, in which case don't bother
+                                    command_ran_2 = subprocess.run(new_command, shell=True, capture_output=True, text=True, encoding="utf8", timeout=int(os.getenv("cron-timeout","10")))
+                                    if len(command_ran_2.stderr) > 0: # error even after attempted bypass?
+                                        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                                        cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip()+"\nProxy bypass failed as well",))
+                                    else:
+                                        query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
+                                        cursor.execute(query, (command_ran.stdout.strip()+"\nProxy bypass succeeded",r[0],))
+                                else: # can't replace because not set
                                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
-                                    cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip()+"\nProxy bypass failed as well",))
-                                else:
-                                    query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
-                                    cursor.execute(query, (command_ran.stdout.strip()+"\nProxy bypass succeeded",r[0],))
-                            else: # can't replace because not set
-                                query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
-                                cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
+                                    cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
+                            except Exception: # something failed during command replacement, command execution after replacement or insertion
+                                print_debug_log("Issue while trying to salvage a cronjob with a failure: "+traceback.format_exc())
                         else:
                             query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
                             cursor.execute(query, (command_ran.stdout.strip(),r[0],))
@@ -1641,7 +1651,7 @@ def slave_attempt_self_register():
                 cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 query = '''SELECT * FROM ip_table where hostname = %s and ip = %s'''
-                cursor.execute(query,(os.getenv("self-register-ip",""),os.getenv("self-register-host","")))
+                cursor.execute(query,(os.getenv("self-register-host",""),os.getenv("self-register-ip","")))
                 conn.commit()
                 results = cursor.fetchall()
                 if len(results) == 0: # now attempt self registration
@@ -4454,9 +4464,21 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    cursor.execute("SELECT host, user, description, threshold_cpu, protocol, details, threshold_mem FROM snmp_host")
+                    cursor.execute("SELECT host, user, description, threshold_cpu, threshold_mem, protocol, details FROM snmp_host")
                     rows = cursor.fetchall()
-                    return render_template("control_panel_snmp.html", hosts=rows)
+                    real_rows = []
+                    for row in rows: #try to hide keys for privacy
+                        current_row = []
+                        [current_row.append[row[i]] for i in range(len(row)-1)]  # the first 6 elements are fine
+                        current_json = json.loads(row[len(row)-1])
+                        if row[5] == "true": # try to hide only if secure, so we have sensitive data, thanks to mysql this has to be a string comparison
+                            updated_json = {}
+                            for a,b in current_json.items():
+                                updated_json[a]=b[:3]+"***" # show only first 3 chars to show sufficient proof of incorrect information
+                            current_json = updated_json
+                        current_row.append(json.dumps(current_json))
+                        real_rows.append(current_row)
+                    return render_template("control_panel_snmp.html", hosts=real_rows)
             except Exception:
                 return f"Error loading hosts: {traceback.format_exc()}"
         return redirect(url_for('login'))
@@ -4551,6 +4573,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     return render_template("error_showing.html", r = "The provided host wasn't found in the db"), 404
                 received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
                 data = asyncio.run(gather_snmp_info(received_data))
+                if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
+                    return jsonify({"error": "No data found from snmp walk, ensure that the protocol is correct, that the credentials are okay and that the host is reachable."}), 500
                 return render_template("snmp_shower.html", host=host, data=data)
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
