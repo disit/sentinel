@@ -3581,7 +3581,10 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     conversion["RunningFor"] = "Not running"
                 conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
-                conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                try:
+                    conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
+                except KeyError as E:
+                    conversion["Container"] = "Container id not found"
                 conversion["Name"] = item["metadata"]["name"]
 
                 # new things
