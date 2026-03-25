@@ -580,7 +580,8 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
     else:
         server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
+        if os.getenv("use-tls", "True") == "True":
+            server.starttls()
     
     if os.getenv("authenticate-email", "True") == "True":
         server.login(sender_email, sender_password)
@@ -606,7 +607,8 @@ def send_emails(sender_email, sender_password, receiver_emails, data_to_be_sent)
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
     else:
         server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
+        if os.getenv("use-tls", "True") == "True":
+            server.starttls()
     if os.getenv("authenticate-email", "True") == "True":
         server.login(sender_email, sender_password)
     for dict_element in data_to_be_sent:

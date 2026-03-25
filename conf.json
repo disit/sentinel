@@ -38,5 +38,6 @@
 	"smnp-auth-protocol": "",
 	"telegram-api-token": "replaceme",
 	"telegram-channel":"123456789",
-    "unsafe-mode": "True"
+    "unsafe-mode": "True",
+	"use-tls": "True"
 }
