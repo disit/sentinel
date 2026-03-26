@@ -275,17 +275,17 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJob').modal('hide')">Cancel</button>
-                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton">Save changes</button>
+                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton" onClick="confirm_edit()">Save changes</button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="confirmEditModal" tabindex="-1" role="dialog" aria-labelledby="confirmEditModalLabel">
+<div class="modal fade" id="confirmEditModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="confirmEditModalLabel">Confirmation for deleting cronjob</h5>
+                <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmation for editing cronjob</h5>
                 <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#confirmEditModal').modal('hide')">
                     <span aria-hidden="true">X</span>
                 </button>
@@ -300,7 +300,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#confirmEditModal').modal('hide')">Close</button>
-                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmEditButton" >Edit cronjob</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmEditButton">Edit cronjob</button>
             </div>
         </div>
     </div>

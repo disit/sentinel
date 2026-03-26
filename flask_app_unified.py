@@ -1571,6 +1571,8 @@ def runcronjobs():
                                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
                                     cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
                             except Exception: # something failed during command replacement, command execution after replacement or insertion
+                                query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                                cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
                                 print_debug_log("Issue while trying to salvage a cronjob with a failure: "+traceback.format_exc())
                         else:
                             query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
