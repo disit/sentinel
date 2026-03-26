@@ -513,7 +513,7 @@
         try {
             $.ajax({
                 url: './edit_cronjob_new',
-                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled, restart: restart, description: description, Timeout_timeEdit: Timeout_timeEdit, RetriesEdit: RetriesEdit, Retries_waitEdit: Retries_waitEdit, IPEdit: IPEdit, TargetEdit: TargetEdit, contacts: contacts},
+                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled, restart: restart, description: description, Timeout_timeEdit: Timeout_timeEdit, RetriesEdit: RetriesEdit, Retries_waitEdit: Retries_waitEdit, IPEdit: IPEdit, TargetEdit: TargetEdit, contacts: contacts, severity: severity},
                 type: 'POST',
                 success: function(response) {
                     alert("Cronjob was edited!");
