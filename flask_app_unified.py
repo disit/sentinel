@@ -1659,6 +1659,7 @@ def slave_attempt_self_register():
                 if len(results) == 0: # now attempt self registration
                     query_2 = '''INSERT INTO `checker`.`ip_table` (`ip`, `hostname`) VALUES (%s, %s);'''
                     cursor.execute(query_2,(os.getenv("self-register-ip",""),os.getenv("self-register-host","")))
+                    conn.commit()
                     cursor.fetchall()
                     if cursor.rowcount > 0:
                         print_debug_log("Successfully self registered as slave")
@@ -1998,6 +1999,18 @@ def create_app():
         if 'username' in session:
             return get_local_top()
         return render_template("error_showing.html", r = "You are not authenticated"), 403
+    
+    @app.route("/refresh_containers_database", methods=["GET"])
+    def refresh_database():
+        print_debug_log("Manual")
+        if 'username' in session:
+            if session["username"] == "admin":
+                update_container_state_db()
+                return "Updated data", 201
+            else:
+                return "Not allowed to refresh the database for containers", 401
+        else:
+            return render_template("error_showing.html", r = "You are not authenticated"), 403
 
 
     @app.route("/organize_containers", methods=["GET"])
@@ -3066,12 +3079,14 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                             return result, 500
                         else:
                             log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=session['username'])
+                            update_container_state_db()
                             return result
                     else:
                         try:
                             result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                             #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
                             log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=session['username'])
+                            update_container_state_db()
                             return result.stdout
                         except Exception:
                             return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
@@ -3079,9 +3094,10 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     try:
                         r = requests.post(request.form.to_dict()['source']+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM),"id":request.form.to_dict()['id']})
                         print(f"asking {request.form.to_dict()['source']} to reboot {request.form.to_dict()['id']} resulted in code {r.status_code} and body {r.text[:100]}...")
+                        update_container_state_db()
                         return r.text, r.status_code
                     except:
-                        return f"Issue while rebooting pod: {traceback.format_exc()}", 500
+                        return f"Issue while rebooting pod/container: {traceback.format_exc()}", 500
             else:
                 try:
                     jwt_token=jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
