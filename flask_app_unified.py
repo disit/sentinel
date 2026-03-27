@@ -2230,6 +2230,7 @@ def create_app():
                     query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, contacts, severity FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, contacts, severity FROM checker.cronjobs where where_to_run is null;'''
                     query2 = '''SELECT * from categories;'''
                     query3 = '''SELECT * from cronjob_prototypes;'''
+                    query4 = '''SELECT hostname from ip_table;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
@@ -2239,7 +2240,10 @@ def create_app():
                     cursor.execute(query3)
                     conn.commit()
                     results_3 = cursor.fetchall()
-                    return render_template("organize_cronjobs_new.html",cronjobs=results, categories=results_2, timeout=int(os.getenv("requests-timeout","15000")), cronjobs_prototypes=results_3)
+                    cursor.execute(query4)
+                    conn.commit()
+                    results_4 = cursor.fetchall()
+                    return render_template("organize_cronjobs_new.html",cronjobs=results, categories=results_2, timeout=int(os.getenv("requests-timeout","15000")), cronjobs_prototypes=results_3, valid_where=results_4)
 
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())

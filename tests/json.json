@@ -1,0 +1,1387 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "cni.projectcalico.org/containerID": "1babb4b1c3095e1c2f06e39149db4ee4c0ee451a1ae28e44709b642856472e74",
+                    "cni.projectcalico.org/podIP": "10.1.64.206/32",
+                    "cni.projectcalico.org/podIPs": "10.1.64.206/32",
+                    "kubectl.kubernetes.io/restartedAt": "2026-02-25T13:38:28+02:00"
+                },
+                "creationTimestamp": "2026-02-25T11:38:28Z",
+                "generateName": "iot-app-api-54fb9656db-",
+                "labels": {
+                    "app": "iot-app-api",
+                    "pod-template-hash": "54fb9656db"
+                },
+                "name": "iot-app-api-54fb9656db-l7rbc",
+                "namespace": "iotapps",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "iot-app-api-54fb9656db",
+                        "uid": "739e66a0-088a-4bee-a214-e5aa30e458f3"
+                    }
+                ],
+                "resourceVersion": "14158509",
+                "uid": "c9d32466-19c8-46be-821c-76aa8016751a"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "DEFAULT_CLUSTER",
+                                "value": "k8s"
+                            },
+                            {
+                                "name": "HOSTNAME",
+                                "value": "www.smartcyprus.gov.cy"
+                            },
+                            {
+                                "name": "HOST_IP",
+                                "value": "10.12.98.131"
+                            },
+                            {
+                                "name": "BASE_URL",
+                                "value": "https://www.smartcyprus.gov.cy/"
+                            },
+                            {
+                                "name": "K8S_APPS_BASE_URL",
+                                "value": "https://www.smartcyprus.gov.cy/iotapps"
+                            },
+                            {
+                                "name": "NODERED_BASIC_IMG",
+                                "value": "disitlab/snap4city-nodered-v2.2.2-basic:v10"
+                            },
+                            {
+                                "name": "NODERED_ADV_IMG",
+                                "value": "disitlab/snap4city-nodered-v2.2.2-adv:v15"
+                            },
+                            {
+                                "name": "KUBERNETES_URL",
+                                "value": "https://kubernetes.default.svc"
+                            },
+                            {
+                                "name": "KUBERNETES_NAMESPACE",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "apiVersion": "v1",
+                                        "fieldPath": "metadata.namespace"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "KUBERNETES_BEARER",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "token",
+                                        "name": "iot-app-api"
+                                    }
+                                }
+                            }
+                        ],
+                        "image": "disitlab/iot-application-api:v0.1",
+                        "imagePullPolicy": "Always",
+                        "name": "iot-app-api",
+                        "ports": [
+                            {
+                                "containerPort": 80,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/mnt/data/nr-data",
+                                "name": "nodered-storage"
+                            },
+                            {
+                                "mountPath": "/mnt/data/plumber",
+                                "name": "plumber-storage"
+                            },
+                            {
+                                "mountPath": "/mnt/data/python",
+                                "name": "python-storage"
+                            },
+                            {
+                                "mountPath": "/mnt/data/portia",
+                                "name": "portia-storage"
+                            },
+                            {
+                                "mountPath": "/usr/local/share/ca-certificates/my-ca.crt",
+                                "name": "ca",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/www/html/templates/nodered-app-with-health.yaml",
+                                "name": "template-nodered",
+                                "readOnly": true,
+                                "subPath": "template-nodered-app-with-health.yaml"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-x6lbl",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostAliases": [
+                    {
+                        "hostnames": [
+                            "www.smartcyprus.gov.cy"
+                        ],
+                        "ip": "10.12.98.131"
+                    }
+                ],
+                "nodeName": "k8s-node-02-master",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/nr-data",
+                            "type": "Directory"
+                        },
+                        "name": "nodered-storage"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/plumber",
+                            "type": "Directory"
+                        },
+                        "name": "plumber-storage"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/python",
+                            "type": "Directory"
+                        },
+                        "name": "python-storage"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/portia",
+                            "type": "Directory"
+                        },
+                        "name": "portia-storage"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "my-ca"
+                        },
+                        "name": "ca"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "template-nodered-with-health"
+                        },
+                        "name": "template-nodered"
+                    },
+                    {
+                        "name": "kube-api-access-x6lbl",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:38:43Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:38:28Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:38:43Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:38:43Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:38:28Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://767e3551f3a6d6573f29a2eacf5e2eb489dc1a1aeee52133d35a22cc22f76270",
+                        "image": "docker.io/disitlab/iot-application-api:v0.1",
+                        "imageID": "docker.io/disitlab/iot-application-api@sha256:7686274c4f2397c7ea8521bdb35af3474d2568cfaabbc9dd3938f47bf324d0f1",
+                        "lastState": {},
+                        "name": "iot-app-api",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-02-25T11:38:42Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/mnt/data/nr-data",
+                                "name": "nodered-storage"
+                            },
+                            {
+                                "mountPath": "/mnt/data/plumber",
+                                "name": "plumber-storage"
+                            },
+                            {
+                                "mountPath": "/mnt/data/python",
+                                "name": "python-storage"
+                            },
+                            {
+                                "mountPath": "/mnt/data/portia",
+                                "name": "portia-storage"
+                            },
+                            {
+                                "mountPath": "/usr/local/share/ca-certificates/my-ca.crt",
+                                "name": "ca",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/www/html/templates/nodered-app-with-health.yaml",
+                                "name": "template-nodered",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-x6lbl",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.12.99.130",
+                "hostIPs": [
+                    {
+                        "ip": "10.12.99.130"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.1.64.206",
+                "podIPs": [
+                    {
+                        "ip": "10.1.64.206"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "startTime": "2026-02-25T11:38:28Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "cni.projectcalico.org/containerID": "1545cf5c6b8571e3da8e94e4325111ce0e207f49b7fe4794c2c419d27f31f967",
+                    "cni.projectcalico.org/podIP": "10.1.206.165/32",
+                    "cni.projectcalico.org/podIPs": "10.1.206.165/32",
+                    "kubectl.kubernetes.io/restartedAt": "2026-02-13T13:43:35+02:00"
+                },
+                "creationTimestamp": "2026-02-25T12:00:15Z",
+                "generateName": "nriaq80v86-5dbfc4b79d-",
+                "labels": {
+                    "app": "nriaq80v86",
+                    "deployment-name": "nriaq80v86",
+                    "pod-template-hash": "5dbfc4b79d"
+                },
+                "name": "nriaq80v86-5dbfc4b79d-kbmkc",
+                "namespace": "iotapps",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "nriaq80v86-5dbfc4b79d",
+                        "uid": "f5c1e4a5-ae4e-460f-8305-ff4430092d1b"
+                    }
+                ],
+                "resourceVersion": "14161439",
+                "uid": "e4a8b3fc-913f-4bd6-a91e-8a33a1f9979c"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "APP_ID",
+                                "value": "nriaq80v86"
+                            },
+                            {
+                                "name": "NODE_EXTRA_CA_CERTS",
+                                "value": "/data/ca.pem"
+                            }
+                        ],
+                        "image": "disitlab/snap4city-nodered-v2.2.2-basic:v7",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 4,
+                            "httpGet": {
+                                "path": "/iotapps/nodered/nriaq80v86/ui",
+                                "port": 1880,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 120,
+                            "periodSeconds": 15,
+                            "successThreshold": 1,
+                            "terminationGracePeriodSeconds": 240,
+                            "timeoutSeconds": 30
+                        },
+                        "name": "node-red",
+                        "ports": [
+                            {
+                                "containerPort": 1880,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nriaq80v86-storage"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-kjb9g",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostAliases": [
+                    {
+                        "hostnames": [
+                            "www.smartcyprus.gov.cy"
+                        ],
+                        "ip": "10.12.98.131"
+                    }
+                ],
+                "nodeName": "k8s-node-06-worker",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/nr-data/nriaq80v86",
+                            "type": "Directory"
+                        },
+                        "name": "nriaq80v86-storage"
+                    },
+                    {
+                        "name": "kube-api-access-kjb9g",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T12:00:21Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T12:00:15Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T12:00:21Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T12:00:21Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T12:00:15Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://0fb128cae9bf2ca2108c67460583dafac17fba57f8adec1517fc17cf0bb2573e",
+                        "image": "docker.io/disitlab/snap4city-nodered-v2.2.2-basic:v7",
+                        "imageID": "docker.io/disitlab/snap4city-nodered-v2.2.2-basic@sha256:99e542ac2faf1580cedd55b100204af67a859903043b92ea1b7e33872d650348",
+                        "lastState": {},
+                        "name": "node-red",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-02-25T12:00:20Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nriaq80v86-storage"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-kjb9g",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.12.99.134",
+                "hostIPs": [
+                    {
+                        "ip": "10.12.99.134"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.1.206.165",
+                "podIPs": [
+                    {
+                        "ip": "10.1.206.165"
+                    }
+                ],
+                "qosClass": "Guaranteed",
+                "startTime": "2026-02-25T12:00:15Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-03-25T13:57:35Z"
+                },
+                "creationTimestamp": "2026-03-25T13:57:35Z",
+                "generateName": "nriaq80v86-6cddbd94c6-",
+                "labels": {
+                    "app": "nriaq80v86",
+                    "deployment-name": "nriaq80v86",
+                    "pod-template-hash": "6cddbd94c6"
+                },
+                "name": "nriaq80v86-6cddbd94c6-wvt6c",
+                "namespace": "iotapps",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "nriaq80v86-6cddbd94c6",
+                        "uid": "78ddd86d-9ce8-4a15-82b4-55f2d027607f"
+                    }
+                ],
+                "resourceVersion": "19323466",
+                "uid": "f89a41e2-2d81-4f0a-8cf6-6bddb36a1e77"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "APP_ID",
+                                "value": "nriaq80v86"
+                            },
+                            {
+                                "name": "NODE_EXTRA_CA_CERTS",
+                                "value": "/data/ca.pem"
+                            }
+                        ],
+                        "image": "disitlab/snap4city-nodered-v2.2.2-basic:v7",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 4,
+                            "httpGet": {
+                                "path": "/iotapps/nodered/nriaq80v86/ui",
+                                "port": 1880,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 120,
+                            "periodSeconds": 15,
+                            "successThreshold": 1,
+                            "terminationGracePeriodSeconds": 240,
+                            "timeoutSeconds": 30
+                        },
+                        "name": "node-red",
+                        "ports": [
+                            {
+                                "containerPort": 1880,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nriaq80v86-storage"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-kqbr4",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostAliases": [
+                    {
+                        "hostnames": [
+                            "www.smartcyprus.gov.cy"
+                        ],
+                        "ip": "10.12.98.131"
+                    }
+                ],
+                "nodeName": "k8s-node-06-worker",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/nr-data/nriaq80v86",
+                            "type": "Directory"
+                        },
+                        "name": "nriaq80v86-storage"
+                    },
+                    {
+                        "name": "kube-api-access-kqbr4",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:57:35Z",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:57:35Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:57:35Z",
+                        "message": "containers with unready status: [node-red]",
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:57:35Z",
+                        "message": "containers with unready status: [node-red]",
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:57:35Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "image": "disitlab/snap4city-nodered-v2.2.2-basic:v7",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "node-red",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "reason": "ContainerCreating"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nriaq80v86-storage"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-kqbr4",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.12.99.134",
+                "hostIPs": [
+                    {
+                        "ip": "10.12.99.134"
+                    }
+                ],
+                "phase": "Pending",
+                "qosClass": "Guaranteed",
+                "startTime": "2026-03-25T13:57:35Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-03-25T13:55:37Z"
+                },
+                "creationTimestamp": "2026-03-25T13:55:38Z",
+                "deletionGracePeriodSeconds": 30,
+                "deletionTimestamp": "2026-03-25T13:58:05Z",
+                "generateName": "nriaq80v86-7dcbfd98dd-",
+                "labels": {
+                    "app": "nriaq80v86",
+                    "deployment-name": "nriaq80v86",
+                    "pod-template-hash": "7dcbfd98dd"
+                },
+                "name": "nriaq80v86-7dcbfd98dd-tznd7",
+                "namespace": "iotapps",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "nriaq80v86-7dcbfd98dd",
+                        "uid": "39a087cc-05be-44fc-82eb-6b5d26093601"
+                    }
+                ],
+                "resourceVersion": "19323452",
+                "uid": "9a651b95-82ad-49ca-8713-92df08fbbef7"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "APP_ID",
+                                "value": "nriaq80v86"
+                            },
+                            {
+                                "name": "NODE_EXTRA_CA_CERTS",
+                                "value": "/data/ca.pem"
+                            }
+                        ],
+                        "image": "disitlab/snap4city-nodered-v2.2.2-basic:v7",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 4,
+                            "httpGet": {
+                                "path": "/iotapps/nodered/nriaq80v86/ui",
+                                "port": 1880,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 120,
+                            "periodSeconds": 15,
+                            "successThreshold": 1,
+                            "terminationGracePeriodSeconds": 240,
+                            "timeoutSeconds": 30
+                        },
+                        "name": "node-red",
+                        "ports": [
+                            {
+                                "containerPort": 1880,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nriaq80v86-storage"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-msnrn",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostAliases": [
+                    {
+                        "hostnames": [
+                            "www.smartcyprus.gov.cy"
+                        ],
+                        "ip": "10.12.98.131"
+                    }
+                ],
+                "nodeName": "k8s-node-06-worker",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/nr-data/nriaq80v86",
+                            "type": "Directory"
+                        },
+                        "name": "nriaq80v86-storage"
+                    },
+                    {
+                        "name": "kube-api-access-msnrn",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:55:38Z",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:55:38Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:55:38Z",
+                        "message": "containers with unready status: [node-red]",
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:55:38Z",
+                        "message": "containers with unready status: [node-red]",
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-03-25T13:55:38Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "image": "disitlab/snap4city-nodered-v2.2.2-basic:v7",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "node-red",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "reason": "ContainerCreating"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nriaq80v86-storage"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-msnrn",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.12.99.134",
+                "hostIPs": [
+                    {
+                        "ip": "10.12.99.134"
+                    }
+                ],
+                "phase": "Pending",
+                "qosClass": "Guaranteed",
+                "startTime": "2026-03-25T13:55:38Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "cni.projectcalico.org/containerID": "fa9edae0c297975337f6c8fbdcb83939deb20bfb84ea3a5bfeafa9d5e9d46573",
+                    "cni.projectcalico.org/podIP": "10.1.206.170/32",
+                    "cni.projectcalico.org/podIPs": "10.1.206.170/32"
+                },
+                "creationTimestamp": "2026-02-25T11:40:48Z",
+                "generateName": "nrltx0ld4n-7ffb94d65c-",
+                "labels": {
+                    "app": "nrltx0ld4n",
+                    "deployment-name": "nrltx0ld4n",
+                    "pod-template-hash": "7ffb94d65c"
+                },
+                "name": "nrltx0ld4n-7ffb94d65c-7lp7q",
+                "namespace": "iotapps",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "nrltx0ld4n-7ffb94d65c",
+                        "uid": "a546a7a8-bca3-4d1b-8182-fba9bdbc63bb"
+                    }
+                ],
+                "resourceVersion": "14158837",
+                "uid": "7644ddf3-eb69-4f7e-ad4a-535690ee0475"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "APP_ID",
+                                "value": "nrltx0ld4n"
+                            },
+                            {
+                                "name": "NODE_EXTRA_CA_CERTS",
+                                "value": "/usr/src/node-red/ca.pem"
+                            },
+                            {
+                                "name": "HTTP_PROXY",
+                                "value": "http://172.20.63.54:8080"
+                            },
+                            {
+                                "name": "HTTPS_PROXY",
+                                "value": "http://172.20.63.54:8080"
+                            },
+                            {
+                                "name": "NO_PROXY",
+                                "value": "localhost,127.0.0.1,.local,10.0.0.0/8,192.168.0.0/16,api.telegram.org"
+                            }
+                        ],
+                        "image": "disitlab/snap4city-nodered-v2.2.2-adv:v15",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 4,
+                            "httpGet": {
+                                "path": "/iotapps/nodered/nrltx0ld4n/ui",
+                                "port": 1880,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 120,
+                            "periodSeconds": 15,
+                            "successThreshold": 1,
+                            "terminationGracePeriodSeconds": 240,
+                            "timeoutSeconds": 30
+                        },
+                        "name": "node-red",
+                        "ports": [
+                            {
+                                "containerPort": 1880,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nrltx0ld4n-storage"
+                            },
+                            {
+                                "mountPath": "/usr/src/node-red/ca.pem",
+                                "name": "ca",
+                                "subPath": "ca.crt"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-wxlbs",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostAliases": [
+                    {
+                        "hostnames": [
+                            "www.smartcyprus.gov.cy"
+                        ],
+                        "ip": "10.12.98.131"
+                    }
+                ],
+                "nodeName": "k8s-node-06-worker",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": {
+                            "path": "/mnt/data/nr-data/nrltx0ld4n",
+                            "type": "Directory"
+                        },
+                        "name": "nrltx0ld4n-storage"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "my-ca"
+                        },
+                        "name": "ca"
+                    },
+                    {
+                        "name": "kube-api-access-wxlbs",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:40:51Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:40:48Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:40:51Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:40:51Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-02-25T11:40:48Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://a883e5879c6ed84a1a7fa1c5aeab78515dcd6846a9361f61673e2972fff16c7a",
+                        "image": "docker.io/disitlab/snap4city-nodered-v2.2.2-adv:v15",
+                        "imageID": "docker.io/disitlab/snap4city-nodered-v2.2.2-adv@sha256:1b011f519a5d39b59560822931abe991050f6c71d3f0f9fe3e3958e69b65abac",
+                        "lastState": {},
+                        "name": "node-red",
+                        "ready": true,
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-02-25T11:40:51Z"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/data",
+                                "name": "nrltx0ld4n-storage"
+                            },
+                            {
+                                "mountPath": "/usr/src/node-red/ca.pem",
+                                "name": "ca"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-wxlbs",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.12.99.134",
+                "hostIPs": [
+                    {
+                        "ip": "10.12.99.134"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.1.206.170",
+                "podIPs": [
+                    {
+                        "ip": "10.1.206.170"
+                    }
+                ],
+                "qosClass": "Guaranteed",
+                "startTime": "2026-02-25T11:40:48Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
