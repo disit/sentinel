@@ -49,7 +49,10 @@
 	  <td>Enabled</td>
 	  {%endif%}
       <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+      <td>
+        <button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button>
+        <button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#addCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#addCronjobModal').modal('hide')">Clone</button>
+      </td>
     </tr>
 {% endfor %}
   </tbody>
@@ -101,7 +104,7 @@
                         <input type="text" class="form-control" id="WhereToRunAdd" placeholder="Insert where to run this cronjob (leave empty for master)">
                     </div>
                     <div class="form-group">
-                        <label for="RestartLogicAdd">Restart Logic</label>
+                        <label for="RestartLogicAdd">Restart Script</label>
                         <input type="text" class="form-control" id="RestartLogicAdd" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
                     </div>
                     <div class="form-group">
@@ -109,7 +112,7 @@
                         <input type="text" class="form-control" id="DescriptionAdd" placeholder="Insert the description which explains the cronjob">
                     </div>
                     <div class="form-group">
-                        <label for="Timeout_timeAdd">Timeout_time</label>
+                        <label for="Timeout_timeAdd">Timeout_time (seconds)</label>
                         <input type="number" min="0"class="form-control" id="Timeout_timeAdd" placeholder="Insert the Timeout_time of the cronjob" onchange="update_add()">
                     </div>
 
@@ -119,7 +122,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="Retries_waitAdd">Retries_wait</label>
+                        <label for="Retries_waitAdd">Retries_wait (seconds)</label>
                         <input type="number" min="0" class="form-control" id="Retries_waitAdd" placeholder="Insert the Retries_wait of the cronjob" onchange="update_add()">
                     </div>
 
@@ -218,7 +221,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="RestartLogicEdit">Restart Logic</label>
+                        <label for="RestartLogicEdit">Restart Script</label>
                         <input type="text" class="form-control" id="RestartLogicEdit" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
                     </div>
 
@@ -228,7 +231,7 @@
                     </div>                    
                     
                     <div class="form-group">
-                        <label for="Timeout_timeEdit">Timeout_time</label>
+                        <label for="Timeout_timeEdit">Timeout_time (seconds)</label>
                         <input type="number" min="0" class="form-control" id="Timeout_timeEdit" placeholder="Insert the Timeout_time of the cronjob" onchange="update_edit()">
                     </div>
 
@@ -238,7 +241,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="Retries_waitEdit">Retries_wait</label>
+                        <label for="Retries_waitEdit">Retries_wait (seconds)</label>
                         <input type="number" min="0" class="form-control" id="Retries_waitEdit" placeholder="Insert the Retries_wait of the cronjob" onchange="update_edit()">
                     </div>
 
@@ -275,17 +278,17 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#editCronJob').modal('hide')">Cancel</button>
-                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton">Save changes</button>
+                <button type="button" class="btn btn-success" data-dismiss="modal" id="saveCronJobChangesButton" onClick="confirm_edit()">Save changes</button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="confirmEditModal" tabindex="-1" role="dialog" aria-labelledby="confirmEditModalLabel">
+<div class="modal fade" id="confirmEditModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="confirmEditModalLabel">Confirmation for deleting cronjob</h5>
+                <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmation for editing cronjob</h5>
                 <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#confirmEditModal').modal('hide')">
                     <span aria-hidden="true">X</span>
                 </button>
@@ -300,7 +303,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn close btn-secondary" data-dismiss="modal" aria-label="Close" onClick="$('#confirmEditModal').modal('hide')">Close</button>
-                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmEditButton" >Edit cronjob</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmEditButton">Edit cronjob</button>
             </div>
         </div>
     </div>
@@ -466,7 +469,7 @@
         var Retries_waitAdd = $('#Retries_waitAdd').val();
         var IPAdd = $('#IPAdd').val();
         var TargetAdd = $('#TargetAdd').val();
-        var contacts = $('#contactsAdd').val();
+        var contacts = $('#ContactsAdd').val();
         if (password) {
             try {
                 $.ajax({
@@ -508,12 +511,12 @@
     var Retries_waitEdit = $('#Retries_waitEdit').val();
     var IPEdit = $('#IPEdit').val();
     var TargetEdit = $('#TargetEdit').val();
-    var contacts = $('#contactsEdit').val();
+    var contacts = $('#ContactsEdit').val();
     if (password) {
         try {
             $.ajax({
                 url: './edit_cronjob_new',
-                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled, restart: restart, description: description, Timeout_timeEdit: Timeout_timeEdit, RetriesEdit: RetriesEdit, Retries_waitEdit: Retries_waitEdit, IPEdit: IPEdit, TargetEdit: TargetEdit, contacts: contacts},
+                data: {psw: password, command: command, name: name, category: category, where_to_run: where, id: id, disabled: disabled, restart: restart, description: description, Timeout_timeEdit: Timeout_timeEdit, RetriesEdit: RetriesEdit, Retries_waitEdit: Retries_waitEdit, IPEdit: IPEdit, TargetEdit: TargetEdit, contacts: contacts, severity: severity},
                 type: 'POST',
                 success: function(response) {
                     alert("Cronjob was edited!");

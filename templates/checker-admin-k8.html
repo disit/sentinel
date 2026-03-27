@@ -49,6 +49,11 @@
 				<input type="button" class="btn btn-info" value="Open Sentinel Hosts Control Panel" onclick="window.open('./sentinel_hosts_control_panel')"/>
 			</li>
 			{%endif%}
+			<li class="nav-item active">
+				<form action="./refresh_containers_database" method="GET">
+					<input type="submit" class="btn btn-info" value="Manual container database refresh" />
+				</form>
+			</li>
 {% endblock %}
 
 {% block additional_content_admin_log_datatable_trigger %}

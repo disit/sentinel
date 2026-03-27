@@ -3,6 +3,8 @@ find a way to register winrar
 
 rename hostname to base host path in backend
 remove ["Node"] or ["Source"], as they are equal in value at this point (remove them from UI as well!)
-email protocol doesn't work?
+email protocol to be tested
+position for docker-kind container seems to be useless
+snmp never checked
 
 https://docs.google.com/spreadsheets/d/1NphAYe7GHYzO6Fc0p3Nduh759dzja_6f2JCPACBUbsU/edit?usp=sharing

@@ -1571,6 +1571,8 @@ def runcronjobs():
                                     query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
                                     cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
                             except Exception: # something failed during command replacement, command execution after replacement or insertion
+                                query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`, `errors`) VALUES (%s, %s, %s);'''
+                                cursor.execute(query, (command_ran.stdout.strip(),r[0],command_ran.stderr.strip(),))
                                 print_debug_log("Issue while trying to salvage a cronjob with a failure: "+traceback.format_exc())
                         else:
                             query = '''INSERT INTO `cronjob_history` (`result`, `id_cronjob`) VALUES (%s, %s);'''
@@ -1659,6 +1661,7 @@ def slave_attempt_self_register():
                 if len(results) == 0: # now attempt self registration
                     query_2 = '''INSERT INTO `checker`.`ip_table` (`ip`, `hostname`) VALUES (%s, %s);'''
                     cursor.execute(query_2,(os.getenv("self-register-ip",""),os.getenv("self-register-host","")))
+                    conn.commit()
                     cursor.fetchall()
                     if cursor.rowcount > 0:
                         print_debug_log("Successfully self registered as slave")
@@ -2329,22 +2332,22 @@ def create_app():
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s,
-                                    `restart_logic`= %s, `description`= %s, `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s,
+                                    `restart_logic`= %s, `description`= %s, `timeout_time`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s,
                                     `target`= %s, `contacts` = %s, `severity` = %s WHERE (`idcronjobs` = %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                request.form.to_dict()['where_to_run'],0 if request.form.to_dict()["disabled"] == "true" else 1,
                                                request.form.to_dict()['restart'],request.form.to_dict()['description'],
                                                request.form.to_dict()['Timeout_timeEdit'],request.form.to_dict()['RetriesEdit'],request.form.to_dict()['Retries_waitEdit'],
-                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],request.form.to_dict()['severity'],))
+                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
 
                     else:
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = NULL, `disabled` = %s, `restart_logic` = %s, `description`= %s,
-                        `timeout`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s, `target`= %s, `contacts` = %s, `severity`= %s WHERE (`idcronjobs` = %s);'''
+                        `timeout_time`= %s, `retries`= %s, `retries_wait`= %s, `ip`= %s, `target`= %s, `contacts` = %s, `severity`= %s WHERE (`idcronjobs` = %s);'''
                         cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['category'],
                                                0 if request.form.to_dict()["disabled"] == "true" else 1,request.form.to_dict()['restart'],
                                                request.form.to_dict()['description'], request.form.to_dict()['Timeout_timeEdit'],
                                                request.form.to_dict()['RetriesEdit'], request.form.to_dict()['Retries_waitEdit'],
-                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['id'],request.form.to_dict()['severity'],))
+                                               request.form.to_dict()['IPEdit'],request.form.to_dict()['TargetEdit'],request.form.to_dict()['contacts'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
                     conn.commit()
                     if cursor.rowcount > 0:
                         return "ok", 201
@@ -3066,12 +3069,14 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                             return result, 500
                         else:
                             log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=session['username'])
+                            update_container_state_db()
                             return result
                     else:
                         try:
                             result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                             #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
                             log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=session['username'])
+                            update_container_state_db()
                             return result.stdout
                         except Exception:
                             return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
@@ -3079,9 +3084,10 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     try:
                         r = requests.post(request.form.to_dict()['source']+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM),"id":request.form.to_dict()['id']})
                         print(f"asking {request.form.to_dict()['source']} to reboot {request.form.to_dict()['id']} resulted in code {r.status_code} and body {r.text[:100]}...")
+                        update_container_state_db()
                         return r.text, r.status_code
                     except:
-                        return f"Issue while rebooting pod: {traceback.format_exc()}", 500
+                        return f"Issue while rebooting pod/container: {traceback.format_exc()}", 500
             else:
                 try:
                     jwt_token=jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
