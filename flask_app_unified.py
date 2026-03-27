@@ -2001,6 +2001,18 @@ def create_app():
         if 'username' in session:
             return get_local_top()
         return render_template("error_showing.html", r = "You are not authenticated"), 403
+    
+    @app.route("/refresh_containers_database", methods=["GET"])
+    def refresh_database():
+        print_debug_log("Manual")
+        if 'username' in session:
+            if session["username"] == "admin":
+                update_container_state_db()
+                return "Updated data", 201
+            else:
+                return "Not allowed to refresh the database for containers", 401
+        else:
+            return render_template("error_showing.html", r = "You are not authenticated"), 403
 
 
     @app.route("/organize_containers", methods=["GET"])
