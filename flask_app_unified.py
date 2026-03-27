@@ -4492,8 +4492,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     real_rows = []
                     for row in rows: #try to hide keys for privacy
                         current_row = []
-                        [current_row.append[row[i]] for i in range(len(row)-1)]  # the first 6 elements are fine
-                        current_json = json.loads(row[len(row)-1])
+                        [current_row.append(row[i]) for i in range(6)]  # the first 6 elements are fine
+                        current_json = json.loads(row[6])
                         if row[5] == "true": # try to hide only if secure, so we have sensitive data, thanks to mysql this has to be a string comparison
                             updated_json = {}
                             for a,b in current_json.items():
