@@ -48,15 +48,18 @@
 	  {%else%}
 	  <td>Enabled</td>
 	  {%endif%}
-      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronjobModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#addCronjobModal').modal('hide')">Edit</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronJobModal').modal('hide')">Delete</button></td>
+      <td>
+        <button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#addCronJobModal').modal('hide')">Edit</button>
+        <button type="button" class="btn btn-primary open-modal-c" data-toggle="modal" data-target="#addCronJob" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="cloneCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#editCronjobModal').modal('hide')">Clone (experimental)</button>
+      </td>
     </tr>
 {% endfor %}
   </tbody>
 </table>
 <button type="button" class="btn btn-primary open-modal" data-toggle="modal" data-target="#addCronJobModal" id="addCronjob">Add</button>
 <div class="modal fade" id="addCronJobModal" tabindex="-1" role="dialog" aria-labelledby="addCronJobLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addCronJobLabel">Add a new cronjob</h5>
@@ -89,6 +92,7 @@
                     
                     <label for="command-prototype-add">Select command type:</label>
                     <select id="command-prototype-add" name="command-prototype-add" class="form-select" onchange="handleSelectionCommandPrototypeAdd(this)">
+                    <option value="default" data-desc="default" disabled selected>Choose a command prototype</option>
                     {% for element in cronjobs_prototypes%}{% set word_list = element[3].split(',') %}
                     <option value="{{element[1] | e}}" data-desc="{{element[2] | e}}" data-params="{{word_list}}">{{element[4]}}</option>
                     {% endfor %}
@@ -98,53 +102,61 @@
 
                     <div class="form-group">
                         <label for="WhereToRunAdd">Where to run</label>
-                        <input type="text" class="form-control" id="WhereToRunAdd" placeholder="Insert where to run this cronjob (leave empty for master)">
+                        <input type="text" class="form-control" id="WhereToRunAdd" placeholder="Insert where to run this cronjob (leave empty for master)" hidden>
                     </div>
-                    <div class="form-group">
-                        <label for="RestartLogicAdd">Restart Logic</label>
-                        <input type="text" class="form-control" id="RestartLogicAdd" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
-                    </div>
+
+                    <select id="where-selection-add" class="form-select">
+                        <option value="">Master</option>
+                        {%for item in rows_hosts %}
+                        <option value="{{item[0]}}">{{item[0]}}</option>
+                        {% endfor %}
+                    </select>
+
                     <div class="form-group">
                         <label for="DescriptionAdd">Description</label>
                         <input type="text" class="form-control" id="DescriptionAdd" placeholder="Insert the description which explains the cronjob">
                     </div>
                     <div class="form-group">
-                        <label for="Timeout_timeAdd">Timeout_time</label>
+                        <label for="Timeout_timeAdd">Timeout_time (seconds)</label>
                         <input type="number" min="0"class="form-control" id="Timeout_timeAdd" placeholder="Insert the Timeout_time of the cronjob" onchange="update_add()">
                     </div>
 
                     <div class="form-group">
-                        <label for="RetriesAdd">Retries</label>
+                        <label for="RetriesAdd">Retries (how many times the action will be performed before giving up)</label>
                         <input type="number" min="0" class="form-control" id="RetriesAdd" placeholder="Insert the Retries of the cronjob" onchange="update_add()">
                     </div>
 
                     <div class="form-group">
-                        <label for="Retries_waitAdd">Retries_wait</label>
+                        <label for="Retries_waitAdd">Retries_wait (seconds)</label>
                         <input type="number" min="0" class="form-control" id="Retries_waitAdd" placeholder="Insert the Retries_wait of the cronjob" onchange="update_add()">
                     </div>
 
                     <div class="form-group">
-                        <label for="IPAdd">IP</label>
+                        <label for="IPAdd">IP (used only while attempting to connect directy to a service if a first attempt fails)</label>
                         <input class="form-control" id="IPAdd" placeholder="Insert the IP of the cronjob">
                     </div>
                     
                     <div class="form-group">
-                        <label for="TargetAdd">Target</label>
+                        <label for="TargetAdd">Target (towards what the operation will be performed)</label>
                         <input type="text" class="form-control" id="TargetAdd" placeholder="Insert the Target of the cronjob" onchange="update_add()">
                     </div>
                     
                     <div class="form-group">
-                        <label for="ContactsAdd">Contacts</label>
+                        <label for="ContactsAdd">Contacts (seen in main UI)</label>
                         <input type="text" class="form-control" id="ContactsAdd" placeholder="Insert the contacts of the cronjob" value="Unset contacts">
                     </div>
                     
                     <label for="severity-selection">Select severity:</label>
                     <select id="severity-selection" name="severity-selection" class="form-select">
-                        <option value="Critical">Critical</option>
-                        <option value="Relevant">Relevant</option>
-                        <option value="Warning">Warning</option>
+                        <option value="Critical">Critical (Email and Telegram notifications)</option>
+                        <option value="Relevant">Relevant (Email notifications)</option>
+                        <option value="Warning">Warning (No notifications)</option>
                     </select>
 
+                    <div class="form-group">
+                        <label for="RestartLogicAdd">Restart Logic (command to be perfomed to attempt to restore a service)</label>
+                        <input type="text" class="form-control" id="RestartLogicAdd" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
+                    </div>
 					<div class="form-check">
 						<input class="form-check-input" type="checkbox" value="" id="createEnabled" checked>
 						<label class="form-check-label" for="createEnabled">
@@ -162,7 +174,7 @@
 </div>
 
 <div class="modal fade" id="editCronJob" tabindex="-1" role="dialog" aria-labelledby="editCronJobModal" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="editComponentLabel">Edit cronjob</h5>
@@ -204,6 +216,7 @@
 
                     <label for="command-prototype-edit">Select command type:</label>
                     <select id="command-prototype-edit" name="command-prototype-edit" class="form-select" onchange="handleSelectionCommandPrototypeEdit(this)">
+                    <option value="default" data-desc="default" disabled selected>Choose a command prototype</option>
                     {% for element in cronjobs_prototypes%}{% set word_list = element[3].split(',') %}
                     <option value="{{element[1] | e}}" data-desc="{{element[2] | e}}" data-params="{{word_list}}">{{element[4]}}</option>
                     {% endfor %}
@@ -214,13 +227,15 @@
 
                     <div class="form-group">
                         <label for="WhereToRunEdit">Where to run</label>
-                        <input type="text" class="form-control" id="WhereToRunEdit" placeholder="Insert where to run this cronjob (leave empty for master)">
+                        <input type="text" class="form-control" id="WhereToRunEdit" placeholder="Insert where to run this cronjob (leave empty for master)" hidden>
                     </div>
 
-                    <div class="form-group">
-                        <label for="RestartLogicEdit">Restart Logic</label>
-                        <input type="text" class="form-control" id="RestartLogicEdit" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
-                    </div>
+                    <select id="where-selection-edit" name="category-selection-edit" class="form-select">
+                        <option value="">Master</option>
+                        {%for item in rows_hosts %}
+                        <option value="{{item[0]}}">{{item[0]}}</option>
+                        {% endfor %}
+                    </select>
 
                     <div class="form-group">
                         <label for="DescriptionEdit">Description</label>
@@ -228,43 +243,48 @@
                     </div>                    
                     
                     <div class="form-group">
-                        <label for="Timeout_timeEdit">Timeout_time</label>
+                        <label for="Timeout_timeEdit">Timeout_time (seconds)</label>
                         <input type="number" min="0" class="form-control" id="Timeout_timeEdit" placeholder="Insert the Timeout_time of the cronjob" onchange="update_edit()">
                     </div>
 
                     <div class="form-group">
-                        <label for="RetriesEdit">Retries</label>
+                        <label for="RetriesEdit">Retries (how many times the action will be performed before giving up)</label>
                         <input type="number" min="0" class="form-control" id="RetriesEdit" placeholder="Insert the Retries of the cronjob" onchange="update_edit()">
                     </div>
 
                     <div class="form-group">
-                        <label for="Retries_waitEdit">Retries_wait</label>
+                        <label for="Retries_waitEdit">Retries_wait (seconds)</label>
                         <input type="number" min="0" class="form-control" id="Retries_waitEdit" placeholder="Insert the Retries_wait of the cronjob" onchange="update_edit()">
                     </div>
 
                     <div class="form-group">
-                        <label for="IPEdit">IP</label>
+                        <label for="IPEdit">IP (used only while attempting to connect directy to a service if a first attempt fails)</label>
                         <input type="text" class="form-control" id="IPEdit" placeholder="Insert the IP of the cronjob">
                     </div>
 
                     <div class="form-group">
-                        <label for="TargetEdit">Target</label>
+                        <label for="TargetEdit">Target (towards what the operation will be performed)</label>
                         <input type="text" class="form-control" id="TargetEdit" placeholder="Insert the Target of the cronjob" onchange="update_edit()">
                     </div>
 
                     <div class="form-group">
-                        <label for="ContactsEdit">Contacts</label>
+                        <label for="ContactsEdit">Contacts (seen in main UI)</label>
                         <input type="text" class="form-control" id="ContactsEdit" placeholder="Insert the contacts of the cronjob">
                     </div>
 
                     
                     <label for="severity-selection-edit">Select severity:</label>
                     <select id="severity-selection-edit" name="severity-selection-edit" class="form-select">
-                        <option value="Critical">Critical</option>
-                        <option value="Relevant">Relevant</option>
-                        <option value="Warning">Warning</option>
+                        <option value="Critical">Critical (Email and Telegram notifications)</option>
+                        <option value="Relevant">Relevant (Email notifications)</option>
+                        <option value="Warning">Warning (No notifications)</option>
                     </select>
                     
+
+                    <div class="form-group">
+                        <label for="RestartLogicEdit">Restart Logic (command to be perfomed to attempt to restore a service)</label>
+                        <input type="text" class="form-control" id="RestartLogicEdit" placeholder="Insert the restart logic behind the element under cronjob scrutiny">
+                    </div>
 					<div class="form-check">
 						<input class="form-check-input" type="checkbox" value="" id="editEnabled" checked>
 						<label class="form-check-label" for="editEnabled">
@@ -384,6 +404,49 @@
         $('#CronJobDeleteId').val(id);
         $('#deleteCronJob').modal('show');
     });
+    $('.open-modal-c').on('click', function() {
+        var enabled = $(this).data('disabled')
+        var name = $(this).data('name');
+        var command = $(this).data('command');
+        var category = $(this).data('category');
+        var severity = $(this).data('severity');
+        var where_to_run = $(this).data('where');
+        var restart = $(this).data('restart');
+        var description = $(this).data('description');
+
+        var timeouttime = $(this).data('timeouttime');
+        var retries = $(this).data('retries');
+        var retrieswait = $(this).data('retrieswait');
+        var ip = $(this).data('ip');
+        var target = $(this).data('target_val');
+        var contacts = $(this).data('contacts');
+        $('#Timeout_timeAdd').val(timeouttime);
+        $('#RetriesAdd').val(retries);
+        $('#Retries_waitAdd').val(retrieswait);
+        $('#IPAdd').val(ip);
+        $('#TargetAdd').val(target);
+        $('#ContactsAdd').val(contacts);
+        $('#NameCronJobAdd').val(name);
+        $('#RestartLogicAdd').val(restart);
+        $('#DescriptionAdd').val(description);
+        if (where_to_run==="master") {$('#WhereToRunAdd').val("");} else {$('#WhereToRunAdd').val(where_to_run);}
+        $('#createEnabled')[0].checked=1^enabled;
+        let select = document.getElementById('category-selection');
+        let select_severity = document.getElementById('severity-selection');
+        let select_where_to_run = document.getElementById('where-selection-add');
+        select.value=category;
+        select_severity.value=severity;
+        if (where_to_run==="master") {select_where_to_run.value="";} else {select_where_to_run.value=where;}
+        {% for element in cronjobs_prototypes%}
+        if (command.includes("{{element[1] | e}}")) {
+            document.getElementById('command-prototype-add').value = "{{element[1] | e}}";
+            handleSelectionCommandPrototypeEdit(document.getElementById('command-prototype-add'));
+        }
+        {% endfor %}
+        $('#CommandAdd').val(command); //last because parsing issues may break the original command
+        $('#addCronJob').modal('show');
+    });
+
     $('.open-modal-e').on('click', function() {
         var id = $(this).data('component');
         var enabled = $(this).data('disabled')
@@ -409,15 +472,23 @@
         $('#ContactsEdit').val(contacts);
         $('#CronJobEditId').val(id);
         $('#NameCronJobEdit').val(name);
-        $('#CommandEdit').val(command);
         $('#RestartLogicEdit').val(restart);
         $('#DescriptionEdit').val(description);
         if (where_to_run==="master") {$('#WhereToRunEdit').val("");} else {$('#WhereToRunEdit').val(where_to_run);}
         $('#editEnabled')[0].checked=1^enabled;
         let select = document.getElementById('category-selection-edit');
         let select_severity = document.getElementById('severity-selection-edit');
+        let select_where_to_run = document.getElementById('where-selection-edit');
         select.value=category;
         select_severity.value=severity;
+        if (where_to_run==="master") {select_where_to_run.value="";} else {select_where_to_run.value=where;}
+        {% for element in cronjobs_prototypes%}
+        if (command.includes("{{element[1] | e}}")) {
+            document.getElementById('command-prototype-edit').value = "{{element[1] | e}}";
+            handleSelectionCommandPrototypeEdit(document.getElementById('command-prototype-edit'));
+        }
+        {% endfor %}
+        $('#CommandEdit').val(command);
         $('#editCronJob').modal('show');
     });
     $('.open-modal').on('click', function() {
@@ -457,7 +528,8 @@
         var severity = $('#severity-selection').val();
         var command = $('#CommandAdd').val();
         var name = $('#NameCronJobAdd').val();
-        var where = $('#WhereToRunAdd').val();
+        var where = $('#where-selection-add').val();
+        //var where = $('#WhereToRunAdd').val();
         var restart = $('#RestartLogicAdd').val();
         var description = $('#DescriptionAdd').val();
 		var disabled = $('#createEnabled')[0].checked;
@@ -499,7 +571,8 @@
     var severity = $('#severity-selection-edit').val();
     var command = $('#CommandEdit').val();
     var name = $('#NameCronJobEdit').val();
-    var where = $('#WhereToRunEdit').val();
+    //var where = $('#WhereToRunEdit').val();
+    var where = $('#where-selection-edit').val();
 	var disabled = $('#editEnabled')[0].checked;
     var restart = $('#RestartLogicEdit').val();
     var description = $('#DescriptionEdit').val();        
@@ -547,6 +620,7 @@
     }
 
     function update_add(){
+        if ($("#command-prototype-add").val() == "") return;
         const container = document.getElementById('additional-params-add');
         const inputs = Array.from(container.querySelectorAll('input'));
         const inputs_final = inputs.map(input => input.value.trim()).filter(value => value !== "").join(' ');
@@ -554,6 +628,7 @@
         $("#CommandAdd").val(composed_command_text);
     }
     function update_edit(){
+        if ($("#command-prototype-edit").val() == "") return;
         const container = document.getElementById('additional-params-edit');
         const inputs = Array.from(container.querySelectorAll('input'));
         const inputs_final = inputs.map(input => input.value.trim()).filter(value => value !== "").join(' ');

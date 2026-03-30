@@ -117,10 +117,13 @@ CREATE TABLE `certification_retrieval` (
   `host` varchar(100) NOT NULL,
   `path` varchar(300) NOT NULL,
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `what` varchar(100) NOT NULL,
+  `other_options` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   KEY `host_key_cert` (`host`),
   CONSTRAINT `fk_certification_host_lookup` FOREIGN KEY (`host`) REFERENCES `host` (`host`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

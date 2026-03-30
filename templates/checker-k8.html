@@ -220,7 +220,6 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 		});
 		getcontainersdb();
 		showTestResults();
-		getcrons();
 		$("table[id^='table-']").DataTable();
 		document.getElementById("last-update").innerHTML = "Last update: " + new Date().toLocaleString();
 		cg = colorGenerator();
@@ -1191,6 +1190,7 @@ function makeCronJobTable(data) { // disabled
 		get_summary_new();
 		get_complex_tests();
 		who_has_issues();
+		getcrons();
 		
 		$('.open-modal').on('click', function() {
 			var id = $(this).data('containerid');
@@ -1285,7 +1285,7 @@ function makeCronJobTable(data) { // disabled
 						data: {id: id, psw: password, source: source},
 						type: 'POST',
 						success: function(response) {
-							logging('<b>' + id + "</b> was restarted!", category+"-logs");
+							logging('<b>' + id + "</b> was restarted! If a kubernetes container was rebooted, the previous ceased to exist, wait a few minutes to see the new one", category+"-logs");
 							$('#passwordModal').modal('hide');
 							if (id.includes('proxy')) {
 								alert("By restarting the proxy, you will lose connection to the Snap4Sentinel backend. By closing this alert, you will reload the page.");

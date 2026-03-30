@@ -55,6 +55,10 @@
                         <label for="whatRetrievalAdd">What</label>
                         <input type="text" class="form-control" id="whatRetrievalAdd" placeholder="file.txt" required>               
                     </div>
+                    <div class="form-group">
+                        <label for="otherOptionsAdd">What</label>
+                        <input type="text" class="form-control" id="otherOptionsAdd" placeholder="--exclude='*-log*'" required>               
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -87,6 +91,10 @@
                     <div class="form-group">
                         <label for="whatRetrievalEdit">What</label>
                         <input type="text" class="form-control" id="whatRetrievalEdit" placeholder="file.txt" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="otherOptionsEdit">What</label>
+                        <input type="text" class="form-control" id="otherOptionsEdit" placeholder="--exclude='*-log*'" required>               
                     </div>
                     <input type="text" class="form-control" id="retrievalidEdit" hidden>
                 </form>
@@ -187,10 +195,12 @@
         var path = $(this).data('path');
         var what = $(this).data('what');
         var host = $(this).data('host');
+        var options = $(this).data('options');
         var retrievalid = $(this).data('retrievalid');
         $('#retrievalPathEdit').val(path);
         $('#whatRetrievalEdit').val(what);
         $('#retrievalidEdit').val(retrievalid);
+        $('#otherOptionsEdit').val(options);
         let select = document.getElementById('retrievalHostEdit');
         select.value=host;
         $('#editRetrievalModal').modal('show');
@@ -211,11 +221,12 @@
         var id = $('#retrievalidEdit').val();
         var host = $('#retrievalHostEdit').val();
         var password = $('#passwordInputEdit').val();
+        var options = $('#otherOptionsEdit').val();
         if (password) {
             try {
                 $.ajax({
                     url: './edit_configuration_retrieval',
-                    data: {psw: password, path: path, id: id, host: host, what: what},
+                    data: {psw: password, path: path, id: id, host: host, what: what, options: options},
                     type: 'POST',
                     success: function(response) {
                         alert("Retrieval was edited!");
@@ -241,11 +252,12 @@
         var what = $('#whatRetrievalAdd').val();
         var host = $('#retrievalHostAdd').val();
         var password = $('#passwordInputAdd').val();
+        var options = $('#otherOptionsAdd').val();
         if (password) {
             try {
                 $.ajax({
                     url: './add_configuration_retrieval',
-                    data: {psw: password, path: path, host: host, what: what},
+                    data: {psw: password, path: path, host: host, what: what, options: options},
                     type: 'POST',
                     success: function(response) {
                         alert("Retrieval was added!");

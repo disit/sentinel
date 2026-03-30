@@ -541,6 +541,7 @@ def parse_top(data):
                 'command': ' '.join(columns[11:])
             }
             parsed_data['processes'].append(process_info)
+    print_debug_log("Done parsing a top")
     return parsed_data
 
 
@@ -1082,6 +1083,7 @@ def auto_alert_status():
 
     components_docker = [a[0] for a in results if a[4]=="docker"]
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=="kubernetes"]
+    # TODO look here to start applying position to containers
     components_original_docker = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="docker"]
     components_original_kubernetes = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="kubernetes"]
 
@@ -1677,7 +1679,6 @@ def slave_attempt_self_register():
     print("Given conf parameters seem to indicate there is no need to self register")
 
 def send_advanced_alerts(message):
-    # TODO filter out warnings from email, only keep criticals for telegram
     print_debug_log("Preparing the content of an alert")
     if is_this_notification_duplicated(message):
         return # won't send a doubled notification
@@ -2117,6 +2118,8 @@ def create_app():
     def restart_logic_cronjob():
         if 'username' not in session:
             return "Session not active, won't proceed.", 500
+        if session["username"] != "admin":
+            return "User not authorized to perform the operation", 401
         try:
             cronjob_id = request.form.get('cronjob_id','',int)
         except ValueError:
@@ -2125,11 +2128,11 @@ def create_app():
             return "Cronjob identifier not found or not set", 500
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''SELECT restart_logic FROM checker.cronjobs where idcronjobs=%s;'''
+            query = '''SELECT restart_logic, where_to_run FROM checker.cronjobs where idcronjobs=%s;'''
             cursor.execute(query,(cronjob_id,))
             conn.commit()
             result_command = cursor.fetchone()
-            if not result_command or len(result[0])==0:
+            if not result_command or len(result_command[0])==0:
                 return "This cronjob doesn't have a restart logic", 500
             else:
                 with restart_cronjob_lock:
@@ -2140,20 +2143,63 @@ def create_app():
                         conn.commit()
                         result = cursor.fetchone()
                     if not result or len(result[0])==0: # free to go
-                        restart_result = queued_running(result_command)
-                        with mysql.connector.connect(**db_conn_info) as conn:
-                            cursor = conn.cursor(buffered=True)
-                            query = '''INSERT INTO `checker`.`rebooting_cronjobs` (`cronjob_id`, `perpetrator`, `result`) VALUES (%s, %s, %s)'''
-                            cursor.execute(query,(cronjob_id,session['username'],restart_result.stdout+"\n"+restart_result.stderr))
-                            conn.commit()
-                        if len(restart_result.stderr)>0:
-                            return "Error in restarting the cronjob: "+restart_result.stderr, 500
+                        if result_command[1] == None:
+                            restart_result = queued_running(result_command[0])
+                            with mysql.connector.connect(**db_conn_info) as conn:
+                                cursor = conn.cursor(buffered=True)
+                                query = '''INSERT INTO `checker`.`rebooting_cronjobs` (`cronjob_id`, `perpetrator`, `result`) VALUES (%s, %s, %s)'''
+                                cursor.execute(query,(cronjob_id,session['username'],restart_result.stdout+"\n"+restart_result.stderr))
+                                conn.commit()
+                            if len(restart_result.stderr)>0:
+                                return "Error in restarting the cronjob: "+restart_result.stderr, 500
+                            else:
+                                return "Restarting the service behind the cronjob returned " + restart_result.stdout, 200
                         else:
-                            return "Restarting the service behind the cronjob returned " + restart_result.stderr, 500
+                            r = requests.post(result_command[0]+"/restart_logic_cronjob_slave", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM),"command":result_command[0]})
+                            r_turned = json.loads(r.text)
+                            if r_turned["error"] != "":
+                                 return "Error in restarting the cronjob: "+r_turned["error"], 500
+                            with mysql.connector.connect(**db_conn_info) as conn:
+                                cursor = conn.cursor(buffered=True)
+                                query = '''INSERT INTO `checker`.`rebooting_cronjobs` (`cronjob_id`, `perpetrator`, `result`) VALUES (%s, %s, %s)'''
+                                cursor.execute(query,(cronjob_id,session['username'],r_turned["stdout"]+"\n"+r_turned["stderr"]))
+                                conn.commit()
+                                if len(r_turned["stderr"])>0:
+                                    return "Error in restarting the cronjob: "+r_turned["stderr"], 500
+                                else:
+                                    return "Restarting the service behind the cronjob returned " + r_turned["stderr"], 200
                     else: # too soon
                         return "This cronjob restart was called very recently, wait a minute", 500
 
     # end restart cronjob
+
+    @app.route("/restart_logic_cronjob_slave", methods=["POST"])
+    def restart_logic_cronjob_slave():
+        print_debug_log("Restart cronjob as slave")
+        if os.getenv("is-multi","False") == "True":
+            if os.getenv("is-master","True") == "False":
+                try:
+                    jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
+                    # if we are here the token is valid, run the command then return results to master
+                    restart_result = queued_running(request.form.to_dict()['command'])
+                    
+                    if len(restart_result.stderr)>0:
+                        return jsonify({'error': '', 'stderr':restart_result.stderr, 'stdout':restart_result.stdout}), 200
+                    else:
+                        return jsonify({'error': '', 'stderr':'', 'stdout':restart_result.stdout}), 200
+                except jwt.ExpiredSignatureError:
+                    print_debug_log("Token expired")
+                    return jsonify({'error': 'Token expired'}), 401
+                except jwt.InvalidTokenError:
+                    print_debug_log("Token invalid:" + request.form.to_dict()['auth'])
+                    return jsonify({'error': 'Invalid token'}), 401
+                except Exception:
+                    print_debug_log(f"Something failed:" + traceback.format_exc())
+                    return jsonify({'error': traceback.format_exc()}), 401
+            else:
+                return jsonify({'error': "As a master, I won't execute this opration as a slave"}), 403
+        else:
+            return jsonify({'error': "This endpoint is disabled outside of a sentinel cluster"}), 403
 
     # start run specific cronjob
 
@@ -2230,6 +2276,7 @@ def create_app():
                     query = '''SELECT idcronjobs, name, command, category, where_to_run, disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, contacts, severity FROM checker.cronjobs where where_to_run is not null union SELECT idcronjobs, name, command, category, 'master', disabled, restart_logic, description, timeout_time, retries, retries_wait, ip, target, contacts, severity FROM checker.cronjobs where where_to_run is null;'''
                     query2 = '''SELECT * from categories;'''
                     query3 = '''SELECT * from cronjob_prototypes;'''
+                    query4 = '''SELECT hostname FROM ip_table;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
@@ -2239,7 +2286,10 @@ def create_app():
                     cursor.execute(query3)
                     conn.commit()
                     results_3 = cursor.fetchall()
-                    return render_template("organize_cronjobs_new.html",cronjobs=results, categories=results_2, timeout=int(os.getenv("requests-timeout","15000")), cronjobs_prototypes=results_3)
+                    cursor.execute(query4)
+                    conn.commit()
+                    results_4 = cursor.fetchall()
+                    return render_template("organize_cronjobs_new.html",cronjobs=results, categories=results_2, timeout=int(os.getenv("requests-timeout","15000")), cronjobs_prototypes=results_3, rows_hosts=results_4)
 
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())
@@ -4135,7 +4185,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             with mysql.connector.connect(**db_conn_info) as conn:
                 print_debug_log("Generating a certification (new)")
                 cursor = conn.cursor(buffered=True)
-                query = '''SELECT b.host, a.user, b.path, b.what FROM checker.certification_retrieval as b join host as a on a.host = b.host;'''
+                query = '''SELECT b.host, a.user, b.path, b.what, b.other_options FROM checker.certification_retrieval as b join host as a on a.host = b.host;'''
                 cursor.execute(query)
                 conn.commit()
                 results = cursor.fetchall()
@@ -4145,7 +4195,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     stderrs=[]
                     for r in results:
                         # make dir, move to dir, copy conf files across ssh as a tarball, using premade ssh keys and automatically add new hosts (otherwise fails unless has been accepted once)
-                        all_out=subprocess.run(f'mkdir -p /confs_here/{subfolder} && cd /confs_here/{subfolder} && ssh -i /ssh_keys/{r[1]}_{r[0]} -o StrictHostKeyChecking=accept-new {r[1]}@{r[0]} "tar -cz -C {r[2]} {r[3]}" > {r[1]}_{r[0]}_{r[3]}.tar.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
+                        all_out=subprocess.run(f'mkdir -p /confs_here/{subfolder} && cd /confs_here/{subfolder} && ssh -i /ssh_keys/{r[1]}_{r[0]} -o StrictHostKeyChecking=accept-new {r[1]}@{r[0]} "tar -cz -C {r[2]} {r[3]} {r[4]}" > {r[1]}_{r[0]}_{r[3]}.tar.gz', shell=True, capture_output=True, text=True, encoding="utf_8")
                         if len(all_out.stderr)>0:
                             print(f"Error in retrieving {r[1]}_{r[0]}_{r[3]}.tar.gz: {all_out.stderr}")
                         stdouts.append(all_out.stdout)
@@ -4639,8 +4689,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
                     cursor = conn.cursor(dictionary=True, buffered=True)
-                    query = '''INSERT INTO `checker`.`certification_retrieval` (`host`, `path`, `what`) VALUES (%s, %s, %s);'''
-                    cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'],))
+                    query = '''INSERT INTO `checker`.`certification_retrieval` (`host`, `path`, `what`, `other_options`) VALUES (%s, %s, %s, %s);'''
+                    cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'], request.form.to_dict()['options'],))
                     conn.commit()
                     return "ok", 201
                 except:
@@ -4658,8 +4708,8 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             with mysql.connector.connect(**db_conn_info) as conn:
                 try:
                     cursor = conn.cursor(dictionary=True, buffered=True)
-                    query = '''UPDATE `checker`.`certification_retrieval` SET `host` = %s, `path` = %s, `what` = %s WHERE (`id` = %s);'''
-                    cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'], request.form.to_dict()['id'],))
+                    query = '''UPDATE `checker`.`certification_retrieval` SET `host` = %s, `path` = %s, `what` = %s, `other_options` = %s WHERE (`id` = %s);'''
+                    cursor.execute(query, (request.form.to_dict()['host'], request.form.to_dict()['path'], request.form.to_dict()['what'], request.form.to_dict()['options'], request.form.to_dict()['id'],))
                     conn.commit()
                     return "ok", 201
                 except:
