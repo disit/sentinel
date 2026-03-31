@@ -7,4 +7,13 @@ email protocol to be tested
 position for docker-kind container seems to be useless
 snmp never checked
 
+check that it works:
+1) ! in main ui (and maybe other squares and circles)
+2) tasto clona dentro cronjob
+3) retrieval con opzioni
+4) restart script di qualcosa (master e slave)
+
+mass image updates
+gestione container omonimi in host diversi
+
 https://docs.google.com/spreadsheets/d/1NphAYe7GHYzO6Fc0p3Nduh759dzja_6f2JCPACBUbsU/edit?usp=sharing
