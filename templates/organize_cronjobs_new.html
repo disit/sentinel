@@ -51,7 +51,7 @@
       <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteCronJob" data-component="{{item[0]}}" id="deleteCronjob{{item[0]}}" onClick="$('#addCronJobModal').modal('hide')">Delete</button></td>
       <td>
         <button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editCronJob" data-component="{{item[0]}}" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="editCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#addCronJobModal').modal('hide')">Edit</button>
-        <button type="button" class="btn btn-primary open-modal-c" data-toggle="modal" data-target="#addCronJob" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="cloneCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#editCronjobModal').modal('hide')">Clone (experimental)</button>
+        <button type="button" class="btn btn-primary open-modal-c" data-toggle="modal" data-target="#addCronJob" data-name="{{item[1] | e}}" data-command="{{item[2] | e}}" data-restart="{{item[6] | e}}" data-description="{{item[7] | e}}" data-category="{{item[3] | e}}" id="cloneCronJob{{item[0]}}" data-where="{{item[4] | e}}" data-disabled="{{item[5]}}" data-timeouttime="{{item[8]}}" data-retries="{{item[9]}}" data-retrieswait="{{item[10]}}" data-ip="{{item[11]}}" data-target_val="{{item[12]}}" data-contacts="{{item[13] | e}}" data-severity="{{item[14] | e}}" onClick="$('#editCronjobModal').modal('hide')">Clone</button>
       </td>
     </tr>
 {% endfor %}
@@ -430,7 +430,7 @@
         let select_severity = document.getElementById('severity-selection');
         select.value=category;
         select_severity.value=severity;
-        $('#AddCronJob').modal('show');
+        $('#addCronJobModal').modal('show');
     });
 
 
@@ -655,7 +655,7 @@
     }
 
     function update_add(){
-        if ($("#command-prototype-add").val() == "") return;
+        if ($("#command-prototype-add").val() == "" || $("#command-prototype-add").val() == null) return;
         const container = document.getElementById('additional-params-add');
         const inputs = Array.from(container.querySelectorAll('input'));
         const inputs_final = inputs.map(input => input.value.trim()).filter(value => value !== "").join(' ');
@@ -663,7 +663,7 @@
         $("#CommandAdd").val(composed_command_text);
     }
     function update_edit(){
-        if ($("#command-prototype-edit").val() == "") return;
+        if ($("#command-prototype-edit").val() == "" || $("#command-prototype-edit").val() == null) return;
         const container = document.getElementById('additional-params-edit');
         const inputs = Array.from(container.querySelectorAll('input'));
         const inputs_final = inputs.map(input => input.value.trim()).filter(value => value !== "").join(' ');

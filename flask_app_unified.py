@@ -399,6 +399,57 @@ def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, b
                 newstr += curstr+"<br>"
         return newstr
 
+def mixed_format_error_to_send_new(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
+    k8s_c = [container for container in containers if container[-1] == "Docker"]
+    doc_c = [container for container in containers if not container[-1] == "Docker"]
+    newstr=""
+    for a in k8s_c:
+        curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
+        if because:
+            reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
+
+            if len(reason) == 1:
+                use_this_reason=because[reason[0]]
+            else:
+                if len(reason) == 0:
+                    print_debug_log("fuzzy search failed, trying second one in mixed format error sending")
+                    reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
+                    if len(reason) == 1:
+                        print_debug_log("second fuzzy search succeeded in mixed format error sending")
+                        use_this_reason=because[reason[0]]
+                    else:
+                        if len(reason) == 0:
+                            use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
+                        else:
+                            use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+                else:
+                    use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
+            try:
+                newstr += curstr + explain_reason + use_this_reason+"<br>"
+            except Exception:
+                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
+        else:
+            newstr += curstr+"<br>"
+    for a in doc_c:
+        curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
+        if because:
+            reason=[c for _,c in enumerate([a for a in because.keys()]) if c==a[1]]
+
+            if len(reason) == 1:
+                use_this_reason=because[reason[0]]
+            else:
+                if len(reason) == 0:
+                    use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
+                else:
+                    use_this_reason=because[reason[0]]
+            try:
+                newstr += curstr + explain_reason + use_this_reason+"<br>"
+            except Exception:
+                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
+            else:
+                newstr += curstr+"<br>"
+        return newstr
+    
 
 def mixed_format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
     # split containers for naming reasons
@@ -1081,13 +1132,18 @@ def auto_alert_status():
     containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
     containers_merged_kubernetes = [a for a in containers_merged if not a["Namespace"].startswith("Docker - ")]
 
-    components_docker = [a[0] for a in results if a[4]=="docker"]
-    components_kubernetes = [a[0].replace("*","") for a in results if a[4]=="kubernetes"]
+    components_docker = [a[0] for a in results if a[4]=={"docker"}]
+    components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
     # TODO look here to start applying position to containers
-    components_original_docker = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="docker"]
-    components_original_kubernetes = [(a[0][:max(0,a[0].find("*")-1)],a[3]) for a in results if a[4]=="kubernetes"]
+    components_original_docker = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
+    components_original_kubernetes = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
+
+    #print("-"*20+"\n"+components_docker+"\n\n"+components_original_docker)
 
     containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components_docker) and not ("running" in c["State"])]
+    
+    print("-"*20+"\n"+str(results)+"\n"+str(components_docker)+"\n\n"+str(components_original_docker)+"\n\n"+str(containers_which_should_be_running_and_are_not)+"\n"+"-"*20)
+    
     [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in components_kubernetes) and not ("running" in c["State"])]]
 
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
@@ -1700,7 +1756,7 @@ def send_advanced_alerts(message):
             containers_filtered = []
             for c in message[0]:
                 try:
-                    if cont_sevr[c["Name"]]=="Warning":
+                    if c[3]=="Warning":
                         pass
                     else:
                         containers_filtered.append(c)
@@ -1720,7 +1776,7 @@ def send_advanced_alerts(message):
             containers_filtered = []
             for c in message[1]:
                 try:
-                    if cont_sevr[c["Name"]]=="Warning":
+                    if c[3]=="Warning":
                         pass
                     else:
                         containers_filtered.append(c)
@@ -1741,7 +1797,7 @@ def send_advanced_alerts(message):
             containers_filtered = []
             for c in message[2]:
                 try:
-                    if cont_sevr[c["Name"]]=="Warning":
+                    if c[3]=="Warning":
                         pass
                     else:
                         containers_filtered.append(c)
@@ -1750,12 +1806,11 @@ def send_advanced_alerts(message):
                 except Exception:
                     print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification")
                     containers_filtered.append(c)
-            current_text = mixed_format_error_to_send(f"wasn't found running in the intended location: ",containers=containers_filtered)+"<br><br>"
+            current_text = mixed_format_error_to_send_new(f"wasn't found running in the intended location: ",containers=containers_filtered)+"<br><br>"
             text_for_email += current_text
+            ## TODO too dumb to split correctly, also prints dumb shit
             for el in text_for_email.split("<br>"):
-                cont_names = re.findall("named (.+)",el,re.MULTILINE)
-                if len(cont_names) > 0: # filters out something that won't work
-                    email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
+                email_data.append({"subject":c[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status"})
 
         if len(message[3])>0:
             text_for_email+= message[3] + '<br><br>'
@@ -2124,8 +2179,6 @@ def create_app():
             cronjob_id = request.form.get('cronjob_id','',int)
         except ValueError:
             return "Cronjob identifier invalid, it must be an non-negative integer", 500
-        if len(cronjob_id):
-            return "Cronjob identifier not found or not set", 500
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             query = '''SELECT restart_logic, where_to_run FROM checker.cronjobs where idcronjobs=%s;'''
@@ -2155,7 +2208,7 @@ def create_app():
                             else:
                                 return "Restarting the service behind the cronjob returned " + restart_result.stdout, 200
                         else:
-                            r = requests.post(result_command[0]+"/restart_logic_cronjob_slave", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM),"command":result_command[0]})
+                            r = requests.post(result_command[1]+"/restart_logic_cronjob_slave", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM),"command":result_command[0]})
                             r_turned = json.loads(r.text)
                             if r_turned["error"] != "":
                                  return "Error in restarting the cronjob: "+r_turned["error"], 500
@@ -2167,7 +2220,7 @@ def create_app():
                                 if len(r_turned["stderr"])>0:
                                     return "Error in restarting the cronjob: "+r_turned["stderr"], 500
                                 else:
-                                    return "Restarting the service behind the cronjob returned " + r_turned["stderr"], 200
+                                    return "Restarting the service behind the cronjob returned " + r_turned["stdout"], 200
                     else: # too soon
                         return "This cronjob restart was called very recently, wait a minute", 500
 
@@ -2232,9 +2285,9 @@ def create_app():
                     cursor.execute(query, (ran_command.stdout.strip(),cronjob_id,))
                 conn.commit()
             if len(ran_command.stderr)>0:
-                return "Error in running the cronjob: "+ran_command.stderr, 500
+                return "Error in running the cronjob: " + ran_command.stderr, 500
             else:
-                return "Restarting the service behind the cronjob returned " + ran_command.stderr, 500
+                return "The cronjob returned " + ran_command.stdout, 200
     # end run specific cronjob
 
     @app.route("/organize_cronjobs", methods=["GET"])

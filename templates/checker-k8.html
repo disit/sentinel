@@ -563,9 +563,9 @@ function makeCronJobTable(data) { // disabled
 				type: 'POST',
 				data: {cronjob_id: cronjobid},
 				success: function(response) {
-					if (response.result==="") response = "No test was found for this component."; 
-					logging("<b>" + element.name + "</b> had its cronjob executed and the result was: <b>"+response.result+'</b><br>With errors: ' + response.errors + '<hr>', location+'-logs');
-					document.getElementById(container+'-result').innerHTML= response.result;
+					if (response==="") response = "No test was found for this component."; 
+					logging("<b>" + element.name + "</b> had its cronjob executed and the result was: <b>"+response+'</b><br>With errors: ' + response + '<hr>', location+'-logs');
+					document.getElementById(cronjobid + "-cronjob-result").innerHTML= response;
 		
 				},
 				error: function(error) {
@@ -871,7 +871,7 @@ function makeCronJobTable(data) { // disabled
 							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="green"/><title>Everything runs as expected</title></svg>';
 						}
 						else { //severity
-							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/><title>Something is not running as expected</title></svg>';
+							content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="red"/><title>Something is going wrong</title></svg>';
 						}
 						
 						td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
@@ -957,14 +957,14 @@ function makeCronJobTable(data) { // disabled
 									}
 									content_of_id_cell = truncatedData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
 								} //severity
-								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="'+get_severity_of_cronjob(elements[6])+'"/></svg>';}
+								else {content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is going wrong</title><circle cx="6" cy="6" r="6" fill="'+get_severity_of_cronjob(elements[6])+'"/></svg>';}
 							}
 							else if (cellData === "running" || cellData.search("running")>-1 && (/restarts:\s*(\d+)$/.test(cellData) && parseInt(cellData.match(/restarts:\s*(\d+)$/)[1], 10) < 5 || check(elements[11])))
 								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Everything runs as expected</title><circle cx="6" cy="6" r="6" fill="green"/></svg>';
-							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+							else content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is going wrong</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 							}
 							catch {
-								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is not running as expected</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';
+								content_of_id_cell = cellData + '  <svg width="12" height="12" style="vertical-align: middle;"><title>Something is going wrong</title><circle cx="6" cy="6" r="6" fill="red"/></svg>';
 							}
 						td.innerHTML = '<div id="'+elements[6]+'-reboot-result">'+content_of_id_cell+'</div>';
 					}
@@ -1212,8 +1212,7 @@ function makeCronJobTable(data) { // disabled
 		});
 		
 		$('.open-modal-c').on('click', function() {
-			$('#cronjobnamemodal').val($(this).data('cronjobnamemodal'));
-			$('#cronjobidmodal').val($(this).data('cronjobid'));
+			$('#cronjobidmodal').val($(this).data('containerid'));
 			$('#passwordModalCronjob').modal('show');
 		});
 		
@@ -1311,7 +1310,7 @@ function makeCronJobTable(data) { // disabled
 	function attempt_reboot_cronjob() {
 			var password = $('#passwordInputCronjob').val();
 			var id = $('#cronjobidmodal').val();
-			var result_loc = document.getElementById(id+"-reboot-result");
+			var result_loc = document.getElementById(id+"-cronjob-result");
 			result_loc.innerHTML='Restarting... <svg width="12" height="12" style="vertical-align: middle;"><circle cx="6" cy="6" r="6" fill="yellow"/><title>Restarting</title></svg>';
 			var string = new Date().toLocaleString();
 			if (password) {
@@ -1321,16 +1320,16 @@ function makeCronJobTable(data) { // disabled
 						data: {cronjob_id: id, psw: password},
 						type: 'POST',
 						success: function(response) {
-							logging('<b>' + id + "</b> was restarted!", category+"-logs");
-							$('#passwordModal').modal('hide');
+							result_loc.innerHTML=response;
+							$('#passwordModalCronjob').modal('hide');
 							if (id.includes('proxy')) {
 								alert("By restarting the proxy, you will lose connection to the Snap4Sentinel backend. By closing this alert, you will reload the page.");
 								location.reload();
 							}
 						},
 						error: function(error) {
-							logging('<b>' + id + "</b> was not restarted! Reason: " + error.responseText, category+"-logs");
-							$('#passwordModal').modal('hide');
+							result_loc.innerHTML=error.textContent;
+							$('#passwordModalCronjob').modal('hide');
 						},
 						timeout: {{timeout}}
 					});
@@ -1359,11 +1358,10 @@ function makeCronJobTable(data) { // disabled
 					document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").setAttribute("title", document.getElementById(table.parentElement.parentElement.parentElement.parentElement.id+"-status").getAttribute("title") + "Issue with " + dataTable.column(7).data().toArray()[i]);
 					hasFailure = true;
 					var current_severity = get_severity_of_container(dataTable.column(6).data());
-					if (color == current_severity) pass;
+					if (color == current_severity) continue;
 					else if (color == "green") color = current_severity;
 					else if (color == "yellow" && (current_severity == "red" || current_severity == "orange")) color = current_severity;
 					else if (color == "orange" && current_severity == "red") color = current_severity;
-					break;
 				}
 			}
 			if (hasFailure) {
@@ -1389,7 +1387,7 @@ function makeCronJobTable(data) { // disabled
 				if (typeof columnData[i] === 'string' && (!columnData[i].includes("running") && !columnData[i].includes("enabled") && !columnData[i].includes("disabled"))) {
 					isNotRunning = false;
 					var current_severity = get_severity_of_container(dataTable.column(6).data());
-					if (color == current_severity) pass;
+					if (color == current_severity) continue;
 					else if (color == "green") color = current_severity;
 					else if (color == "yellow" && (current_severity == "red" || current_severity == "orange")) color = current_severity;
 					else if (color == "orange" && current_severity == "red") color = current_severity;
@@ -1688,7 +1686,7 @@ function makeCronJobTable(data) { // disabled
 		<div class="modal-content">
 			<div class="modal-header">
 				<h5 class="modal-title" id="passwordModalCronjobLabel">Confirmation for cronjob-related restarting</h5>
-				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#passwordModal').modal('hide')">
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#passwordModalCronjob').modal('hide')">
 					<span aria-hidden="true">X</span>
 				</button>
 			</div>
@@ -1697,10 +1695,6 @@ function makeCronJobTable(data) { // disabled
 					<div class="form-group">
 						<label for="passwordInputCronjob">Password</label>
 						<input type="password" class="form-control" id="passwordInputCronjob" autocomplete="current-password" required>
-					</div>
-					<div class="form-group">
-						<label for="containeridmodal">Cronjob Name</label>
-						<input type="text" class="form-control" id="cronjobnamemodal" readonly>
 					</div>
 					<div class="form-group">
 						<input type="text" class="form-control" id="cronjobidmodal" readonly hidden>
