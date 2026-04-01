@@ -1241,6 +1241,31 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
             print_debug_log("Top error:"+traceback.format_exc())
             top_errors.append(top_r)
 
+    try: # asking right now, not asyncronously
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            cursor.execute("SELECT * FROM snmp_host WHERE;")
+            rows = cursor.fetchall()
+            cursor.close()
+            if rows:
+                for row in rows:
+                    received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
+                    data = asyncio.run(gather_snmp_info(received_data))
+                    if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
+                        # here it means something bad happened
+                        print_debug_log(f"Host {row['host']} gave no data, maybe authentication failed?")
+                    else:
+                        for ram_usage in data["memory"]:
+                            if ram_usage["used_MB"]/ram_usage["total_MB"] > row["threshold_mem"]:
+                                pass # too much ram used, send a notification, it is ram_usage["description"] which is at fault
+                        if data["cpu"]["average"]*100 > float(row["threshold_cpu"])*100:
+                            pass # too much cpu used, send a notification, some process is running too hard
+                        if data["load_avg"]["1min"] > float(row["threshold_cpu"])*100 or data["load_avg"]["5min"] > float(row["threshold_cpu"])*100:
+                            pass # too much cpu used recently but not exactly now, send a notification, 15min doesn't matter for notifications
+
+    except Exception:
+        pass
+
     if len(problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
             issues = ["","","","","","","","",""]
