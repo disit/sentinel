@@ -403,6 +403,7 @@ def mixed_format_error_to_send_new(instance_of_problem, containers, because = No
     k8s_c = [container for container in containers if container[-1] == "Docker"]
     doc_c = [container for container in containers if not container[-1] == "Docker"]
     newstr=""
+    print(doc_c, k8s_c)
     for a in k8s_c:
         curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
         if because:
@@ -448,7 +449,7 @@ def mixed_format_error_to_send_new(instance_of_problem, containers, because = No
                 newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
             else:
                 newstr += curstr+"<br>"
-        return newstr
+    return newstr
     
 
 def mixed_format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
@@ -969,7 +970,7 @@ def auto_alert_status():
 
         new_containers_merged = []
         source = os.getenv("platform-url","")
-        for current in new_containers_merged:
+        for current in containers_merged:
             td = {}
             #td["Command"] = current["Command"]
             td["CreatedAt"] = current["CreatedAt"]
@@ -1086,9 +1087,9 @@ def auto_alert_status():
             except requests.exceptions.ConnectionError as E:
                 print("Error on multi reading container data:", str(E))
         containers_merged = containers_merged + total_answer
-        new_containers_merged = []
+        #new_containers_merged = []
         source = os.getenv("platform-url","")
-        for current in new_containers_merged:
+        for current in total_answer:
             td = {}
             #td["Command"] = current["Command"]
             td["CreatedAt"] = current["CreatedAt"]
@@ -1112,7 +1113,11 @@ def auto_alert_status():
                 td["Node"] = current["Node"]
             except KeyError: #happens when docker data comes also from another sentinel instance
                 td["Node"] = os.getenv("platform-url","")
-            td["Volumes"] = current["LocalVolumes"]
+            try:
+                td["Volumes"] = current["LocalVolumes"]
+            except KeyError: #happens when docker data comes also from another sentinel instance
+                td["Volumes"] = "some volumes"
+            #td["Volumes"] = current["LocalVolumes"]
             td["Namespace"] = "Docker - " + source
             new_containers_merged.append(td)
         containers_merged = new_containers_merged
@@ -1132,24 +1137,20 @@ def auto_alert_status():
     containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
     containers_merged_kubernetes = [a for a in containers_merged if not a["Namespace"].startswith("Docker - ")]
 
-    components_docker = [a[0] for a in results if a[4]=={"docker"}]
+    components_docker = [(a[0],a[3]) for a in results if a[4]=={"docker"}]
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
     # TODO look here to start applying position to containers
     components_original_docker = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
     components_original_kubernetes = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
 
-    #print("-"*20+"\n"+components_docker+"\n\n"+components_original_docker)
-
-    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components_docker) and not ("running" in c["State"])]
+    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
     
-    print("-"*20+"\n"+str(results)+"\n"+str(components_docker)+"\n\n"+str(components_original_docker)+"\n\n"+str(containers_which_should_be_running_and_are_not)+"\n"+"-"*20)
-    
-    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in components_kubernetes) and not ("running" in c["State"])]]
+    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]]
 
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
 
-    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in components_docker) and "unhealthy" in c["Status"]]
+    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and "unhealthy" in c["Status"]]
     for c_m in containers_merged_kubernetes:
         if any(c_m["Names"].startswith(value) for value in components_kubernetes):
             if "restarts" in c_m["State"]:
@@ -1161,21 +1162,26 @@ def auto_alert_status():
                 except Exception:
                     containers_which_are_running_but_are_not_healthy.append(c_m)
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
-    names_of_problematic_containers = [n["Names"] for n in problematic_containers]
-
-    containers_which_are_not_expected = list(set(tuple(item) for item in components_original_docker)-set((('-'.join(b["Names"].split('-')[:-2]),b["Namespace"]) for b in containers_merged_docker)))
+    
+    containers_which_are_not_expected=[]
+    for c in components_original_docker: # use this to determine who's missing
+        found=False
+        for in_that_position in [a for a in containers_merged if a["Node"]==c[2]]:
+            if in_that_position["Name"] == c[0]:
+                found=True
+                break
+        if not found:
+            containers_which_are_not_expected.append(c)
     containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
-    missing_containers_k = dict(components_original_kubernetes)
-    containers_which_are_not_expected_k = [a for a in missing_containers_k if not a[0].endswith("*")]
-    og_conts = copy.deepcopy(containers_which_are_not_expected_k)
-    for c in containers_merged_kubernetes:
-        for value,_ in list(missing_containers_k.items()):
-            if '-'.join(c["Names"].split('-')[:-2]).startswith(value):
-                try:
-                    og_conts.remove(value)
-                except ValueError:
-                    pass
-    [containers_which_are_not_expected.append(a) for a in og_conts]
+    
+    for c in components_original_kubernetes: # use this to determine who's missing
+        found=False
+        for in_that_position in [a for a in containers_merged if a["Node"]==c[2]]:
+            if in_that_position["Name"] == c[0]:
+                found=True
+                break
+        if not found:
+            containers_which_are_not_expected.append(c)
 
     if "False" == os.getenv("running-as-kubernetes","False"):
         top = get_top()
@@ -1235,10 +1241,10 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
             print_debug_log("Top error:"+traceback.format_exc())
             top_errors.append(top_r)
 
-    if len(names_of_problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
+    if len(problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
             issues = ["","","","","","","","",""]
-            if len(names_of_problematic_containers) > 0:
+            if len(problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
                 issues[1]=is_alive_with_ports
@@ -1746,71 +1752,53 @@ def send_advanced_alerts(message):
         cont_sevr = {}
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''SELECT component, cast(severity as char) as severity FROM checker.component_to_category;;'''
+            query = '''SELECT component, cast(severity as char) as severity, category, position FROM checker.component_to_category;'''
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
             for r in results:
-                cont_sevr[r[0]] = r[1]
+                cont_sevr[str(r[0])+str(r[3])] = (r[1],r[2])
         if len(message[0])>0:
-            containers_filtered = []
             for c in message[0]:
                 try:
-                    if c[3]=="Warning":
-                        pass
+                    if cont_sevr[c['Name']+c['Node']][0]=="Warning":
+                        continue
                     else:
-                        containers_filtered.append(c)
+                        pass
                 except KeyError: # just make it maximum severity in doubt
-                    containers_filtered.append(c)
+                    pass
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification")
-                    containers_filtered.append(c)
-            text_for_email = mixed_format_error_to_send("is not in the correct status ",containers=containers_filtered,because=dict([(a["Name"],a["State"]) for a in containers_filtered]),explain_reason="as its status currently is: ")+"<br><br>"
-            for el in text_for_email.split("<br>"):
-                cont_names = re.findall("named (.+)",el,re.MULTILINE)
-                if len(cont_names) > 0: # filters out something that won't work
-                    email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
+                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification"+traceback.format_exc())
+                    continue
+                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Source']][1]} has some issues in {c['Source']}."})
 
         if len(message[1])>0:
-            #containers = ", ".join([a["container"] for a in message[1]])
-            containers_filtered = []
             for c in message[1]:
                 try:
                     if c[3]=="Warning":
-                        pass
+                        continue
                     else:
-                        containers_filtered.append(c)
+                        pass
                 except KeyError: # just make it maximum severity in doubt
-                    containers_filtered.append(c)
+                    pass
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification")
-                    containers_filtered.append(c)
-            becauses = dict([[a["container"],a["command"]] for a in containers_filtered])
-            current_text = mixed_format_error_to_send_tests_test_ran("is not answering correctly to its 'is alive' test ",containers=containers_filtered,because=becauses,explain_reason="given the failure of: ")+"<br><br>"
-            text_for_email+= current_text
-            for el in current_text.split("<br>"):
-                cont_names = re.findall("named (.+)",el,re.MULTILINE)
-                if len(cont_names) > 0: # filters out something that won't work
-                    email_data.append({"subject":cont_names[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status: "+el})
+                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification:"+traceback.format_exc())
+                    continue
+                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Source']][1]} is not answering correctly to its \"is alive\" test in {cont_sevr[c['Name']+c['Node']][0]}."})
 
         if len(message[2])>0:
-            containers_filtered = []
             for c in message[2]:
                 try:
                     if c[3]=="Warning":
-                        pass
+                        continue
                     else:
-                        containers_filtered.append(c)
+                        pass
                 except KeyError: # just make it maximum severity in doubt
-                    containers_filtered.append(c)
+                    pass
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification")
-                    containers_filtered.append(c)
-            current_text = mixed_format_error_to_send_new(f"wasn't found running in the intended location: ",containers=containers_filtered)+"<br><br>"
-            text_for_email += current_text
-            ## TODO too dumb to split correctly, also prints dumb shit
-            for el in text_for_email.split("<br>"):
-                email_data.append({"subject":c[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":"This container is not in the correct status"})
+                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification"+traceback.format_exc())
+                    continue
+                email_data.append({"subject":c[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c[0]} in category {c[1]} wasn't found running in {c[2]}."})
 
         if len(message[3])>0:
             text_for_email+= message[3] + '<br><br>'
@@ -1874,11 +1862,42 @@ def send_advanced_alerts(message):
             print("[ERROR] while sending with reason:\n",traceback.format_exc(),"\nMessage would have been: ", text_for_email)
         text_for_telegram = [os.getenv("platform-url","unseturl")+" is in trouble!\n"]
         if len(message[0])>0:
-            text_for_telegram.append("These containers are not in the correct status: " + str(filter_out_wrong_status_containers_for_telegram(message[0])))
+            for c in message[0]:
+                try:
+                    if cont_sevr[c['Name']+c['Node']][0]=="Warning"=="Critical":
+                        pass
+                    else:
+                        continue
+                except KeyError: # just make it maximum severity in doubt
+                    pass
+                except Exception:
+                    print_debug_log(f"Something failed while determinging if {c[0]} should be sent as a notification")
+                text_for_telegram.append(f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Node']][1]} has some issues in {cont_sevr[c['Name']+c['Node']][0]}.")
         if len(message[1])>0:
-            text_for_telegram.append('These containers are not answering correctly to their "is alive" test: '+ str(filter_out_muted_failed_are_alive_for_telegram(message[1])))
-        if len(filter_out_muted_containers_for_telegram(message[2]))>0:
-            text_for_telegram.append(f"These containers weren't found: "+ str(filter_out_muted_containers_for_telegram(message[2])))
+            for c in message[1]:
+                try:
+                    if c[3]=="Critical":
+                        pass
+                    else:
+                        continue
+                except KeyError: # just make it maximum severity in doubt
+                    pass
+                except Exception:
+                    print_debug_log(f"Something failed while determinging if {c[0]} should be sent as a notification")
+                text_for_telegram.append(f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Node']][1]} is not answering correctly to its \"is alive\" test in {cont_sevr[c['Name']+c['Node']][0]}.")
+            
+        if len(message[2])>0:
+            for c in message[2]:
+                try:
+                    if c[3]=="Critical":
+                        pass
+                    else:
+                        continue
+                except KeyError: # just make it maximum severity in doubt
+                    pass
+                except Exception:
+                    print_debug_log(f"Something failed while determinging if {c[0]} should be sent as a notification")
+                text_for_telegram.append(f"Container {c[0]} in category {c[1]} wasn't found running in {c[2]}.")
         if len(message[3])>0:
             text_for_telegram.append(message[3])
         if len(message[4])>0:

@@ -99,7 +99,7 @@
 		<div class="modal-content">
 			<div class="modal-header">
 				<h5 class="modal-title" id="editComponentLabel">Edit container</h5>
-				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editComponentModal').modal('hide')">
+				<button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px;" onClick="$('#editComponent').modal('hide')">
 					<span aria-hidden="true">X</span>
 				</button>
 			</div>
@@ -125,11 +125,11 @@
 						<input type="text" class="form-control" id="ContactsEdit" required>
 					</div>
 					<div class="form-group">
-						<label for="PositionEdit">Position/Namespace</label>
+						<label for="PositionEdit">Position (ignored when kind isn't kubernetes)</label>
 						<input type="text" class="form-control" id="PositionEdit" placeholder="Address of the Snap4Sentinel instance's host which holds the container" required>
 					</div>
 					<div class="form-group">
-						<label for="NamespaceEdit">Namespace (ignored when kind isn't docker)</label>
+						<label for="NamespaceEdit">Namespace (ignored when kind isn't kubernetes)</label>
 						<input type="text" class="form-control" id="NamespaceEdit" required>
 					</div>
 					<label for="kind-selection-edit">Select container kind:</label>
@@ -224,7 +224,7 @@
 		let select = document.getElementById('category-selection-edit');
 		let select_k = document.getElementById('kind-selection-edit');
 		let select_severity = document.getElementById('severity-selection-edit');
-		select_severity.value = select_severity;
+		select_severity.value = $(this).data('severity');
 
 		for (let i = 0; i < select.options.length; i++) {
 			if (select.options[i].text === category) {
