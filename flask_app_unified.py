@@ -1139,7 +1139,6 @@ def auto_alert_status():
 
     components_docker = [(a[0],a[3]) for a in results if a[4]=={"docker"}]
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
-    # TODO look here to start applying position to containers
     components_original_docker = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
     components_original_kubernetes = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
 
@@ -1240,11 +1239,11 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
         except Exception as E:
             print_debug_log("Top error:"+traceback.format_exc())
             top_errors.append(top_r)
-
+    snmp_errors = []
     try: # asking right now, not asyncronously
         with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            cursor.execute("SELECT * FROM snmp_host WHERE;")
+            cursor = conn.cursor(buffered=True,dictionary=True)
+            cursor.execute("SELECT * FROM snmp_host;")
             rows = cursor.fetchall()
             cursor.close()
             if rows:
@@ -1252,23 +1251,27 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                     received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
                     data = asyncio.run(gather_snmp_info(received_data))
                     if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
-                        # here it means something bad happened
                         print_debug_log(f"Host {row['host']} gave no data, maybe authentication failed?")
+                        snmp_errors.append((f"Host {row['host']} gave no data, maybe authentication failed?",f"SNMP Host {row['host']}"))
                     else:
                         for ram_usage in data["memory"]:
                             if ram_usage["used_MB"]/ram_usage["total_MB"] > row["threshold_mem"]:
+                                snmp_errors.append((f"Host {row['host']} has its used RAM above the threshold of {row['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {row['host']}"))
                                 pass # too much ram used, send a notification, it is ram_usage["description"] which is at fault
-                        if data["cpu"]["average"]*100 > float(row["threshold_cpu"])*100:
-                            pass # too much cpu used, send a notification, some process is running too hard
-                        if data["load_avg"]["1min"] > float(row["threshold_cpu"])*100 or data["load_avg"]["5min"] > float(row["threshold_cpu"])*100:
-                            pass # too much cpu used recently but not exactly now, send a notification, 15min doesn't matter for notifications
-
+                        if data["cpu"]["average"] > float(row["threshold_cpu"])*100:
+                            snmp_errors.append((f"Host {row['host']} has its used CPU above the threshold of {row['threshold_cpu']}: {data['cpu']['average']}",f"SNMP Host {row['host']}"))
+                        #if data["load_avg"]["1min"] > float(row["threshold_cpu"])*100 or data["load_avg"]["5min"] > float(row["threshold_cpu"])*100:
+                        #    pass # too much cpu used recently but not exactly now, send a notification, 15min doesn't matter for notifications
+                if len(snmp_errors)==0:
+                    print_debug_log("No snmp issues found")
+            else:
+                print_debug_log("No snmp control to be performed")
     except Exception:
-        pass
+        print_debug_log(f"Issue while checking snmp:"+traceback.format_exc())
 
     if len(problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
-            issues = ["","","","","","","","",""]
+            issues = ["","","","","","","","","",""]
             if len(problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
@@ -1287,6 +1290,9 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                 issues[7]=problematic_tops_ram
             if len(top_errors)>0:
                 issues[8]=top_errors
+            if len(snmp_errors)>0:
+                issues[9]=snmp_errors
+                
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -1878,6 +1884,10 @@ def send_advanced_alerts(message):
                     prepare_text_top_error += f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br>"
                     email_data.append({"subject":error_top[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>Issue while interpreting top with errors: ({traceback.format_exc()})</br>"})
             text_for_email += prepare_text_top_error + "<br><br>"
+        if len(message[9])>0:
+            for msg in message[9]:
+                email_data.append({"subject":msg[1] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>{msg[0]}</br>"})
+            
         try:
             if len(text_for_email) > 15 or len(email_data)>0:
                 send_emails(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), email_data)
@@ -1986,6 +1996,10 @@ def send_advanced_alerts(message):
                     prepare_text_top_error += f"\nIssue while interpreting top with errors: ({traceback.format_exc()})\n"
 
             text_for_telegram.append(prepare_text_top_error)
+        if len(message[9])>0:
+            for msg in message[9]:
+                text_for_telegram.append(msg[0])
+         
         print_debug_log(str(text_for_telegram))
         try:
             if len(text_for_telegram)>1:
