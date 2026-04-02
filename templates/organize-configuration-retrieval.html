@@ -22,8 +22,8 @@
       <td>{{item['path']}}</td>
       <td>{{item['what']}}</td>
       <td>{{item['host']}}</td>
-      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteRetrieval" data-component="{{item['id']}}" id="deleteRetrieval{{item['id']}}" onClick="$('#addRetrievalModal').modal('hide')">Delete</button></td>
-      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editRetrieval" data-retrievalid="{{item['id']}}" data-path="{{item['path'] | e}}" data-what="{{item['what'] | e}}" data-host="{{item['host'] | e}}" onClick="$('#addRetrievalModal').modal('hide')">Edit</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-m" data-toggle="modal" data-target="#deleteRetrieval" data-component="{{item['id']}}" id="deleteRetrieval{{item['id']}}" onClick="$('#addRetrievalModal').modal('hide')">Edit</button></td>
+      <td><button type="button" class="btn btn-primary open-modal-e" data-toggle="modal" data-target="#editRetrieval" data-retrievalid="{{item['id']}}" data-path="{{item['path'] | e}}" data-what="{{item['what'] | e}}" data-host="{{item['host'] | e}}" onClick="$('#addRetrievalModal').modal('hide')">Delete</button></td>
     </tr>
 {% endfor %}
   </tbody>
@@ -44,21 +44,23 @@
             <div class="modal-body">
                 <form id="addretrievalForm">
                     <label for="retrievalHostAdd">Select host:</label>
-                    <select id="retrievalHostAdd" name="category-selection" class="form-select">
+                    <select id="retrievalHostAdd" name="category-selection" class="form-select" onchange="previewAdd()">
                         {%for item in rows_hosts %}<option value="{{item['host']}}">{{item['host']}}</option>{% endfor %}
                     </select>
                     <div class="form-group">
                         <label for="retrievalPathAdd">Path</label>
-                        <input type="text" class="form-control" id="retrievalPathAdd" placeholder="/some/path" required>
+                        <input type="text" class="form-control" id="retrievalPathAdd" placeholder="/some/path" required onchange="previewAdd()">
                     </div>
                     <div class="form-group">
                         <label for="whatRetrievalAdd">What</label>
-                        <input type="text" class="form-control" id="whatRetrievalAdd" placeholder="file.txt" required>               
+                        <input type="text" class="form-control" id="whatRetrievalAdd" placeholder="file.txt" required onchange="previewAdd()">               
                     </div>
                     <div class="form-group">
-                        <label for="otherOptionsAdd">What</label>
-                        <input type="text" class="form-control" id="otherOptionsAdd" placeholder="--exclude='*-log*'" required>               
+                        <label for="otherOptionsAdd">Options</label>
+                        <input type="text" class="form-control" id="otherOptionsAdd" placeholder="--exclude='*-log*'" required onchange="previewAdd()">               
                     </div>
+                    <label for="previewAdd">What the result looks like</label>
+                    <input type="text" class="form-control" id="previewAdd" readonly>   
                 </form>
             </div>
             <div class="modal-footer">
@@ -81,22 +83,24 @@
             <div class="modal-body">
                 <form id="editretrievalForm">
                     <label for="retrievalHostEdit">Select host:</label>
-                    <select id="retrievalHostEdit" name="category-selection" class="form-select">
+                    <select id="retrievalHostEdit" name="category-selection" class="form-select" onchange="previewEdit()">
                         {%for item in rows_hosts %}<option value="{{item['host']}}">{{item['host']}}</option>{% endfor %}
                     </select>
                     <div class="form-group">
                         <label for="retrievalPathEdit">Path</label>
-                        <input type="text" class="form-control" id="retrievalPathEdit" placeholder="/some/path" required>
+                        <input type="text" class="form-control" id="retrievalPathEdit" placeholder="/some/path" required onchange="previewEdit()">
                     </div>
                     <div class="form-group">
                         <label for="whatRetrievalEdit">What</label>
-                        <input type="text" class="form-control" id="whatRetrievalEdit" placeholder="file.txt" required>
+                        <input type="text" class="form-control" id="whatRetrievalEdit" placeholder="file.txt" required onchange="previewEdit()">
                     </div>
                     <div class="form-group">
-                        <label for="otherOptionsEdit">What</label>
-                        <input type="text" class="form-control" id="otherOptionsEdit" placeholder="--exclude='*-log*'" required>               
+                        <label for="otherOptionsEdit">Options</label>
+                        <input type="text" class="form-control" id="otherOptionsEdit" placeholder="--exclude='*-log*'" required onchange="previewEdit()">               
                     </div>
                     <input type="text" class="form-control" id="retrievalidEdit" hidden>
+                    <label for="previewEdit">What the result looks like</label>
+                    <input type="text" class="form-control" id="previewEdit" readonly>   
                 </form>
             </div>
             <div class="modal-footer">
@@ -278,6 +282,17 @@
             alert('Please enter a password');
         }
     });
+
+    function previewEdit() {
+        var item_to_show = document.getElementById("previewEdit");
+        item_to_show.value = "ssh userof@" + $('#retrievalHostEdit').val() + ' "tar -cz -C ' + $('#retrievalPathEdit').val() + " " + $('#whatRetrievalEdit').val() + " " + $('#otherOptionsEdit').val();
+    }
+
+    function previewAdd() {
+        var item_to_show = document.getElementById("previewAdd");
+        item_to_show.value = "ssh userof@" + $('#retrievalHostAdd').val() + ' "tar -cz -C ' + $('#retrievalPathAdd').val() + " " + $('#whatRetrievalAdd').val() + " " + $('#otherOptionsAdd').val();
+    }
+
     $('#deleteretrievalButton').on('click', function() {
         var password = $('#passwordInputDelete').val();
         var id = $('#retrievalDelete').val();

@@ -1,4 +1,5 @@
 apscheduler
+httpx
 flask[async]
 PyJWT
 mysql-connector-python

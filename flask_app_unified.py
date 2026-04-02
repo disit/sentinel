@@ -30,6 +30,7 @@ from urllib.parse import urlparse
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash
 import asyncio
+import httpx
 import copy
 import html
 import json
@@ -522,7 +523,39 @@ def mixed_format_error_to_send(instance_of_problem, containers, because = None, 
 KEY_DIR = "/ssh_keys"
 os.makedirs(KEY_DIR, exist_ok=True)
 
-
+async def async_fetch_post(client: httpx.AsyncClient, url: str, data = {}, fallback_url = "", retries=3):
+    retry_exponential=1
+    for attempt in range(retries):
+        try:
+            print_debug_log("parallel asking "+url[:min(len(url),100)])
+            if data == {}:
+                print_debug_log("parallel asking "+url[:min(len(url),100)])
+                response = await client.post(url, timeout=10.0, follow_redirects=True)
+            else:
+                response = await client.post(url, data=data, timeout=10.0, follow_redirects=True)
+            # Raises an exception for 4xx or 5xx status codes
+            response.raise_for_status() 
+            return response.text
+            
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            if attempt == retries - 1:
+                if fallback_url == "":
+                    print_debug_log(f"Failed {url} after {retries} attempts: {e}")
+                    return {"error": "Connection Failed", "details": str(e)}
+                else:
+                    return async_fetch_post(client, fallback_url, data)
+            # Wait a bit before retrying
+            await asyncio.sleep(retry_exponential)
+            retry_exponential = retry_exponential ** 2
+            
+        except httpx.HTTPStatusError as e:
+            # Handle 4xx or 5xx errors specifically
+            print_debug_log(f"Server error {e.response.status_code} at {url}")
+            return {"error": "HTTP Error", "status": e.response.status_code, "text":e.response.text}
+            
+        except Exception as e:
+            print_debug_log(f"Unexpected error at {url}: {e}")
+            return {"error": "Unknown", "message": str(e)}
 
 def parse_top(data):
     # Initialize dictionaries to hold parsed data
@@ -951,7 +984,7 @@ async def run_shell_command(name, command):
         return {"container":name, "result": f"Command {command} had an error:\n{traceback.format_exc()}", "command": command}
 
 
-def auto_alert_status():
+async def auto_alert_status():
     print_debug_log("Starting auto alert status")
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return
@@ -1071,21 +1104,44 @@ def auto_alert_status():
             conn.commit()
             results = cursor.fetchall()
             total_answer=[]
-            try:
-                for r in results:
-                    print_debug_log(f"Asking data from {r[0]}")
-                    obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
-                    try:
-                        total_answer = total_answer + json.loads(obtained)
-                    except:
+            if os.getenv("parallel-auto-alert-status","True"):
+                try:
+                    print_debug_log("Attempting parallel calls")
+                    async with httpx.AsyncClient() as client:
+                        # We wrap the tasks to ensure they all finish even if some fail
+                        tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
+                        
+                        # return_exceptions=True prevents one crash from stopping others
+                        responses = await asyncio.gather(*tasks, return_exceptions=True)
+                        
+                        for returned_containers in responses:
+                            try:
+                                if type(returned_containers) == dict:
+                                    print_debug_log("Issue in parallel reading containers, got an error in the request: "+str(returned_containers))
+                                else:
+                                    json_of_this_reponse = json.loads(returned_containers)
+                                    total_answer = total_answer + json_of_this_reponse
+                            except:
+                                print_debug_log("Issue in parallel reading containers: "+traceback.format_exc())
+                except:
+                    print_debug_log("General issue in parallel reading containers: "+traceback.format_exc())
+            
+            else:
+                try:
+                    for r in results:
+                        print_debug_log(f"Asking data from {r[0]}")
+                        obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                         try:
-                            obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             total_answer = total_answer + json.loads(obtained)
-                            print(f"Received {obtained[:100]}... from {r[0]}")
-                        except Exception as E:
-                            print("Error on multi reading container data:", str(E))
-            except requests.exceptions.ConnectionError as E:
-                print("Error on multi reading container data:", str(E))
+                        except:
+                            try:
+                                obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                                total_answer = total_answer + json.loads(obtained)
+                                print(f"Received {obtained[:100]}... from {r[0]}")
+                            except Exception as E:
+                                print("Error on multi reading container data:", str(E))
+                except requests.exceptions.ConnectionError as E:
+                    print("Error on multi reading container data:", str(E))
         containers_merged = containers_merged + total_answer
         #new_containers_merged = []
         source = os.getenv("platform-url","")
@@ -1132,15 +1188,28 @@ def auto_alert_status():
     except Exception:
         send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
         return
-    is_alive_with_ports = asyncio.run(auto_run_tests()) # check namespace here if k8s
+    
+    
+    try:
+        # Check if there is an active loop in the current thread
+        loop = asyncio.get_running_loop()
+        # If we are here, a loop is running. 
+        # We create a task to run the coroutine concurrently.
+        is_alive_with_ports = await auto_run_tests()
+    except RuntimeError:
+        # If we are here, no loop is running.
+        # We start a new one to run the coroutine.
+        is_alive_with_ports = asyncio.run(auto_run_tests())
+    
+    #is_alive_with_ports = asyncio.run(auto_run_tests) # check namespace here if k8s
     is_alive_with_ports = [a for a in is_alive_with_ports if "Failure" in a["result"]] # only keep those who failed
     containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
     containers_merged_kubernetes = [a for a in containers_merged if not a["Namespace"].startswith("Docker - ")]
 
     components_docker = [(a[0],a[3]) for a in results if a[4]=={"docker"}]
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
-    components_original_docker = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
-    components_original_kubernetes = [(a[0][:a[0].find("*")-1 if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
+    components_original_docker = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
+    components_original_kubernetes = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
 
     containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
     
@@ -1166,7 +1235,7 @@ def auto_alert_status():
     for c in components_original_docker: # use this to determine who's missing
         found=False
         for in_that_position in [a for a in containers_merged if a["Node"]==c[2]]:
-            if in_that_position["Name"] == c[0]:
+            if in_that_position["Name"] == c[0] or c[0]=="":
                 found=True
                 break
         if not found:
@@ -1176,7 +1245,7 @@ def auto_alert_status():
     for c in components_original_kubernetes: # use this to determine who's missing
         found=False
         for in_that_position in [a for a in containers_merged if a["Node"]==c[2]]:
-            if in_that_position["Name"] == c[0]:
+            if in_that_position["Name"] == c[0] or c[0]=="":
                 found=True
                 break
         if not found:
@@ -1249,7 +1318,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
             if rows:
                 for row in rows:
                     received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
-                    data = asyncio.run(gather_snmp_info(received_data))
+                    data = await gather_snmp_info(received_data)
                     if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
                         print_debug_log(f"Host {row['host']} gave no data, maybe authentication failed?")
                         snmp_errors.append((f"Host {row['host']} gave no data, maybe authentication failed?",f"SNMP Host {row['host']}"))
@@ -1437,7 +1506,7 @@ def send_alerts(message):
     except Exception:
         print("Error sending alerts:",traceback.format_exc())
 
-def update_container_state_db():
+async def update_container_state_db():
     print_debug_log("Populating database with container data")
     if os.getenv("is-master","False") == "False": #slaves don't write to db
         return
@@ -1460,6 +1529,28 @@ def update_container_state_db():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
+                if os.getenv("parallel-db-refresh","True"):
+                    try:
+                        print_debug_log("Attempting parallel calls db")
+                        async with httpx.AsyncClient() as client:
+                            # We wrap the tasks to ensure they all finish even if some fail
+                            tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
+                            
+                            # return_exceptions=True prevents one crash from stopping others
+                            responses = await asyncio.gather(*tasks, return_exceptions=True)
+                            
+                            for returned_containers in responses:
+                                try:
+                                    if type(returned_containers) == dict:
+                                        print_debug_log("Issue in parallel reading containers db, got an error in the request: "+str(returned_containers))
+                                    else:
+                                        json_of_this_reponse = json.loads(returned_containers)
+                                        total_answer = total_answer + json_of_this_reponse
+                                except:
+                                    print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
+                    except:
+                        print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
+            
                 for r in results:
                     try:
                         print_debug_log(f"Getting data from {r[0]}")
@@ -1554,7 +1645,7 @@ def update_container_state_db():
                 conversion["Name"] = item["metadata"]["name"]
                 try:
                     conversion["Ports"] = ", ".join([f"{a['containerPort']}" for a in item["spec"]["containers"][0]["ports"]])
-                except KeyError as E:
+                except KeyError:
                     conversion["Ports"] = "No ports"
 
                 fmt = "%Y-%m-%dT%H:%M:%SZ"
@@ -1562,7 +1653,7 @@ def update_container_state_db():
                     dt1 = datetime.strptime(item["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], fmt)
                     dt2 = datetime.now()
                     conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minute(s) and {(dt2-dt1).seconds % 60} second(s)"
-                except Exception as E:
+                except Exception:
                     conversion["RunningFor"] = "Not running"
                 conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
@@ -1593,6 +1684,27 @@ def update_container_state_db():
                 conn.commit()
                 results = cursor.fetchall()
                 total_answer=[]
+                if os.getenv("parallel-db-refresh","True"):
+                    try:
+                        print_debug_log("Attempting parallel calls db")
+                        async with httpx.AsyncClient() as client:
+                            # We wrap the tasks to ensure they all finish even if some fail
+                            tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
+                            
+                            # return_exceptions=True prevents one crash from stopping others
+                            responses = await asyncio.gather(*tasks, return_exceptions=True)
+                            
+                            for returned_containers in responses:
+                                try:
+                                    if type(returned_containers) == dict:
+                                        print_debug_log("Issue in parallel reading containers db, got an error in the request: "+str(returned_containers))
+                                    else:
+                                        json_of_this_reponse = json.loads(returned_containers)
+                                        total_answer = total_answer + json_of_this_reponse
+                                except:
+                                    print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
+                    except:
+                        print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
                 for r in results:
                     try:
                         print_debug_log(f"Getting data from {r[0]}")
@@ -2013,7 +2125,8 @@ def send_advanced_alerts(message):
 
 def job_wrapper_updatedb(timeout_seconds):
     # Create a process to run the task
-    p = multiprocessing.Process(target=update_container_state_db)
+    p = multiprocessing.Process(target=lambda: asyncio.run(update_container_state_db()))
+    #p = multiprocessing.Process(target=update_container_state_db)
     p.start()
 
     # Wait for the process to finish or hit the timeout
@@ -2028,7 +2141,7 @@ def job_wrapper_updatedb(timeout_seconds):
 
 def job_wrapper_notifications(timeout_seconds):
     # Create a process to run the task
-    p = multiprocessing.Process(target=auto_alert_status)
+    p = multiprocessing.Process(target=lambda: asyncio.run(auto_alert_status()))
     p.start()
 
     # Wait for the process to finish or hit the timeout
@@ -2041,10 +2154,10 @@ def job_wrapper_notifications(timeout_seconds):
     else:
         pass  # all is fine
 
-update_container_state_db() #on start, populate immediately
+asyncio.run(update_container_state_db()) #on start, populate immediately
 scheduler = BackgroundScheduler()
-scheduler.add_job(job_wrapper_updatedb, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")), args=[120])
-scheduler.add_job(job_wrapper_notifications, trigger='interval', max_instances=5, minutes=int(os.getenv("error-notification-frequency","5")), args=[120])
+scheduler.add_job(job_wrapper_updatedb, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")), args=[int(os.getenv("maximum-timeout-allowed", "120"))])
+scheduler.add_job(job_wrapper_notifications, trigger='interval', max_instances=5, minutes=int(os.getenv("error-notification-frequency","5")), args=[int(os.getenv("maximum-timeout-allowed", "120"))])
 
 #scheduler.add_job(auto_alert_status, trigger='interval', max_instances=5, minutes=int(os.getenv("error-notification-frequency","5")))
 #scheduler.add_job(update_container_state_db, trigger='interval', max_instances=5, minutes=int(os.getenv("database-update-frequency", "2")))
@@ -2053,7 +2166,8 @@ scheduler.add_job(isalive, 'cron', hour=20, minute=0)
 scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-frequency-minutes","5")))
 scheduler.add_job(clean_old_db_entries, 'cron',day=1)
 scheduler.start()
-auto_alert_status()
+asyncio.run(auto_alert_status())
+
 
 slave_attempt_self_register()
 
@@ -2118,11 +2232,11 @@ def create_app():
     
     @app.route("/refresh_containers_database", methods=["GET"])
     def refresh_database():
-        print_debug_log("Manual")
+        print_debug_log("Manual containers refresh")
         if 'username' in session:
             if session["username"] == "admin":
-                update_container_state_db()
-                return "Updated data", 201
+                asyncio.run(update_container_state_db())
+                return redirect(url_for('main_page'), code=201)
             else:
                 return "Not allowed to refresh the database for containers", 401
         else:
@@ -3242,14 +3356,14 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                             return result, 500
                         else:
                             log_to_db('rebooting_containers', 'docker restart '+request.form.to_dict()['id']+' resulted in: '+result, user_op=session['username'])
-                            update_container_state_db()
+                            asyncio.run(update_container_state_db())
                             return result
                     else:
                         try:
                             result = queued_running(f"kubectl rollout restart deployment {'-'.join(request.form.to_dict()['id'].split('-')[:-2])} -n $(kubectl get deployments --all-namespaces | awk '$2==\"{'-'.join(request.form.to_dict()['id'].split('-')[:-2])}\" {{print $1}}')")
                             #result = queued_running('kubectl rollout restart deployments/'+"-".join(request.form.to_dict()['id'].split("-")[:-2])).stdout
                             log_to_db('rebooting_containers', 'kubernetes restart '+request.form.to_dict()['id']+' resulted in: '+result.stdout, user_op=session['username'])
-                            update_container_state_db()
+                            asyncio.run(update_container_state_db())
                             return result.stdout
                         except Exception:
                             return f"Issue while rebooting container/pod: {traceback.format_exc()}", 500
@@ -3257,7 +3371,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     try:
                         r = requests.post(request.form.to_dict()['source']+"/reboot_container", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=1)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM),"id":request.form.to_dict()['id']})
                         print(f"asking {request.form.to_dict()['source']} to reboot {request.form.to_dict()['id']} resulted in code {r.status_code} and body {r.text[:100]}...")
-                        update_container_state_db()
+                        asyncio.run(update_container_state_db())
                         return r.text, r.status_code
                     except:
                         return f"Issue while rebooting pod/container: {traceback.format_exc()}", 500
