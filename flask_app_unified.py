@@ -1846,13 +1846,13 @@ def calculate_timedelta(first_time: str):
     days = delta.days
     hours, remainder = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    final_string=f"{seconds} seconds"
+    final_string=f"{seconds} s"
     if minutes>0:
-        final_string = f"{minutes} minutes, " + final_string
+        final_string = f"{minutes} m, " + final_string
     if hours>0:
-        final_string = f"{hours} hours, " + final_string
+        final_string = f"{hours} h, " + final_string
     if days>0:
-        final_string = f"{days} days, " + final_string
+        final_string = f"{days} d, " + final_string
     return final_string
 
 def slave_attempt_self_register():
@@ -3175,7 +3175,7 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                                 "Namespace": result[3],
                                 "Node": result[9],
                                 "Ports": "Not applicable",
-                                "RunningFor": calculate_timedelta(createtime),
+                                "RunningFor": calculate_timedelta(createtime) + f" - last ran: {result[0]}",
                                 "Source": result[10] if result[10] is not None else (os.getenv("platform-url","") if result[8] else "Nonlocal"),
                                 "State": ("running - "+str(result[1]) if result[2]==None else result[2]) if result[7]==0 else "This cronjob is disabled",
                                 "Status": "Enabled" if result[7]==0 else "Disabled",

@@ -239,7 +239,7 @@
 
                     <div class="form-group">
                         <label for="DescriptionEdit">Description</label>
-                        <input type="number" min="0" class="form-control" id="DescriptionEdit" placeholder="Insert the description which explains the cronjob">
+                        <input type="text" class="form-control" id="DescriptionEdit" placeholder="Insert the description which explains the cronjob">
                     </div>                    
                     
                     <div class="form-group">
@@ -516,7 +516,6 @@
         let select_where_to_run = document.getElementById('where-selection-edit');
         select.value=category;
         select_severity.value=severity;
-        if (where_to_run==="master") {select_where_to_run.value="";} else {select_where_to_run.value=where;}
         {% for element in cronjobs_prototypes%}
         if (command.includes("{{element[1] | e}}")) {
             document.getElementById('command-prototype-edit').value = "{{element[1] | e}}";
@@ -527,6 +526,24 @@
         $('#editCronJob').modal('show');
     });
     $('.open-modal').on('click', function() {
+        $('#Timeout_timeAdd').val(0);
+        $('#RetriesAdd').val(0);
+        $('#Retries_waitAdd').val(0);
+        $('#IPAdd').val("");
+        $('#TargetAdd').val("");
+        $('#ContactsAdd').val("");
+        $('#NameCronJobAdd').val("");
+        $('#RestartLogicAdd').val("");
+        $('#DescriptionAdd').val("");
+        $('#WhereToRunAdd').val("");
+        $('#createEnabled')[0].checked=1;
+        let select = document.getElementById('category-selection');
+        let select_severity = document.getElementById('severity-selection');
+        let select_where_to_run = document.getElementById('where-selection-add');
+        select_severity.value="Critical";
+        select_where_to_run.value="";
+        select.value = "{{categories[0][0] | e}}";
+        $('#CommandAdd').val(""); //last because parsing issues may break the original command
         $('#addCronJobModal').modal('show');
     });
     $('#deleteCronJobButton').on('click', function() {
