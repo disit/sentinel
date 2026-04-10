@@ -38,7 +38,9 @@ Deprecated, to be removed in future versions
 #### /refresh_containers_database
 ##### GET
 If the user is logged is an admin, it forces the backed to update its containers data (async)
+
 If the user is not an admin, it's forbidden from doing the above
+
 Goes to login if user is not in session
 
 ---
@@ -46,53 +48,75 @@ Goes to login if user is not in session
 #### /organize_containers
 ##### GET
 If the user is logged is an admin, it shows the interface for organizing containers (docker and kubernetes)
+
 If the user is not an admin, it's forbidden from doing the above
+
 Goes to login if user is not in session
 
 ---
 ### add_container
 #### /add_container
 ##### POST
+##### requires the following in the form data: 'id', 'category', 'contacts', 'namespace', 'kind', 'severity', 'kind'
 If the user is logged is an admin, it adds to the database a new container to be supervised
+
 If the user is not an admin, it's forbidden from doing the above
+
 Goes to login if user is not in session
 
 ---
 ### edit_container
 #### /edit_container
 ##### POST
+##### requires the following in the form data: 'id', 'category', 'contacts', 'namespace', 'kind', 'severity', 'kind'
 If the user is logged is an admin, it edits the database to change a container to be supervised
+
 If the user is not an admin, it's forbidden from doing the above
+
 Goes to login if user is not in session
 
 ---
 ### delete_container
 #### /delete_container
-##### POST (should be a DELETE in the future)
+##### POST, DELETE (should be only DELETE in the future)
+##### requires the following in the form data: 'psw', 'id'
 If the user is logged is an admin, it deletes a container to be supervised from the database
+
 If the user is not an admin, it's forbidden from doing the above
+
+Wants the password of the user as a double security
+
 Goes to login if user is not in session
 
 ---
 ### restart_logic_cronjob
 #### /restart_logic_cronjob
 ##### POST
-If the user is logged is an admin, takes the related restart command for a cronjob and runs it, possibly delegating it to a slave by calling its `/restart_logic_cronjob_slave` when applicable
+##### requires the following in the form data: 'cronjob_id'
+
+If the user is logged is an admin, takes the related restart command for a cronjob identified by `cronjob_id` and runs it, possibly delegating it to a slave by calling its `/restart_logic_cronjob_slave` when applicable
+
 If the user is not an admin, it's forbidden from doing the above
+
 Goes to login if user is not in session
 
 ---
 ### restart_logic_cronjob_slave
 #### /restart_logic_cronjob_slave
 ##### POST
+
 Called by a master when a cronjob running on a slave must be restarted
 
 ---
 ### run_specific_cronjob
 #### /run_specific_cronjob
 ##### POST
+##### requires the following in the form data: 'cronjob_id'
+
 If the user is logged is an admin, it performs the indicated cronjob now to get immediate results
+
 If the user is not an admin, it's forbidden from doing the above
+
 Returns 500 if the user is not in session
 
 ---
@@ -105,8 +129,11 @@ Deprecated
 ### organize_cronjobs_new
 #### /organize_cronjobs_new
 ##### GET
+
 If the user is logged is an admin, it shows the interface for organizing cronjobs
+
 If the user is not an admin, it's forbidden from doing the above
+
 Returns 500 if the user is not in session
 
 ---
@@ -125,54 +152,79 @@ Deprecated
 ### add_cronjob_new
 #### /add_cronjob_new
 ##### POST
+##### requires the following in the form data: 'name', 'command', 'category', 'where_to_run' (optional), "disabled", 'restart', 'description', 'Timeout_timeAdd', 'RetriesAdd', 'Retries_waitAdd', 'IPAdd', 'TargetAdd', 'contacts', 'severity'
+
 If the user is logged is an admin, it adds to the database a new cronjob to be performed periodically
+
 If the user is not an admin, it's forbidden from doing the above
+
 Goes to login if user is not in session
 
 ---
 ### edit_cronjob_new
 #### /edit_cronjob_new
 ##### POST
-If the user is logged is an admin, it edits the database entry of a cronjob
+##### requires the following in the form data: 'name', 'command', 'category', 'where_to_run' (optional), "disabled", 'restart', 'description', 'Timeout_timeAdd', 'RetriesAdd', 'Retries_waitAdd', 'IPAdd', 'TargetAdd', 'contacts', 'severity', 'id'
+
+If the user is logged is an admin, it edits the database entry of a cronjob with the given `id`
+
 If the user is not an admin, it's forbidden from doing the above
+
 Goes to login if user is not in session
 
 ---
 ### delete_cronjob
 #### /delete_cronjob
-##### POST (should be DELETE in the future)
+##### POST, DELETE (should be only DELETE in the future)
+##### requires the following in the form data: 'psw', 'id'
+
 If the user is logged is an admin, it deletes a cronjob from the database
+
 If the user is not an admin, it's forbidden from doing the above
+
+Wants the password of the user as a double security
+
 Goes to login if user is not in session
 
 ---
 ### organize_extra_resources
 #### /organize_extra_resources
 ##### GET
+
 Discontinued due to cronjobs
 
 ---
 ### add_extra_resource
 #### /add_extra_resource
 ##### POST
+
 Discontinued due to cronjobs
 
 ---
 ### edit_extra_resource
 #### /edit_extra_resource
 ##### POST
+
 Discontinued due to cronjobs
 
 ---
 ### delete_extra_resource
 #### /delete_extra_resource
-##### POST (should be DELETE in the future, if it wasn't discontinued)
+##### POST (should be DELETE in the future, if it wasn't to be discontinued)
+
 Discontinued due to cronjobs
 
 ---
 ### organize_tests
 #### /organize_tests
-##### @app.route("/organize_tests", methods=["GET"])
+##### GET
+
+If the user is logged is an admin, it shows the interface for organizing tests (of containers)
+
+If the user is not an admin, it's forbidden from doing the above
+
+Returns 500 if the user is not in session
+
 ---
 ### add_test
 #### /add_test

@@ -2321,7 +2321,7 @@ def create_app():
                 return f"Something went wrong during the editing of a container because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
 
-    @app.route("/delete_container", methods=["POST"])
+    @app.route("/delete_container", methods=["POST", "DELETE"])
     def delete_container():
         print_debug_log("Deleting container")
         if 'username' in session:
@@ -2645,7 +2645,7 @@ def create_app():
                 return f"Something went wrong during the editing of a cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
 
-    @app.route("/delete_cronjob", methods=["POST"])
+    @app.route("/delete_cronjob", methods=["POST", "DELETE"])
     def delete_cronjob():
         print_debug_log("Deleting cronjob")
         if 'username' in session:
