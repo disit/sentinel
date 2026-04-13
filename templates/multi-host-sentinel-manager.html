@@ -32,7 +32,7 @@ function deleteHost(host) {
             $.ajax({
                 url: './delete_sentinel_host',
                 data: {hostname: hostname},
-                type: 'POST',
+                type: 'DELETE',
                 success: function(response) {
                     alert("Host was deleted!");
                     location.reload();

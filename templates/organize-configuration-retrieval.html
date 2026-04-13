@@ -301,7 +301,7 @@
                 $.ajax({
                     url: './delete_configuration_retrieval',
                     data: {psw: password, id: id},
-                    type: 'POST',
+                    type: 'DELETE',
                     success: function(response) {
                         alert("Retrieval was deleted!");
                         window.location = window.location.href.split("?")[0];

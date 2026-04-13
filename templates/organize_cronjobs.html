@@ -298,7 +298,7 @@
                 $.ajax({
                     url: './delete_cronjob',
                     data: {id: id, psw: password},
-                    type: 'POST',
+                    type: 'DELETE',
                     success: function(response) {
                         alert("Cronjob was deleted!");
                         window.location = window.location.href.split("?")[0];

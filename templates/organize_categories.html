@@ -142,7 +142,7 @@
 				$.ajax({
 					url: './delete_category',
 					data: {id: id, psw: password},
-					type: 'POST',
+					type: 'DELETE',
 					success: function(response) {
 						alert("Category was deleted!");
 						location.reload();

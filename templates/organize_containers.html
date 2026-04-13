@@ -181,7 +181,7 @@
 				$.ajax({
 					url: './delete_container',
 					data: {id: id, psw: password},
-					type: 'POST',
+					type: 'DELETE',
 					success: function(response) {
 						alert(id + " was deleted!");
 						location.reload();

@@ -189,7 +189,7 @@
 				$.ajax({
 					url: './delete_extra_resource',
 					data: {id: id, psw: password},
-					type: 'POST',
+					type: 'DELETE',
 					success: function(response) {
 						alert("The new resource was deleted!");
 						location.reload();

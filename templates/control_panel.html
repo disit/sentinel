@@ -42,7 +42,7 @@ function deleteHost(host) {
             $.ajax({
                 url: './delete_saved_host',
                 data: {host: host},
-                type: 'POST',
+                type: 'DELETE',
                 success: function(response) {
                     alert("Host was deleted!");
                     location.reload();

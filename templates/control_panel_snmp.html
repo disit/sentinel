@@ -47,7 +47,7 @@ function deleteSNMPHost(host) {
             $.ajax({
                 url: './delete_snmp_host',
                 data: {host: host},
-                type: 'POST',
+                type: 'DELETE',
                 success: function(response) {
                     alert("SNMP host was deleted!");
                     location.reload();

@@ -37,7 +37,7 @@ Deprecated, to be removed in future versions
 ### refresh_containers_database
 #### /refresh_containers_database
 ##### GET
-If the user is logged is an admin, it forces the backed to update its containers data (async)
+If the user logged is an admin, it forces the backed to update its containers data (async)
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -47,7 +47,7 @@ Goes to login if user is not in session
 ### organize_containers
 #### /organize_containers
 ##### GET
-If the user is logged is an admin, it shows the interface for organizing containers (docker and kubernetes)
+If the user logged is an admin, it shows the interface for organizing containers (docker and kubernetes)
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -58,7 +58,7 @@ Goes to login if user is not in session
 #### /add_container
 ##### POST
 ##### requires the following in the form data: 'id', 'category', 'contacts', 'namespace', 'kind', 'severity', 'kind'
-If the user is logged is an admin, it adds to the database a new container to be supervised
+If the user logged is an admin, it adds to the database a new container to be supervised
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -69,7 +69,7 @@ Goes to login if user is not in session
 #### /edit_container
 ##### POST
 ##### requires the following in the form data: 'id', 'category', 'contacts', 'namespace', 'kind', 'severity', 'kind'
-If the user is logged is an admin, it edits the database to change a container to be supervised
+If the user logged is an admin, it edits the database to change a container to be supervised
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -80,7 +80,7 @@ Goes to login if user is not in session
 #### /delete_container
 ##### POST, DELETE (should be only DELETE in the future)
 ##### requires the following in the form data: 'psw', 'id'
-If the user is logged is an admin, it deletes a container to be supervised from the database
+If the user logged is an admin, it deletes a container to be supervised from the database
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -94,7 +94,7 @@ Goes to login if user is not in session
 ##### POST
 ##### requires the following in the form data: 'cronjob_id'
 
-If the user is logged is an admin, takes the related restart command for a cronjob identified by `cronjob_id` and runs it, possibly delegating it to a slave by calling its `/restart_logic_cronjob_slave` when applicable
+If the user logged is an admin, takes the related restart command for a cronjob identified by `cronjob_id` and runs it, possibly delegating it to a slave by calling its `/restart_logic_cronjob_slave` when applicable
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -113,7 +113,7 @@ Called by a master when a cronjob running on a slave must be restarted
 ##### POST
 ##### requires the following in the form data: 'cronjob_id'
 
-If the user is logged is an admin, it performs the indicated cronjob now to get immediate results
+If the user logged is an admin, it performs the indicated cronjob now to get immediate results
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -130,7 +130,7 @@ Deprecated
 #### /organize_cronjobs_new
 ##### GET
 
-If the user is logged is an admin, it shows the interface for organizing cronjobs
+If the user logged is an admin, it shows the interface for organizing cronjobs
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -154,7 +154,7 @@ Deprecated
 ##### POST
 ##### requires the following in the form data: 'name', 'command', 'category', 'where_to_run' (optional), "disabled", 'restart', 'description', 'Timeout_timeAdd', 'RetriesAdd', 'Retries_waitAdd', 'IPAdd', 'TargetAdd', 'contacts', 'severity'
 
-If the user is logged is an admin, it adds to the database a new cronjob to be performed periodically
+If the user logged is an admin, it adds to the database a new cronjob to be performed periodically
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -166,7 +166,7 @@ Goes to login if user is not in session
 ##### POST
 ##### requires the following in the form data: 'name', 'command', 'category', 'where_to_run' (optional), "disabled", 'restart', 'description', 'Timeout_timeAdd', 'RetriesAdd', 'Retries_waitAdd', 'IPAdd', 'TargetAdd', 'contacts', 'severity', 'id'
 
-If the user is logged is an admin, it edits the database entry of a cronjob with the given `id`
+If the user logged is an admin, it edits the database entry of a cronjob with the given `id`
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -178,7 +178,7 @@ Goes to login if user is not in session
 ##### POST, DELETE (should be only DELETE in the future)
 ##### requires the following in the form data: 'psw', 'id'
 
-If the user is logged is an admin, it deletes a cronjob from the database
+If the user logged is an admin, it deletes a cronjob from the database
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -210,7 +210,7 @@ Discontinued due to cronjobs
 ---
 ### delete_extra_resource
 #### /delete_extra_resource
-##### POST (should be DELETE in the future, if it wasn't to be discontinued)
+##### POST, DELETE (should be DELETE in the future, if it wasn't to be discontinued)
 
 Discontinued due to cronjobs
 
@@ -219,7 +219,7 @@ Discontinued due to cronjobs
 #### /organize_tests
 ##### GET
 
-If the user is logged is an admin, it shows the interface for organizing tests (of containers)
+If the user logged is an admin, it shows the interface for organizing tests (of containers)
 
 If the user is not an admin, it's forbidden from doing the above
 
@@ -228,177 +228,523 @@ Returns 500 if the user is not in session
 ---
 ### add_test
 #### /add_test
-##### @app.route("/add_test", methods=["POST"])
+##### POST
+##### requires the following in form data: 'container_name', 'command', 'command_explained'
+
+If the user logged is an admin, it adds to the database a new test (related to a container) to be performed periodically
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if user is not in session
+
 ---
 ### edit_test
 #### /edit_test
-##### @app.route("/edit_test", methods=["POST"])
+##### POST
+##### requires the following in form data: 'container_name', 'command', 'command_explained', 'id'
+
+If the user logged is an admin, it edits the database entry of a test with the given `id`
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if user is not in session
+
 ---
 ### delete_test
 #### /delete_test
-##### @app.route("/delete_test", methods=["POST"])
+##### POST, DELETE (should be only delete in the future)
+##### requires the following in the form data: 'psw', 'id'
+
+If the user logged is an admin, it deletes a test from the database
+
+If the user is not an admin, it's forbidden from doing the above
+
+Wants the password of the user as a double security
+
+Goes to login if user is not in session
+
 ---
 ### organize_complex_tests
 #### /organize_complex_tests
-##### @app.route("/organize_complex_tests", methods=["GET"])
+##### GET
+
+If the user logged is an admin, it shows the interface for organizing complex tests (of categories)
+
+If the user is not an admin, it's forbidden from doing the above
+
+Returns 500 if the user is not in session
+
 ---
 ### add_complex_test
 #### /add_complex_test
-##### @app.route("/add_complex_test", methods=["POST"])
+##### POST
+##### requires the following in the form data: 'name', 'command', 'extra_parameters', 'button_color', 'explanation', 'category'
+
+If the user logged is an admin, it adds to the database a new complex test (related to a category) to be performed on demand
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if user is not in session
+
 ---
 ### edit_complex_test
 #### /edit_complex_test
-##### @app.route("/edit_complex_test", methods=["POST"])
+##### POST
+##### requires the following in form data: 'name', 'command', 'extra_parameters', 'button_color', 'explanation', 'category', 'id'
+
+If the user logged is an admin, it edits the database entry of a complex test with the given `id`
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if user is not in session
+
 ---
 ### delete_complex_test
 #### /delete_complex_test
-##### @app.route("/delete_complex_test", methods=["POST"])
+##### POST, DELETE (should be only delete in the future)
+##### requires the following in the form data: 'psw', 'id'
+
+If the user logged is an admin, it deletes a complex test from the database
+
+If the user is not an admin, it's forbidden from doing the above
+
+Wants the password of the user as a double security
+
+Goes to login if user is not in session
+
 ---
 ### organize_categories
 #### /organize_categories
-##### @app.route("/organize_categories", methods=["GET"])
+##### GET
+
+If the user logged is an admin, it shows the interface for organizing categories
+
+If the user is not an admin, it's forbidden from doing the above
+
+Returns 500 if the user is not in session
+
 ---
 ### add_category
 #### /add_category
-##### @app.route("/add_category", methods=["POST"])
+##### POST
+##### requires the following in the form data: 'category'
+
+If the user logged is an admin, it adds to the database a new category
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if user is not in session
+
 ---
 ### edit_category
 #### /edit_category
-##### @app.route("/edit_category", methods=["POST"])
+##### POST
+##### requires the following in the form data: 'category', 'id'
+
+If the user logged is an admin, it edits the database entry of a category with the given `id`
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if user is not in session
+
 ---
 ### delete_category
 #### /delete_category
-##### @app.route("/delete_category", methods=["POST"])
+##### POST, DELETE (should be only delete in the future)
+##### requires the following in the form data: 'password', 'id'
+
+If the user logged is an admin, it deletes a category from the database
+
+If the user is not an admin, it's forbidden from doing the above
+
+Wants the password of the user as a double security
+
+Goes to login if user is not in session
+
 ---
 ### login
 #### /login
-##### @app.route("/login", methods=['GET', 'POST'])
+##### GET, POST
+##### requires the following in the form data in POST: 'password', 'username'
+
+The GET returns the login page, the POST attempts the login with username and password
+
 ---
 ### login_2
 #### /login_2
-##### @app.route("/login_2", methods=['GET', 'POST'])
+##### GET, POST
+##### requires the following in the form data in POST: 'password', 'username'
+
+Not yet used, as above but prints errors to webpage, if any
+
 ---
 ### get_data_from_source
 #### /get_data_from_source
-##### @app.route("/get_data_from_source", methods=["GET"])
+##### GET
+##### requires the following in the form data in GET: 'id'
+
+Extra resource internal resolution, discontinued due to cronjobs
+
 ---
 ### get_complex_test_buttons
 #### /get_complex_test_buttons
-##### @app.route("/get_complex_test_buttons")
+##### GET
+
+Called by the main ui, get the buttons, still not mainly used
+
 ---
 ### container_is_okay
 #### /container_is_okay
-##### @app.route("/container_is_okay", methods=['POST'])
+##### POST
+##### requires the following in the form data in GET: 'container'
+
+Actually never called
+
 ---
 ### read_containers
 #### /read_containers
-##### @app.route("/read_containers", methods=['POST'])
+##### POST (should be a GET maybe?)
+
+Gets real time container data
+
 ---
 ### read_containers_db
 #### /read_containers_db
-##### @app.route("/read_containers_db", methods=['GET'])
+##### GET
+
+Gets container data from db
+
 ---
 ### run_test
 #### /run_test
-##### @app.route("/run_test", methods=['POST'])
+##### POST
+##### requires the following in the form data: 'container'
+
+Runs the test of the given container, returns results (and saves them)
+
 ---
 ### run_test_complex
 #### /run_test_complex
-##### @app.route("/run_test_complex", methods=['POST'])
+##### POST
+##### requires the following in the form data: 'test_name'
+
+As above, but a complex test instad of a test
+
 ---
 ### test_all_ports
 #### /test_all_ports
-##### @app.route("/test_all_ports", methods=['GET'])
+##### GET
+
+Runs all tests of containers
+
 ---
 ### deauthenticate
 #### /deauthenticate
-##### @app.route("/deauthenticate", methods=['POST','GET'])
+##### POST, GET (probably can be compressed to just one method)
+
+Clears the session
 ---
 ### reboot_container
 #### /reboot_container
-##### @app.route("/reboot_container", methods=['POST'])
+##### POST
+##### requires the following in the form data: 'psw', 'id'
+
+Restarts a container (docker) or issues a rollout (kubernetes) with the given name. Will call itself across nodes of the sentinel cluster. 
+
 ---
 ### get_muted_components
 #### /get_muted_components
-##### @app.route("/get_muted_components", methods=['GET'])
+##### GET
+
+Unused functionality
+
 ---
 ### mute_component_by_hours
 #### /mute_component_by_hours
-##### @app.route("/mute_component_by_hours", methods=['POST'])
+##### POST
+
+Unused functionality
+
 ---
 ### cronjobs
 #### /cronjobs
-##### @app.route("/cronjobs", methods=['POST', 'GET'])
+##### POST, GET
+
+Gets the lastest cronjob results, over 2 methods because main UI reasons
+
 ---
 ### tests_results
 #### /tests_results
-##### @app.route("/tests_results", methods=['POST'])
+##### POST
+
+As above, shoult be a GET but the UI demands otherwise, tests over cronjobs
+
 ---
 ### get_complex_tests
 #### /get_complex_tests
-##### @app.route("/get_complex_tests", methods=["GET"])
+##### GET
+
+As above, complex tests over tests
+
 ---
 ### container/<podname>
 #### /container/<podname>
-##### @app.route("/container/<podname>", methods=['POST'])
+##### POST
+
+Gets the logs of the container/pod in path, shoult be a GET but the UI demands otherwise
+
 ---
 ### cronjobs_logs
 #### /cronjobs_logs
-##### @app.route("/cronjobs_logs", methods=["POST", "GET"])
+##### POST, GET (should be only GET in the future)
+
+As above, but for cronjobs executions
+
 ---
 ### advanced-container/<container_name>
 #### /advanced-container/<container_name>
-##### @app.route("/advanced-container/<container_name>")
+##### GET
+
+Seems a replica of /container/<podname> (method doesn't matter)
+
 ---
 ### get_summary_status
 #### /get_summary_status
-##### @app.route("/get_summary_status")
+##### GET
+
+Never called, it is retrieved someplace else
+
 ---
 ### generate_pdf
 #### /generate_pdf
-##### @app.route("/generate_pdf", methods=['GET'])
+##### GET
+
+Gets a lot of data from the envirnoment of containers, crnojobs, etc.. , puts it into a pdf, and returns it to the user
+
 ---
 ### download
 #### /download
 ##### @app.route("/download")
----
 ### downloads/
 #### /downloads/
 ##### @app.route("/downloads/")
----
 ### downloads/<path:subpath>
 #### /downloads/<path:subpath>
 ##### @app.route("/downloads/<path:subpath>")
+
+Endpoints to show stored filepaths and downloads files
+
 ---
 ### certification
 #### /certification
-##### @app.route("/certification", methods=['GET'])
+##### GET
+
+Deprecated
+
 ---
 ### clustered_certification
 #### /clustered_certification
-##### @app.route("/clustered_certification", methods=['GET'])
+##### GET
+
+Deprecated
+
 ---
 ### certification_mk3
 #### /certification_mk3
-##### @app.route("/certification_mk3", methods=['GET'])
+##### GET
+
+Generates then sends a certification
+
 ---
+### hosts_control_panel
+#### /hosts_control_panel
+##### GET
+
+If the user logged is an admin, it shows the interface for hosts (top view)
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if the user is not in session
+
+---
+### connect_host
+#### /connect_and_store
+##### POST
+##### requires the following in the form data: 'host', 'user', 'psw', 'description', 'cpu', 'mem'
+
+If the user logged is an admin, it adds a new host to the database, but not before establishing a connection and storing the ssh keys
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if the user is not in session
+
+---
+### run_command
+#### /run_command_host
+##### POST
+##### requires the following in the form data: 'host'
+
+Currently unused and is hardcoded to ignore relevant data
+
+Would run a command to the given host with ssh
+
+---
+
+### delete_saved_host
+#### /delete
+##### POST, DELETE (should be only DELETE in the future)
+
+If the user logged is an admin, it deletes the host from the db data and then deletes the keys
+
+If the user is not an admin, it's forbidden from doing the above
+
+Goes to login if the user is not in session
+
+---
+### get_containers_severity
+#### /get_containers_severity
+##### GET
+
+Gets the severity of each container
+
+Goes to login if the user is not in session
+
+---
+### get_host_tops
+#### /get_tops
+##### GET
+
+For each host, gets the top, then add the top from itself (the container running sentinel), unless they are not the admin, in which case they are forbidden
+
+Goes to login if the user is not in session
+
+---
+### sentinel_hosts_control_panel
+#### /sentinel_hosts_control_panel
+##### GET
+
+If the user logged is an admin, it shows the interface for hosts (top view), mostly unused now that hosts can self register as slaves
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
+---
+### add_sentinel_host
+#### /add_sentinel_host
+##### POST
+##### requires the following in the form data: 'hostname', 'ip' (hostname should be something else, like hostpath)
+
+If the user logged is an admin, it adds a new sentinel element to the cluster, mostly unused now that hosts can self register as slaves
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
+---
+### delete_sentinel_host
+#### /delete_sentinel_host
+##### DELETE, POST (should probably only be DELETE)
+##### requires the following in the form data: 'hostname' (hostname should be something else, like hostpath)
+
+If the user logged is an admin, it deletes a sentinel element from the cluster
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
+---
+### snmp_control_panel
+#### /snmp_control_panel
+##### GET
+
+If the user logged is an admin, it shows the interface for hosts using snmp
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
+---
+### add_snmp
+#### /add_snmp
+##### POST
+##### requires the following in the form data: 'user', 'description', 'details', 'cpu', 'mem', 'protocol', 'host', 'PrivKey', 'AuthKey'
+
+If the user logged is an admin, it adds a new snmp host to the cluster
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
+---
+### delete_snmp_host
+#### /delete_snmp_host
+##### DELETE, POST (should probably only be DELETE)
+##### requires the following in the form data: 'host' 
+
+If the user logged is an admin, it deletes a snmp host
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
+---
+
 ### snmp_info
 #### /snmp_info
-##### @app.route("/snmp_info", methods=["GET"])
+##### GET
+##### requires the following in the form data: 'host' 
+
+
+If the user logged is an admin, it shows, disk, memory and cpu details with snmp from host
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
 ---
 ### organize_configuration_retrieval
 #### /organize_configuration_retrieval
-##### @app.route("/organize_configuration_retrieval", methods=["GET"])
+##### GET
+
+If the user logged is an admin, it shows the interface for organizing configuration retrievals
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
 ---
 ### add_configuration_retrieval
 #### /add_configuration_retrieval
-##### @app.route("/add_configuration_retrieval", methods=["POST"])
+##### POST
+##### requires the following in the form data: 'host', 'path', 'what', 'options'
+
+If the user logged is an admin, it adds a new retrieval for configurations
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
 ---
 ### edit_configuration_retrieval
 #### /edit_configuration_retrieval
-##### @app.route("/edit_configuration_retrieval", methods=["POST"])
+##### POST
+##### requires the following in the form data: 'password', 'id'
+
+If the user logged is an admin, it edits a retrieval for configurations with the given id
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
+
 ---
 ### delete_configuration_retrieval
 #### /delete_configuration_retrieval
-##### @app.route("/delete_configuration_retrieval", methods=["POST"])
+##### POST, DELETE (should only be DELETE in the future)
+
+If the user logged is an admin, it deletes a retrieval for configurations with the given id
+
+If the user is not an admin, they are forbidden from doing so
+
+Goes to login if the user is not in session
 ---

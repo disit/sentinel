@@ -2272,9 +2272,11 @@ def create_app():
         print_debug_log("Adding container")
         if 'username' in session:
             try:
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''INSERT INTO `checker`.`component_to_category` (`component`, `category`, `references`, `position`, `kind`, `severity`) VALUES (%s, %s, %s, %s, %s, %s);'''
@@ -2294,10 +2296,12 @@ def create_app():
     def edit_container(): #add position if only if docker
         print_debug_log("Editing container")
         if 'username' in session:
-            try:
+            try:                
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401  
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     if request.form.to_dict()['kind'] == "Kubernetes":
@@ -2328,9 +2332,10 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                cursor = conn.cursor(buffered=True)
+                
                 if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
+                cursor = conn.cursor(buffered=True)
                 # to run malicious code, malicious code must be present in the db or the machine in the first place
                 query = '''DELETE FROM `checker`.`component_to_category` WHERE (`component` = %s);'''
                 cursor.execute(query, (request.form.to_dict()['id'],))
@@ -2526,11 +2531,14 @@ def create_app():
         print_debug_log("Adding cronjob")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
                         query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`) VALUES (%s, %s, %s, %s, %s, %s, %s);'''
@@ -2551,11 +2559,13 @@ def create_app():
         print_debug_log("Editing cronjob: "+str(request.form.to_dict()))
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s, `restart_logic`= %s, `description`= %s WHERE (`idcronjobs` = %s);'''
@@ -2578,11 +2588,14 @@ def create_app():
         print_debug_log("Adding cronjob (new)")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
                         query = '''INSERT INTO `checker`.`cronjobs` (`name`, `command`, `category`, `where_to_run`, `disabled`, `restart_logic`, `description`, `timeout_time`, `retries`, `retries_wait`, `ip`, `target`, `contacts`, `severity`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'''
@@ -2611,11 +2624,13 @@ def create_app():
         print_debug_log("Editing cronjob (new): "+str(request.form.to_dict()))
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
                         query = '''UPDATE `checker`.`cronjobs` SET `name` = %s, `command` = %s, `category` = %s, `where_to_run` = %s, `disabled` = %s,
@@ -2645,7 +2660,7 @@ def create_app():
                 return f"Something went wrong during the editing of a cronjob because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
 
-    @app.route("/delete_cronjob", methods=["POST", "DELETE"])
+    @app.route("/delete_cronjob", methods=['POST', 'DELETE'])
     def delete_cronjob():
         print_debug_log("Deleting cronjob")
         if 'username' in session:
@@ -2694,12 +2709,14 @@ def create_app():
         print_debug_log("Adding extra resource")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`extra_resources` ( `resource_address`, `resource_information`, `resource_description`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['address'],request.form.to_dict()['information'],request.form.to_dict()['description'],))
@@ -2715,12 +2732,13 @@ def create_app():
         print_debug_log("Editing extra resource")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`extra_resources` SET `resource_address` = %s, `resource_information` = %s, `resource_description` = %s WHERE (`id_category` = %s) and (`resource_address` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['address'],request.form.to_dict()['information'],request.form.to_dict()['description'],request.form.to_dict()['id'],request.form.to_dict()['address'],))
@@ -2734,7 +2752,7 @@ def create_app():
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
 
-    @app.route("/delete_extra_resource", methods=["POST"])
+    @app.route("/delete_extra_resource", methods=['POST', 'DELETE'])
     def delete_extra_resource():
         print_debug_log("Deleting extra resource")
         if 'username' in session:
@@ -2781,12 +2799,15 @@ def create_app():
         print_debug_log("Adding test")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-
+                    
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`tests_table` (`container_name`, `command`, `command_explained`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['container_name'],request.form.to_dict()['command'],request.form.to_dict()['command_explained'],))
@@ -2802,12 +2823,15 @@ def create_app():
         print_debug_log("Editing test")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-
+                    
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`tests_table` SET `container_name` = %s, `command` = %s, `command_explained` = %s WHERE (`id` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['container_name'],request.form.to_dict()['command'],request.form.to_dict()['command_explained'],request.form.to_dict()['id'],))
@@ -2821,7 +2845,7 @@ def create_app():
                 return f"Something went wrong during the editing of a test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
 
-    @app.route("/delete_test", methods=["POST"])
+    @app.route("/delete_test", methods=['POST', 'DELETE'])
     def delete_test():
         print_debug_log("Deleting test")
         if 'username' in session:
@@ -2872,12 +2896,14 @@ def create_app():
         print_debug_log("Adding compelx test")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],))
@@ -2893,12 +2919,14 @@ def create_app():
         print_debug_log("Editing complex test")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['name'],request.form.to_dict()['command'],request.form.to_dict()['extra_parameters'],request.form.to_dict()['button_color'],request.form.to_dict()['explanation'],request.form.to_dict()['category'],request.form.to_dict()['id'],))
@@ -2912,7 +2940,7 @@ def create_app():
                 return f"Something went wrong during the editing of a complex test because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
 
-    @app.route("/delete_complex_test", methods=["POST"])
+    @app.route("/delete_complex_test", methods=['POST', 'DELETE'])
     def delete_complex_test():
         print_debug_log("Deleting complex test")
         if 'username' in session:
@@ -2958,11 +2986,14 @@ def create_app():
         print_debug_log("Adding category")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`categories` (`category`) VALUES (%s);'''
                     cursor.execute(query, (request.form.to_dict()['category'],))
@@ -2978,11 +3009,14 @@ def create_app():
         print_debug_log("Editing category")
         if 'username' in session:
             try:
+                if session['username']!="admin":
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+                if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
+                    return "An incorrect password was provided", 400
+                if os.getenv('unsafe-mode') != "True":
+                    return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+                
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    if session['username']!="admin":
-                        return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                    if os.getenv('unsafe-mode') != "True":
-                        return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`categories` SET `category` = %s (`idcategories` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['category'],request.form.to_dict()['id'],))
@@ -2996,7 +3030,7 @@ def create_app():
                 return f"Something went wrong during the editing of a category because of {traceback.format_exc()}", 500
         return redirect(url_for('login'))
 
-    @app.route("/delete_category", methods=["POST"])
+    @app.route("/delete_category", methods=['POST', 'DELETE'])
     def delete_category():
         print_debug_log("Deleting category")
         if 'username' in session:
@@ -3081,7 +3115,7 @@ def create_app():
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
 
-    @app.route("/get_complex_test_buttons")
+    @app.route("/get_complex_test_buttons", methods=["GET"])
     def get_complex_test_buttons():
         print_debug_log("Getting complex tests")
         if 'username' in session:
@@ -4440,7 +4474,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             return redirect(url_for('login'))
 
     # hosts stuff
-    @app.route('/hosts_control_panel')
+    @app.route("/hosts_control_panel")
     def hosts_control_panel():
         if 'username' in session:
             if session['username']!="admin":
@@ -4460,7 +4494,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return f"Error loading hosts: {traceback.format_exc()}"
         return redirect(url_for('login'))
 
-    @app.route('/connect_host', methods=['POST'])
+    @app.route("/connect_host", methods=['POST'])
     def connect_and_store():
         if 'username' in session:
 
@@ -4513,7 +4547,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
 
-    @app.route('/run_command_host', methods=['POST'])
+    @app.route("/run_command_host", methods=['POST'])
     def run_command():
         if 'username' in session:
             if session['username']!="admin":
@@ -4555,7 +4589,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
 
 
-    @app.route('/delete_saved_host', methods=['POST'])
+    @app.route("/delete_saved_host", methods=['POST', 'DELETE'])
     def delete_host():
         if 'username' in session:
             if session['username']!="admin":
@@ -4595,7 +4629,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
 
-    @app.route('/get_containers_severity', methods=['GET'])
+    @app.route("/get_containers_severity", methods=['GET'])
     def get_containers_severity():
         if 'username' in session:
             with mysql.connector.connect(**db_conn_info) as conn:
@@ -4609,7 +4643,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
            
 
-    @app.route('/get_host_tops', methods=['GET'])
+    @app.route("/get_host_tops", methods=['GET'])
     def get_tops():
         if 'username' in session:
             if session['username']!="admin":
@@ -4664,7 +4698,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
     # begin sentinel host stuff
 
-    @app.route('/sentinel_hosts_control_panel')
+    @app.route("/sentinel_hosts_control_panel")
     def sentinel_hosts_control_panel():
         if not os.getenv("is-multi","False") == "True":
             return "Disabled for non-clustered environments", 500
@@ -4685,7 +4719,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return f"Error loading hosts: {traceback.format_exc()}"
         return redirect(url_for('login'))
 
-    @app.route('/add_sentinel_host', methods=['POST'])
+    @app.route("/add_sentinel_host", methods=['POST'])
     def add_sentinel_host():
         if not os.getenv("is-multi","False") == "True":
             return "Disabled for non-clustered environments", 500
@@ -4713,7 +4747,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         return redirect(url_for('login'))
 
 
-    @app.route('/delete_sentinel_host', methods=['POST'])
+    @app.route("/delete_sentinel_host", methods=['POST', 'DELETE'])
     def delete_sentinel_host():
         if not os.getenv("is-multi","False") == "True":
             return "Disabled for non-clustered environments", 500
@@ -4752,7 +4786,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
 
 
     # begin snmp stuff
-    @app.route('/snmp_control_panel', methods=['GET'])
+    @app.route("/snmp_control_panel", methods=['GET'])
     def snmp_control_panel():
         if 'username' in session:
             if session['username']!="admin":
@@ -4818,7 +4852,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 return jsonify({"error": traceback.format_exc()}), 500
         return redirect(url_for('login'))
 
-    @app.route('/delete_snmp_host', methods=['POST'])
+    @app.route("/delete_snmp_host", methods=['POST', 'DELETE'])
     def delete_snmp_host():
         if 'username' in session:
             host = request.form.get('host')
@@ -4940,7 +4974,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 except:
                     return traceback.format_exc(), 500
 
-    @app.route("/delete_configuration_retrieval", methods=["POST"])
+    @app.route("/delete_configuration_retrieval", methods=['POST', 'DELETE'])
     def organize_configuration_retrieval_delete():
         if 'username' in session:
             if session['username']!="admin":
