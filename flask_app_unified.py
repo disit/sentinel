@@ -543,7 +543,7 @@ async def async_fetch_post(client: httpx.AsyncClient, url: str, data = {}, fallb
                     print_debug_log(f"Failed {url} after {retries} attempts: {e}")
                     return {"error": "Connection Failed", "details": str(e)}
                 else:
-                    return async_fetch_post(client, fallback_url, data)
+                    return await async_fetch_post(client, fallback_url, data)
             # Wait a bit before retrying
             await asyncio.sleep(retry_exponential)
             retry_exponential = retry_exponential ** 2
@@ -3132,6 +3132,7 @@ def create_app():
                 return render_template("error_showing.html", r = traceback.format_exc()), 500
         return redirect(url_for('login'))
 
+    #never called
     @app.route("/container_is_okay", methods=['POST'])
     def make_category_green():
         if 'username' in session:

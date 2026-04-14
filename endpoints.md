@@ -443,6 +443,7 @@ Runs all tests of containers
 ##### POST, GET (probably can be compressed to just one method)
 
 Clears the session
+
 ---
 ### reboot_container
 #### /reboot_container
@@ -487,8 +488,8 @@ As above, shoult be a GET but the UI demands otherwise, tests over cronjobs
 As above, complex tests over tests
 
 ---
-### container/<podname>
-#### /container/<podname>
+### container/<podname\>
+#### /container/<podname\>
 ##### POST
 
 Gets the logs of the container/pod in path, shoult be a GET but the UI demands otherwise
@@ -747,4 +748,5 @@ If the user logged is an admin, it deletes a retrieval for configurations with t
 If the user is not an admin, they are forbidden from doing so
 
 Goes to login if the user is not in session
+
 ---
