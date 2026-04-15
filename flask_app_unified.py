@@ -56,8 +56,9 @@ def oid_tuple(oid_str):
     return tuple(int(x) for x in oid_str.split('.'))
 
 def print_debug_log(log_str):
+    """Prints only if debug is turned on, adds datetime for clarity"""
     if os.getenv("debug","False") == "True":
-        print(f"{datetime.now()} DEBUG: {log_str}")
+        print(f"{datetime.now()} DEBUG: {log_str}",flush=True)
 
 async def safe_snmp_walk(host_data):
     """
@@ -83,7 +84,7 @@ async def safe_snmp_walk(host_data):
             userName=user,
             authKey=auth_pass,
             privKey=priv_pass,
-            authProtocol=auth_protocol, #hardcoded
+            authProtocol=auth_protocol,
             privProtocol=usmAesCfb128Protocol #hardcoded
         )
 
@@ -92,9 +93,6 @@ async def safe_snmp_walk(host_data):
         for base_oid in ["1.3.6.1.2.1.25.2.3.1", "1.3.6.1.2.1.25.3.3.1.2", "1.3.6.1.4.1.2021.10.1.3"]: # hrStorageTable (memory & disk), hrProcessorLoad (CPU), load values
             current_oid = ObjectIdentity(base_oid)
             last_oid = None
-
-
-
             while True:
                 errorIndication, errorStatus, errorIndex, varBinds = await next_cmd(
                     snmpEngine,
@@ -227,6 +225,7 @@ async def get_system_info_snmp(host):
     return memory, disk, cpu, loads
 
 async def gather_snmp_info(host):
+    """returns a dict with the snmp data, given host"""
     memory, disk, cpu, loads = await get_system_info_snmp(host)
 
     result = {
@@ -268,7 +267,8 @@ async def gather_snmp_info(host):
     return result
 
 ALGORITHM = 'HS256'
-def string_of_list_to_list(string):
+def string_of_list_to_list(string: str):
+    """used to convert an envvar/json conf value"""
     try:
         a = string[1:-1]
         a = a.replace('"',"")
@@ -289,6 +289,7 @@ with open(USERS_FILE, 'r') as f:
 
 
 class Snap4SentinelTelegramBot:
+    """Reimplemetnation of telegram python library, for some reason it kept failing after a while, wraps calls to api"""
     def __init__(self, bot_token, chat_id=None, actually_send=True):
         self._bot_token = bot_token
         self._chat_id = chat_id
@@ -336,7 +337,7 @@ class Snap4SentinelTelegramBot:
 
 f = open("conf.json")
 config = json.load(f)
-
+# loading env from conf file, easier in docker instances, then loads them into env dict of python to merge with k8s instances
 for key, value in config.items():
     if not os.getenv(key):
         os.environ[key] = value
@@ -355,174 +356,12 @@ db_conn_info = {
     "auth_plugin": 'mysql_native_password'
 }
 
-def mixed_format_error_to_send_tests_test_ran(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
-    # split containers for naming reasons
-
-    container_names = [c["container"] for c in containers]
-    container_names = '|'.join('^{0}'.format(w).strip() for w in container_names if len(w)>0)
-    with mysql.connector.connect(**db_conn_info) as conn:
-        cursor = conn.cursor(buffered=True)
-        matches = []
-        if len(container_names)>0:
-            query = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(container_names)
-            cursor.execute(query)
-            matches = cursor.fetchall()
-
-        if len(matches) ==0:
-            return ""  #found nothing
-        newstr=""
-        for a in matches:
-            curstr="In category " + a[0] + ", in namespace " + a[2] + " the container named " + a[1] + " " + instance_of_problem
-            if because:
-                reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
-
-                if len(reason) == 1:
-                    use_this_reason=because[reason[0]]
-                else:
-                    if len(reason) == 0:
-                        print_debug_log("fuzzy search failed, trying second one in mixed format error sending")
-                        reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
-                        if len(reason) == 1:
-                            print_debug_log("second fuzzy search succeeded in mixed format error sending")
-                            use_this_reason=because[reason[0]]
-                        else:
-                            if len(reason) == 0:
-                                use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
-                            else:
-                                use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
-                    else:
-                        use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
-                try:
-                    newstr += curstr + explain_reason + use_this_reason+"<br>"
-                except Exception as E:
-                    newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
-            else:
-                newstr += curstr+"<br>"
-        return newstr
-
-def mixed_format_error_to_send_new(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
-    k8s_c = [container for container in containers if container[-1] == "Docker"]
-    doc_c = [container for container in containers if not container[-1] == "Docker"]
-    newstr=""
-    print(doc_c, k8s_c)
-    for a in k8s_c:
-        curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
-        if because:
-            reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
-
-            if len(reason) == 1:
-                use_this_reason=because[reason[0]]
-            else:
-                if len(reason) == 0:
-                    print_debug_log("fuzzy search failed, trying second one in mixed format error sending")
-                    reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
-                    if len(reason) == 1:
-                        print_debug_log("second fuzzy search succeeded in mixed format error sending")
-                        use_this_reason=because[reason[0]]
-                    else:
-                        if len(reason) == 0:
-                            use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
-                        else:
-                            use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
-                else:
-                    use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
-            try:
-                newstr += curstr + explain_reason + use_this_reason+"<br>"
-            except Exception:
-                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
-        else:
-            newstr += curstr+"<br>"
-    for a in doc_c:
-        curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
-        if because:
-            reason=[c for _,c in enumerate([a for a in because.keys()]) if c==a[1]]
-
-            if len(reason) == 1:
-                use_this_reason=because[reason[0]]
-            else:
-                if len(reason) == 0:
-                    use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
-                else:
-                    use_this_reason=because[reason[0]]
-            try:
-                newstr += curstr + explain_reason + use_this_reason+"<br>"
-            except Exception:
-                newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
-            else:
-                newstr += curstr+"<br>"
-    return newstr
-    
-
-def mixed_format_error_to_send(instance_of_problem, containers, because = None, explain_reason=None): #TODO complete this
-    # split containers for naming reasons
-    k8s_c = [container for container in containers if container["Namespace"].startswith("Docker")]
-    doc_c = [container for container in containers if not container["Namespace"].startswith("Docker")]
-    k8s_c_names = '|'.join('^{0}'.format(w).strip() for w in k8s_c["Name"].split(", ") if len(w)>0)
-    doc_c_names = ', '.join('"{0}"'.format(w).strip() for w in doc_c["Name"].split(", "))
-    with mysql.connector.connect(**db_conn_info) as conn:
-        cursor = conn.cursor(buffered=True)
-        k8s_matches, doc_matches= [], []
-        if len(k8s_c_names)>0:
-            query_k8s = '''SELECT category, component, position FROM checker.component_to_category WHERE component REGEXP '{}' ORDER BY category;'''.format(k8s_c_names)
-            cursor.execute(query_k8s)
-            k8s_matches = cursor.fetchall()
-        if len(doc_c_names)>0:
-            query_doc = 'SELECT category, component, position FROM checker.component_to_category where component in ({}) order by category;'.format(doc_c_names)
-            cursor.execute(query_doc)
-            doc_matches = cursor.fetchall()
-        if len(doc_matches) + len(k8s_matches) == 0:
-            return ""  #found nothing
-        newstr=""
-        for a in k8s_matches:
-            curstr="In category " + a[0] + ", in namespace " + a[2] + " the kubernetes container named " + a[1] + " " + instance_of_problem
-            if because:
-                reason=[c for _,c in enumerate([a for a in because.keys()]) if c.startswith(a[1][:a[1].find("*")])] # container-* matches container-abcdefgh-12345
-
-                if len(reason) == 1:
-                    use_this_reason=because[reason[0]]
-                else:
-                    if len(reason) == 0:
-                        print_debug_log("fuzzy search failed, trying second one in mixed format error sending")
-                        reason=[c for _,c in enumerate([a for a in because.keys()]) if c in a[1]] # container-* matches container
-                        if len(reason) == 1:
-                            print_debug_log("second fuzzy search succeeded in mixed format error sending")
-                            use_this_reason=because[reason[0]]
-                        else:
-                            if len(reason) == 0:
-                                use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
-                            else:
-                                use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
-                    else:
-                        use_this_reason = "couldn't find reason due to multiple container name matches (this is a non-critical bug)."
-                try:
-                    newstr += curstr + explain_reason + use_this_reason+"<br>"
-                except Exception as E:
-                    newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
-            else:
-                newstr += curstr+"<br>"
-        for a in doc_matches:
-            curstr="In category " + a[0] + ", located in " + a[2] + " the docker container named " + a[1] + " " + instance_of_problem
-            if because:
-                reason=[c for _,c in enumerate([a for a in because.keys()]) if c==a[1]]
-
-                if len(reason) == 1:
-                    use_this_reason=because[reason[0]]
-                else:
-                    if len(reason) == 0:
-                        use_this_reason = "couldn't find reason due to a failed container name match (this is a non-critical bug)."
-                    else:
-                        use_this_reason=because[reason[0]]
-                try:
-                    newstr += curstr + explain_reason + use_this_reason+"<br>"
-                except Exception:
-                    newstr += curstr + explain_reason + "couldn't find reason (this is a non-critical bug): " + traceback.format_exc()+"<br>"
-            else:
-                newstr += curstr+"<br>"
-        return newstr
-
+# stores keys used to ssh into other hosts, remember to make the path persistent!
 KEY_DIR = "/ssh_keys"
 os.makedirs(KEY_DIR, exist_ok=True)
 
+
+# parallelize calls to other sentinels, useful whene there are many and waiting one by one might cause timeouts
 async def async_fetch_post(client: httpx.AsyncClient, url: str, data = {}, fallback_url = "", retries=3):
     retry_exponential=1
     for attempt in range(retries):
@@ -631,6 +470,7 @@ def parse_top(data):
 
 
 def send_telegram(chat_id, message):
+    """encapsules sending a telegram message"""
     a,b = bot_2.send_message_new(message, chat_id)
     if a:
         print_debug_log("Telegram message was sent")
@@ -639,7 +479,7 @@ def send_telegram(chat_id, message):
     return
 
 
-def linkify(text):
+def linkify(text: str):
     # This regex looks for patterns starting with http://, https://, or www.
     url_pattern = r'(https?://[^\s]+|www\.[^\s]+)'
 
@@ -653,7 +493,7 @@ def linkify(text):
 
     return re.sub(url_pattern, replace_with_link, text)
 
-def send_email(sender_email, sender_password, receiver_emails, subject, message):
+def send_email(sender_email: str, sender_password: str, receiver_emails: list, subject: str, message: list):
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
         print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
     composite_message = message + f"<br><a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a>"
@@ -680,7 +520,7 @@ def send_email(sender_email, sender_password, receiver_emails, subject, message)
     server.quit()
     print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
 
-def send_emails(sender_email, sender_password, receiver_emails, data_to_be_sent):
+def send_emails(sender_email: str, sender_password: str, receiver_emails: list, data_to_be_sent: list):
     print_debug_log("Sending multiple emails")
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
         print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
@@ -709,88 +549,8 @@ def send_emails(sender_email, sender_password, receiver_emails, data_to_be_sent)
     print("Email(s) was (were) sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
 
 
-def filter_out_muted_containers_for_telegram(containers):
-    print_debug_log("Filtering out muted containers")
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY component ORDER BY until DESC) AS row_num FROM telegram_alert_pauses
-                    )
-                    SELECT component, until FROM RankedEntries WHERE row_num = 1;'''
-            cursor.execute(query)
-            results = cursor.fetchall()
-        new_elements=[]
-        for element in containers:
-            if any(element in string for string in [a[0] for a in results]) and element[1].strftime("%Y-%m-%d %H:%M:%S")>datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
-                pass
-            else:
-                new_elements.append(element)
-    except Exception:
-        print("Something went wrong during container filtering because of:",traceback.format_exc())
-    return ", ".join(new_elements)
-
-def filter_out_muted_failed_are_alive_for_telegram(tests):
-    print_debug_log("Filtering out failed are alive containers")
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY component ORDER BY until DESC) AS row_num FROM telegram_alert_pauses
-                    )
-                    SELECT component, until FROM RankedEntries WHERE row_num = 1;'''
-            cursor.execute(query)
-            results = cursor.fetchall()
-            if len(results) == 0:
-                return ", ".join([a["container"] for a in tests])
-        new_elements=[]
-        for element in results:
-            for element_2 in tests:
-                if element[0] == element_2["container"]:
-                    if element[1].strftime("%Y-%m-%d %H:%M:%S")>datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
-                        pass
-                    else:
-                        if element_2 in new_elements:
-                            pass
-                        else:
-                            new_elements.append(element_2)
-                else:
-                    if element_2 in new_elements:
-                        pass
-                    else:
-                        new_elements.append(element_2)
-    except Exception:
-        print("Something went wrong during container filtering because of:",traceback.format_exc())
-    return ", ".join([a["container"] for a in new_elements])
-
-def filter_out_wrong_status_containers_for_telegram(containers):
-    print_debug_log("Filtering out wrong status containers")
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            query = '''WITH RankedEntries AS (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY component ORDER BY until DESC) AS row_num FROM telegram_alert_pauses
-                    )
-                    SELECT component, until FROM RankedEntries WHERE row_num = 1;'''
-            cursor.execute(query)
-            results = cursor.fetchall()
-        new_elements=[]
-        restruct={}
-        for a in results:
-            restruct[a[0]]=a[1]
-        for element in containers:
-            if element["Name"] in [a[0] for a in results]:
-                if restruct[element[element]].strftime("%Y-%m-%d %H:%M:%S")>datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
-                    pass
-                else:
-                    new_elements.append(element)
-            else:
-                new_elements.append(element)
-    except Exception:
-        print("Something went wrong during container filtering because of:",traceback.format_exc())
-    return ", ".join([a["Name"] for a in new_elements])
-
 def isalive():
+    """sends is alive to telegram and mails, also adding a summary on cronjobs"""
     print_debug_log("Sending 'is alive'")
     with mysql.connector.connect(**db_conn_info) as conn:
         cursor = conn.cursor(buffered=True)
@@ -818,19 +578,17 @@ SELECT count(name),categories.category,cast(severity as char) as severity, error
     return
 
 def clean_old_db_entries():
+    """Deletes old entries for db (prone to be very verbose), could be called on start of service"""
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
             # id != 0 and similar due to mysql not liking deletions which don't depend on primary key
-            query = '''DELETE FROM checker.cronjob_history WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_cronjob != 0;
-DELETE FROM host_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0;
-DELETE FROM snmp_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0;
-DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_test !=0;'''
-
-            results=cursor.execute(query, multi=True) # multi for cursor reasons
-            for result in results:
-                if result.with_rows:
-                    result.fetchall() # sometimes multiple statements cause something to fail, this is an extra safety
+            queries = ['DELETE FROM checker.cronjob_history WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_cronjob != 0',
+                     'DELETE FROM host_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0',
+                     'DELETE FROM snmp_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0',
+                     'DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_test !=0']
+            for query in queries:
+                cursor.execute(query) # multi for cursor reasons
             conn.commit()
             print("Deletion of old logs was successful")
     except:
@@ -839,6 +597,7 @@ DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdat
 
 
 def populate_tops_entries():
+    """ask tops from all hosts from which we set up ssh"""
     print_debug_log("Populating top entries")
     try:
         # Fetch user from DB
@@ -896,7 +655,8 @@ def populate_tops_entries():
         print(errors)
         raise E
 
-def is_this_notification_duplicated(message) -> bool:
+def is_this_notification_duplicated(message: dict) -> bool:
+    """If this dict representation of errors has already be sent, tell not to send again"""
     try:
         list_string = json.dumps(message, sort_keys=True, default=str)
         list_bytes = list_string.encode('utf-8')
@@ -924,6 +684,7 @@ def is_this_notification_duplicated(message) -> bool:
     return False
 
 async def auto_run_tests():
+    """run all (simple) tests, for containers, async wrap"""
     print_debug_log("Automatically running tests")
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -949,6 +710,7 @@ async def auto_run_tests():
         print("Something went wrong during tests running because of:",traceback.format_exc())
 
 async def run_shell_command(name, command):
+    """async wrapper for calling many commands at once, for cronjobs"""
     print_debug_log(f"Running this command: {command}")
     try:
         #print("run_shell_command: start "+name+" cmd:"+command)
@@ -985,6 +747,7 @@ async def run_shell_command(name, command):
 
 
 async def auto_alert_status():
+    """main routine for determining if something is not going as expected"""
     print_debug_log("Starting auto alert status")
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return
@@ -2170,6 +1933,7 @@ asyncio.run(auto_alert_status())
 
 
 slave_attempt_self_register()
+
 
 runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
