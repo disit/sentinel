@@ -502,13 +502,6 @@ Gets the logs of the container/pod in path, shoult be a GET but the UI demands o
 As above, but for cronjobs executions
 
 ---
-### advanced-container/<container_name>
-#### /advanced-container/<container_name>
-##### GET
-
-Seems a replica of /container/<podname> (method doesn't matter)
-
----
 ### get_summary_status
 #### /get_summary_status
 ##### GET
