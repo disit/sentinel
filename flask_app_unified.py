@@ -586,7 +586,8 @@ def clean_old_db_entries():
             queries = ['DELETE FROM checker.cronjob_history WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_cronjob != 0',
                      'DELETE FROM host_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0',
                      'DELETE FROM snmp_data WHERE sampled_at < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0',
-                     'DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_test !=0']
+                     'DELETE FROM tests_results WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id_test !=0',
+                     'DELETE FROM getting_tests WHERE datetime < curdate() - INTERVAL DAYOFWEEK(curdate())+6 DAY and id !=0']
             for query in queries:
                 cursor.execute(query) # multi for cursor reasons
             conn.commit()
