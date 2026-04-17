@@ -3562,17 +3562,6 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                 logs = "This cronjob doesn't exists or it has no logs yet"
             return render_template('log_show.html', r = logs, container_name=f"cronjob #{cronjob_id}")
 
-
-    @app.route("/advanced-container/<container_name>")
-    def get_container_logs_advanced(container_name):
-        if 'username' in session: # probably unneeded
-            try:
-                r = get_container_logs(container_name)
-                return r.text
-            except Exception:
-                print("Something went wrong during reading because of:",traceback.format_exc())
-        return redirect(url_for('login'))
-
     @app.route("/get_summary_status")
     def get_summary_status():
         if 'username' in session:
