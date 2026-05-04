@@ -750,47 +750,51 @@ async def run_shell_command(name, command):
 async def auto_alert_status():
     """main routine for determining if something is not going as expected"""
     print_debug_log("Starting auto alert status")
+    other_errors = []
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return
     if "False" == os.getenv("running-as-kubernetes","False"):
+        try:
+            containers_ps = [a for a in (subprocess.run(['docker', 'ps', '--format', 'json', '-a'], capture_output=True, text=True, encoding="utf_8", timeout=10).stdout).split('\n')][:-1]
+            containers_stats = [b for b in (subprocess.run(['docker', 'stats', '--format', 'json', '-a', '--no-stream'], capture_output=True, text=True, encoding="utf_8", timeout=10).stdout).split('\n')][:-1]
+            containers_merged = []
+            for container_stats in containers_stats:
+                for container_ps in containers_ps:
+                    for key1, value1 in json.loads(container_stats).items():
+                        for key2, value2 in json.loads(container_ps).items():
+                            if key1 == "Name" and key2 == "Names":
+                                if value1 == value2:
+                                    containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
 
-        containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-        containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-        containers_merged = []
-        for container_stats in containers_stats:
-            for container_ps in containers_ps:
-                for key1, value1 in json.loads(container_stats).items():
-                    for key2, value2 in json.loads(container_ps).items():
-                        if key1 == "Name" and key2 == "Names":
-                            if value1 == value2:
-                                containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
-
-        new_containers_merged = []
-        source = os.getenv("platform-url","")
-        for current in containers_merged:
-            td = {}
-            #td["Command"] = current["Command"]
-            td["CreatedAt"] = current["CreatedAt"]
-            try: #it is set if it comes from elsewhere
-                td["Source"] = current["Source"]
-            except:
-                td["Source"] = source
-            td["ID"] = current["ID"]
-            td["Image"] = current["Image"]
-            td["Labels"] = current["Labels"]
-            td["Mounts"] = current["Mounts"]
-            td["Names"] = current["Names"]
-            td["Name"] = current["Names"]
-            td["Ports"] = current["Ports"]
-            td["RunningFor"] = current["RunningFor"]
-            td["State"] = current["State"]
-            td["Status"] = current["Status"]
-            td["Container"] = current["Container"]
-            # host origin = node, sorta
-            td["Node"] = os.getenv("platform-url","") #current[""]
-            td["Volumes"] = current["LocalVolumes"]
-            td["Namespace"] = "Docker - " + source
-            new_containers_merged.append(td)
+            new_containers_merged = []
+            source = os.getenv("platform-url","")
+            for current in containers_merged:
+                td = {}
+                #td["Command"] = current["Command"]
+                td["CreatedAt"] = current["CreatedAt"]
+                try: #it is set if it comes from elsewhere
+                    td["Source"] = current["Source"]
+                except:
+                    td["Source"] = source
+                td["ID"] = current["ID"]
+                td["Image"] = current["Image"]
+                td["Labels"] = current["Labels"]
+                td["Mounts"] = current["Mounts"]
+                td["Names"] = current["Names"]
+                td["Name"] = current["Names"]
+                td["Ports"] = current["Ports"]
+                td["RunningFor"] = current["RunningFor"]
+                td["State"] = current["State"]
+                td["Status"] = current["Status"]
+                td["Container"] = current["Container"]
+                # host origin = node, sorta
+                td["Node"] = os.getenv("platform-url","") #current[""]
+                td["Volumes"] = current["LocalVolumes"]
+                td["Namespace"] = "Docker - " + source
+                new_containers_merged.append(td)
+        except subprocess.TimeoutExpired as E: # docker ps timed out
+            other_errors.append("Failed to load from docker socket: " + str(E))
+            new_containers_merged=[]
     else:
 
         raw_jsons = []
@@ -1104,7 +1108,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
 
     if len(problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
         try:
-            issues = ["","","","","","","","","",""]
+            issues = ["","","","","","","","","","",""]
             if len(problematic_containers) > 0:
                 issues[0]=problematic_containers
             if len(is_alive_with_ports) > 0:
@@ -1125,6 +1129,8 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                 issues[8]=top_errors
             if len(snmp_errors)>0:
                 issues[9]=snmp_errors
+            if len(other_errors)>0:
+                issues[10]=other_errors
                 
             send_advanced_alerts(issues)
         except Exception:
@@ -1275,16 +1281,20 @@ async def update_container_state_db():
     if os.getenv("is-master","False") == "False": #slaves don't write to db
         return
     if "False" == os.getenv("running-as-kubernetes","False"):
-        containers_ps = [a for a in (subprocess.run('docker ps --format json -a', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-        containers_stats = [b for b in (subprocess.run('docker stats --format json -a --no-stream', shell=True, capture_output=True, text=True, encoding="utf_8").stdout).split('\n')][:-1]
-        containers_merged = []
-        for container_stats in containers_stats:
-            for container_ps in containers_ps:
-                for key1, value1 in json.loads(container_stats).items():
-                    for key2, value2 in json.loads(container_ps).items():
-                        if key1 == "Name" and key2 == "Names":
-                            if value1 == value2:
-                                containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+        try:
+            containers_ps = [a for a in (subprocess.run(['docker', 'ps', '--format', 'json', '-a'], capture_output=True, text=True, encoding="utf_8", timeout=10).stdout).split('\n')][:-1]
+            containers_stats = [b for b in (subprocess.run(['docker', 'stats', '--format', 'json', '-a', '--no-stream'], capture_output=True, text=True, encoding="utf_8", timeout=10).stdout).split('\n')][:-1]
+                
+            containers_merged = []
+            for container_stats in containers_stats:
+                for container_ps in containers_ps:
+                    for key1, value1 in json.loads(container_stats).items():
+                        for key2, value2 in json.loads(container_ps).items():
+                            if key1 == "Name" and key2 == "Names":
+                                if value1 == value2:
+                                    containers_merged.append({**json.loads(container_ps), **json.loads(container_stats)})
+        except subprocess.TimeoutExpired: # docker ps or stats timed out
+            containers_merged = []
         if os.getenv("is-multi","False") == "True":
             with mysql.connector.connect(**db_conn_info) as conn:
                 cursor = conn.cursor(buffered=True)
@@ -1763,7 +1773,9 @@ def send_advanced_alerts(message):
         if len(message[9])>0:
             for msg in message[9]:
                 email_data.append({"subject":msg[1] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"<br>{msg[0]}</br>"})
-            
+        if len(message[10])>0:
+            for msg in message[10]:
+                 email_data.append({"subject":"Unspecified error: - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":msg})
         try:
             if len(text_for_email) > 15 or len(email_data)>0:
                 send_emails(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), email_data)
@@ -1875,6 +1887,10 @@ def send_advanced_alerts(message):
         if len(message[9])>0:
             for msg in message[9]:
                 text_for_telegram.append(msg[0])
+                
+        if len(message[10])>0:
+            for msg in message[10]:
+                text_for_telegram.append(msg)
          
         print_debug_log(str(text_for_telegram))
         try:
