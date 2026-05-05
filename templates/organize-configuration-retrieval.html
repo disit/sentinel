@@ -4,6 +4,19 @@
 {{ super() }}
 {% endblock %}
 {% block content %}
+<script>
+
+    function previewEdit() {
+        var item_to_show = document.getElementById("previewEditLabel");
+        item_to_show.value = "ssh userof@" + $('#retrievalHostEdit').val() + ' "tar -cz -C ' + $('#retrievalPathEdit').val() + " " + $('#whatRetrievalEdit').val() + " " + $('#otherOptionsEdit').val();
+    }
+
+    function previewAdd() {
+        var item_to_show = document.getElementById("previewAddInput");
+        item_to_show.value = "ssh userof@" + $('#retrievalHostAdd').val() + ' "tar -cz -C ' + $('#retrievalPathAdd').val() + " " + $('#whatRetrievalAdd').val() + " " + $('#otherOptionsAdd').val();
+    }
+
+</script>
 <table id="retrievals">
   <thead>
       <tr>
@@ -60,7 +73,7 @@
                         <input type="text" class="form-control" id="otherOptionsAdd" placeholder="--exclude='*-log*'" required onchange="previewAdd()">               
                     </div>
                     <label for="previewAdd">What the result looks like</label>
-                    <input type="text" class="form-control" id="previewAdd" readonly>   
+                    <input type="text" class="form-control" id="previewAddInput" readonly>   
                 </form>
             </div>
             <div class="modal-footer">
@@ -100,7 +113,7 @@
                     </div>
                     <input type="text" class="form-control" id="retrievalidEdit" hidden>
                     <label for="previewEdit">What the result looks like</label>
-                    <input type="text" class="form-control" id="previewEdit" readonly>   
+                    <input type="text" class="form-control" id="previewEditLabel" readonly>   
                 </form>
             </div>
             <div class="modal-footer">
@@ -282,16 +295,6 @@
             alert('Please enter a password');
         }
     });
-
-    function previewEdit() {
-        var item_to_show = document.getElementById("previewEdit");
-        item_to_show.value = "ssh userof@" + $('#retrievalHostEdit').val() + ' "tar -cz -C ' + $('#retrievalPathEdit').val() + " " + $('#whatRetrievalEdit').val() + " " + $('#otherOptionsEdit').val();
-    }
-
-    function previewAdd() {
-        var item_to_show = document.getElementById("previewAdd");
-        item_to_show.value = "ssh userof@" + $('#retrievalHostAdd').val() + ' "tar -cz -C ' + $('#retrievalPathAdd').val() + " " + $('#whatRetrievalAdd').val() + " " + $('#otherOptionsAdd').val();
-    }
 
     $('#deleteretrievalButton').on('click', function() {
         var password = $('#passwordInputDelete').val();
