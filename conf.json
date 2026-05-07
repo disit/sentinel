@@ -38,7 +38,7 @@
 	"smtp-port":"587",
 	"smtp-server": "change.me.com",
 	"smtp-type": "ssl",
-	"smnp-auth-protocol": "",
+	"snmp-auth-protocol": "",
 	"telegram-api-token": "replaceme",
 	"telegram-channel":"123456789",
     "unsafe-mode": "True",

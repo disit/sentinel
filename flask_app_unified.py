@@ -74,9 +74,9 @@ async def safe_snmp_walk(host_data):
         json_details=json.loads(host_data["details"])
         auth_pass = json_details["AuthKey"]
         priv_pass = json_details["PrivKey"]
-        if os.getenv("smnp-auth-protocol","SHA-512") == "SHA-512":
+        if os.getenv("smnp-auth-protocol",os.getenv("snmp-auth-protocol","SHA-512")) == "SHA-512":
             auth_protocol = usmHMAC384SHA512AuthProtocol
-        elif os.getenv("smnp-auth-protocol","SHA-512") == "SHA":
+        elif os.getenv("smnp-auth-protocol",os.getenv("snmp-auth-protocol","SHA-512")) == "SHA":
             auth_protocol = usmHMACSHAAuthProtocol
         else:
             auth_protocol = usmHMAC384SHA512AuthProtocol
@@ -373,9 +373,9 @@ async def async_fetch_post(client: httpx.AsyncClient, url: str, data = {}, fallb
             else:
                 response = await client.post(url, data=data, timeout=10.0, follow_redirects=True)
             # Raises an exception for 4xx or 5xx status codes
-            response.raise_for_status() 
+            response.raise_for_status()
             return response.text
-            
+
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             if attempt == retries - 1:
                 if fallback_url == "":
@@ -386,12 +386,12 @@ async def async_fetch_post(client: httpx.AsyncClient, url: str, data = {}, fallb
             # Wait a bit before retrying
             await asyncio.sleep(retry_exponential)
             retry_exponential = retry_exponential ** 2
-            
+
         except httpx.HTTPStatusError as e:
             # Handle 4xx or 5xx errors specifically
             print_debug_log(f"Server error {e.response.status_code} at {url}")
             return {"error": "HTTP Error", "status": e.response.status_code, "text":e.response.text}
-            
+
         except Exception as e:
             print_debug_log(f"Unexpected error at {url}: {e}")
             return {"error": "Unknown", "message": str(e)}
@@ -493,7 +493,7 @@ def linkify(text: str):
 
     return re.sub(url_pattern, replace_with_link, text)
 
-def send_email(sender_email: str, sender_password: str, receiver_emails: list, subject: str, message: list):
+def send_email(sender_email: str, sender_password: str, receiver_emails: list, subject: str, message: str):
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
         print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
     composite_message = message + f"<br><a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a>"
@@ -508,7 +508,7 @@ def send_email(sender_email: str, sender_password: str, receiver_emails: list, s
         server = smtplib.SMTP(smtp_server, smtp_port)
         if os.getenv("use-tls", "True") == "True":
             server.starttls()
-    
+
     if os.getenv("authenticate-email", "True") == "True":
         server.login(sender_email, sender_password)
     msg = MIMEMultipart()
@@ -878,10 +878,10 @@ async def auto_alert_status():
                     async with httpx.AsyncClient() as client:
                         # We wrap the tasks to ensure they all finish even if some fail
                         tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
-                        
+
                         # return_exceptions=True prevents one crash from stopping others
                         responses = await asyncio.gather(*tasks, return_exceptions=True)
-                        
+
                         for returned_containers in responses:
                             try:
                                 if type(returned_containers) == dict:
@@ -893,7 +893,7 @@ async def auto_alert_status():
                                 print_debug_log("Issue in parallel reading containers: "+traceback.format_exc())
                 except:
                     print_debug_log("General issue in parallel reading containers: "+traceback.format_exc())
-            
+
             else:
                 try:
                     for r in results:
@@ -956,19 +956,19 @@ async def auto_alert_status():
     except Exception:
         send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
         return
-    
-    
+
+
     try:
         # Check if there is an active loop in the current thread
         loop = asyncio.get_running_loop()
-        # If we are here, a loop is running. 
+        # If we are here, a loop is running.
         # We create a task to run the coroutine concurrently.
         is_alive_with_ports = await auto_run_tests()
     except RuntimeError:
         # If we are here, no loop is running.
         # We start a new one to run the coroutine.
         is_alive_with_ports = asyncio.run(auto_run_tests())
-    
+
     #is_alive_with_ports = asyncio.run(auto_run_tests) # check namespace here if k8s
     is_alive_with_ports = [a for a in is_alive_with_ports if "Failure" in a["result"]] # only keep those who failed
     containers_merged_docker = [a for a in containers_merged if a["Namespace"].startswith("Docker - ")]
@@ -980,7 +980,7 @@ async def auto_alert_status():
     components_original_kubernetes = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
 
     containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
-    
+
     [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]]
 
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
@@ -998,7 +998,7 @@ async def auto_alert_status():
                 except Exception:
                     containers_which_are_running_but_are_not_healthy.append(c_m)
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
-    
+
     containers_which_are_not_expected=[]
     for c in components_original_docker: # use this to determine who's missing
         found=False
@@ -1009,7 +1009,7 @@ async def auto_alert_status():
         if not found:
             containers_which_are_not_expected.append(c)
     containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
-    
+
     for c in components_original_kubernetes: # use this to determine who's missing
         found=False
         for in_that_position in [a for a in containers_merged if a["Node"]==c[2]]:
@@ -1131,7 +1131,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                 issues[9]=snmp_errors
             if len(other_errors)>0:
                 issues[10]=other_errors
-                
+
             send_advanced_alerts(issues)
         except Exception:
             print(traceback.format_exc())
@@ -1284,7 +1284,7 @@ async def update_container_state_db():
         try:
             containers_ps = [a for a in (subprocess.run(['docker', 'ps', '--format', 'json', '-a'], capture_output=True, text=True, encoding="utf_8", timeout=10).stdout).split('\n')][:-1]
             containers_stats = [b for b in (subprocess.run(['docker', 'stats', '--format', 'json', '-a', '--no-stream'], capture_output=True, text=True, encoding="utf_8", timeout=10).stdout).split('\n')][:-1]
-                
+
             containers_merged = []
             for container_stats in containers_stats:
                 for container_ps in containers_ps:
@@ -1309,10 +1309,10 @@ async def update_container_state_db():
                         async with httpx.AsyncClient() as client:
                             # We wrap the tasks to ensure they all finish even if some fail
                             tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
-                            
+
                             # return_exceptions=True prevents one crash from stopping others
                             responses = await asyncio.gather(*tasks, return_exceptions=True)
-                            
+
                             for returned_containers in responses:
                                 try:
                                     if type(returned_containers) == dict:
@@ -1324,7 +1324,7 @@ async def update_container_state_db():
                                     print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
                     except:
                         print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
-            
+
                 for r in results:
                     try:
                         print_debug_log(f"Getting data from {r[0]}")
@@ -1464,10 +1464,10 @@ async def update_container_state_db():
                         async with httpx.AsyncClient() as client:
                             # We wrap the tasks to ensure they all finish even if some fail
                             tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
-                            
+
                             # return_exceptions=True prevents one crash from stopping others
                             responses = await asyncio.gather(*tasks, return_exceptions=True)
-                            
+
                             for returned_containers in responses:
                                 try:
                                     if type(returned_containers) == dict:
@@ -1646,12 +1646,12 @@ def slave_attempt_self_register():
                     cursor.fetchall()
                     if cursor.rowcount > 0:
                         print_debug_log("Successfully self registered as slave")
-                        return 
+                        return
                     else:
                         raise Exception("Unsuccessfully self registered as slave, wasn't in the db but failed to insert")
                 else:
                     print_debug_log("Self registration not needed, already in db")
-                    return 
+                    return
         except Exception:
             print("Something went wrong during attempted slave self registration because of:",traceback.format_exc())
             return
@@ -1808,7 +1808,7 @@ def send_advanced_alerts(message):
                 except Exception:
                     print_debug_log(f"Something failed while determinging if {c[0]} should be sent as a notification")
                 text_for_telegram.append(f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Node']][1]} is not answering correctly to its \"is alive\" test in {cont_sevr[c['Name']+c['Node']][0]}.")
-            
+
         if len(message[2])>0:
             for c in message[2]:
                 try:
@@ -1887,11 +1887,11 @@ def send_advanced_alerts(message):
         if len(message[9])>0:
             for msg in message[9]:
                 text_for_telegram.append(msg[0])
-                
+
         if len(message[10])>0:
             for msg in message[10]:
                 text_for_telegram.append(msg)
-         
+
         print_debug_log(str(text_for_telegram))
         try:
             if len(text_for_telegram)>1:
@@ -2010,7 +2010,7 @@ def create_app():
         if 'username' in session:
             return get_local_top()
         return render_template("error_showing.html", r = "You are not authenticated"), 403
-    
+
     @app.route("/refresh_containers_database", methods=["GET"])
     def refresh_database():
         print_debug_log("Manual containers refresh")
@@ -2077,11 +2077,11 @@ def create_app():
     def edit_container(): #add position if only if docker
         print_debug_log("Editing container")
         if 'username' in session:
-            try:                
+            try:
                 if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 if session['username']!="admin":
-                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401  
+                    return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
@@ -2113,7 +2113,7 @@ def create_app():
             with mysql.connector.connect(**db_conn_info) as conn:
                 if session['username']!="admin":
                     return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-                
+
                 if not check_password_hash(users[session['username']], request.form.to_dict()['psw']):
                     return "An incorrect password was provided", 400
                 cursor = conn.cursor(buffered=True)
@@ -2193,7 +2193,7 @@ def create_app():
                     jwt.decode(request.form.to_dict()['auth'], os.getenv("cluster-secret","None"), algorithms=[ALGORITHM])
                     # if we are here the token is valid, run the command then return results to master
                     restart_result = queued_running(request.form.to_dict()['command'])
-                    
+
                     if len(restart_result.stderr)>0:
                         return jsonify({'error': '', 'stderr':restart_result.stderr, 'stdout':restart_result.stdout}), 200
                     else:
@@ -2318,7 +2318,7 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
@@ -2375,7 +2375,7 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     if request.form.to_dict()['where_to_run'] != "":
@@ -2496,7 +2496,7 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`extra_resources` ( `resource_address`, `resource_information`, `resource_description`) VALUES (%s, %s, %s);'''
@@ -2586,9 +2586,9 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    
+
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`tests_table` (`container_name`, `command`, `command_explained`) VALUES (%s, %s, %s);'''
                     cursor.execute(query, (request.form.to_dict()['container_name'],request.form.to_dict()['command'],request.form.to_dict()['command_explained'],))
@@ -2610,9 +2610,9 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
-                    
+
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`tests_table` SET `container_name` = %s, `command` = %s, `command_explained` = %s WHERE (`id` = %s);'''
                     cursor.execute(query, (request.form.to_dict()['container_name'],request.form.to_dict()['command'],request.form.to_dict()['command_explained'],request.form.to_dict()['id'],))
@@ -2683,7 +2683,7 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`complex_tests` (`name_of_test`, `command`, `extraparameters`, `button_color`, `explanation`, `category_id`) VALUES (%s, %s, %s, %s, %s, %s);'''
@@ -2706,7 +2706,7 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`complex_tests` SET `name_of_test` = %s, `command` = %s, `extraparameters` = %s, `button_color` = %s, `explanation` = %s, `category_id` = %s WHERE (`id` = %s);'''
@@ -2773,7 +2773,7 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''INSERT INTO `checker`.`categories` (`category`) VALUES (%s);'''
@@ -2796,7 +2796,7 @@ def create_app():
                     return "An incorrect password was provided", 400
                 if os.getenv('unsafe-mode') != "True":
                     return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
-                
+
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
                     query = '''UPDATE `checker`.`categories` SET `category` = %s (`idcategories` = %s);'''
@@ -3790,7 +3790,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             for cronjob in cronjobs_out:
                 if not cronjob:
                     break
-                
+
                 cronjob_id = re.sub(r'[^a-zA-Z0-9]', '-', cronjob[3])
                 content.append(Paragraph(f'<a href="#c-{cronjob_id}" color="blue">Cronjob {cronjob[3]}</a>', styles["Normal"]))
                 cronjobs.append(cronjob)
@@ -4412,7 +4412,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 output = {r[0]:r[1] for r in results}
                 return jsonify(output)
         return redirect(url_for('login'))
-           
+
 
     @app.route("/get_host_tops", methods=['GET'])
     def get_tops():
@@ -4763,7 +4763,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     return "ok", 201
                 except:
                     return traceback.format_exc(), 500
-                
+
 
     return app
 
