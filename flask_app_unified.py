@@ -949,7 +949,10 @@ async def auto_alert_status():
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
-            query = '''SELECT * FROM checker.component_to_category;'''
+            if os.getenv("skip-empty-positions-containers", "False") == "False":
+                query = '''SELECT * FROM checker.component_to_category;'''
+            else:
+                query = '''SELECT * FROM checker.component_to_category where position != "";'''
             cursor.execute(query)
             conn.commit()
             results = cursor.fetchall()
