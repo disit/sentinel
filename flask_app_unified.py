@@ -1324,23 +1324,44 @@ async def update_container_state_db():
                                     print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
                     except:
                         print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
-
-                for r in results:
+                if os.getenv("parallel-db-refresh","True"):
                     try:
-                        print_debug_log(f"Getting data from {r[0]}")
-                        if os.getenv("platform-url","") == r[0]:
-                            continue # don't take yourself
-                        obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                        print_debug_log("Attempting parallel calls data")
+                        async with httpx.AsyncClient() as client:
+                            # We wrap the tasks to ensure they all finish even if some fail
+                            tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
+
+                            # return_exceptions=True prevents one crash from stopping others
+                            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+                            for returned_containers in responses:
+                                try:
+                                    if type(returned_containers) == dict:
+                                        print_debug_log("Issue in parallel reading containers db, got an error in the request: "+str(returned_containers))
+                                    else:
+                                        json_of_this_reponse = json.loads(returned_containers)
+                                        total_answer = total_answer + json_of_this_reponse
+                                except:
+                                    print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
+                    except:
+                        print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
+                else:
+                    for r in results:
                         try:
-                            total_answer = total_answer + json.loads(obtained)
-                        except:
+                            print_debug_log(f"Getting data from {r[0]}")
+                            if os.getenv("platform-url","") == r[0]:
+                                continue # don't take yourself
+                            obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)},timeout=20).text
                             try:
-                                obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                                 total_answer = total_answer + json.loads(obtained)
                             except:
-                                print(traceback.format_exc())
-                    except requests.exceptions.ConnectionError:
-                        print(traceback.format_exc())
+                                try:
+                                    obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)},timeout=20).text
+                                    total_answer = total_answer + json.loads(obtained)
+                                except:
+                                    print_debug_log(traceback.format_exc())
+                        except requests.exceptions.ConnectionError:
+                            print(traceback.format_exc())
             containers_merged = containers_merged + total_answer
         else:
             print("NOT updating container data as multi...")
@@ -1479,22 +1500,44 @@ async def update_container_state_db():
                                     print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
                     except:
                         print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
-                for r in results:
+                if os.getenv("parallel-db-refresh","True"):
                     try:
-                        print_debug_log(f"Getting data from {r[0]}")
-                        if os.getenv("platform-url","") == r[0]:
-                            continue # don't take yourself
-                        obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                        print_debug_log("Attempting parallel calls data")
+                        async with httpx.AsyncClient() as client:
+                            # We wrap the tasks to ensure they all finish even if some fail
+                            tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
+
+                            # return_exceptions=True prevents one crash from stopping others
+                            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+                            for returned_containers in responses:
+                                try:
+                                    if type(returned_containers) == dict:
+                                        print_debug_log("Issue in parallel reading containers db, got an error in the request: "+str(returned_containers))
+                                    else:
+                                        json_of_this_reponse = json.loads(returned_containers)
+                                        total_answer = total_answer + json_of_this_reponse
+                                except:
+                                    print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
+                    except:
+                        print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
+                else:
+                    for r in results:
                         try:
-                            total_answer = total_answer + json.loads(obtained)
-                        except:
+                            print_debug_log(f"Getting data from {r[0]}")
+                            if os.getenv("platform-url","") == r[0]:
+                                continue # don't take yourself
+                            obtained = requests.post(r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                             try:
-                                obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
                                 total_answer = total_answer + json.loads(obtained)
                             except:
-                                print(traceback.format_exc())
-                    except requests.exceptions.ConnectionError:
-                        print(traceback.format_exc())
+                                try:
+                                    obtained = requests.post(r[0]+"/sentinel/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}).text
+                                    total_answer = total_answer + json.loads(obtained)
+                                except:
+                                    print(traceback.format_exc())
+                        except requests.exceptions.ConnectionError:
+                            print(traceback.format_exc())
             conversions = conversions + total_answer
         else:
             print("NOT updating container data as multi...")
@@ -1955,7 +1998,7 @@ slave_attempt_self_register()
 runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
     app = Flask(__name__)
-    app.config['application-root'] =os.getenv("application-root", "2")
+    app.config['APPLICATION-ROOT'] =os.getenv("APPLICATION-ROOT", "/")
     app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_host=1)
     app.secret_key = os.getenv("secret-key", "")
     app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
