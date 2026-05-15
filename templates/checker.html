@@ -197,7 +197,17 @@
 				url: './read_containers_db',
 				type: 'GET',
 				success: function(response) {
-					makeTable(response.result);
+					var newresult = response.result;
+					const seenCombinations = new Set();
+					const uniqueResult = newresult.filter(item => {
+						const compositeKey = `${item.Container}|${item.Source}`;
+						if (seenCombinations.has(compositeKey)) {
+							return false;
+						}
+						seenCombinations.add(compositeKey);
+						return true;
+					});
+					makeTable(newresult);
 					if(response.error.length > 0)
 						for (var a of response.error) {add_alert(a)};
 				},

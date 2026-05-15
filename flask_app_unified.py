@@ -1308,30 +1308,8 @@ async def update_container_state_db():
                 total_answer=[]
                 if os.getenv("parallel-db-refresh","True"):
                     try:
-                        print_debug_log("Attempting parallel calls db")
-                        async with httpx.AsyncClient() as client:
-                            # We wrap the tasks to ensure they all finish even if some fail
-                            tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
-
-                            # return_exceptions=True prevents one crash from stopping others
-                            responses = await asyncio.gather(*tasks, return_exceptions=True)
-
-                            for returned_containers in responses:
-                                try:
-                                    if type(returned_containers) == dict:
-                                        print_debug_log("Issue in parallel reading containers db, got an error in the request: "+str(returned_containers))
-                                    else:
-                                        json_of_this_reponse = json.loads(returned_containers)
-                                        total_answer = total_answer + json_of_this_reponse
-                                except:
-                                    print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
-                    except:
-                        print_debug_log("General issue in parallel reading containers db: "+traceback.format_exc())
-                if os.getenv("parallel-db-refresh","True"):
-                    try:
                         print_debug_log("Attempting parallel calls data")
                         async with httpx.AsyncClient() as client:
-                            # We wrap the tasks to ensure they all finish even if some fail
                             tasks = [async_fetch_post(client, r[0]+"/read_containers", data={"auth":jwt.encode({'sub': username,'exp': datetime.now() + timedelta(minutes=15)}, os.getenv("cluster-secret","None"), algorithm=ALGORITHM)}, fallback_url=r[0]+"/sentinel/read_containers") for r in results]
 
                             # return_exceptions=True prevents one crash from stopping others
@@ -1343,6 +1321,7 @@ async def update_container_state_db():
                                         print_debug_log("Issue in parallel reading containers db, got an error in the request: "+str(returned_containers))
                                     else:
                                         json_of_this_reponse = json.loads(returned_containers)
+                                        #print_debug_log(f"Got {len(json.loads(returned_containers))} things")
                                         total_answer = total_answer + json_of_this_reponse
                                 except:
                                     print_debug_log("Issue in parallel reading containers db: "+traceback.format_exc())
@@ -2081,13 +2060,23 @@ def create_app():
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     query = '''SELECT component, category, `references`, position, cast(kind as char) as kind, cast(severity as char) as severity FROM checker.component_to_category;'''
                     query2 = '''SELECT category from categories;'''
+                    query3 = '''SELECT containers FROM checker.container_data order by id desc limit 1;'''
                     cursor.execute(query)
                     conn.commit()
                     results = cursor.fetchall()
                     cursor.execute(query2)
                     conn.commit()
                     results_2 = cursor.fetchall()
-                    return render_template("organize_containers_unified.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")))
+                    cursor.execute(query3)
+                    conn.commit()
+                    results_3 = cursor.fetchone()
+                    doc_c, k8s_p = set(), set()
+                    for i in json.loads(results_3[0]):
+                        if i["Namespace"].startswith("Docker"):
+                            doc_c.add(i["Node"])
+                        else:
+                            k8s_p.add(i["Node"])
+                    return render_template("organize_containers_unified.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")), docker_cont=list(doc_c), k8s_cont=list(k8s_p))
 
             except Exception:
                 print("Something went wrong because of",traceback.format_exc())

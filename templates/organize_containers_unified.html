@@ -65,12 +65,15 @@
 					</div>
 					<div class="form-group">
 						<label for="PositionAdd">Position (ignored when kind isn't docker)</label>
-						<input type="text" class="form-control" id="PositionAdd" placeholder="Address of the Snap4Sentinel instance's host which holds the container">
+						<input class="form-control" list="PositionAddList1" id="PositionAdd1" placeholder="Type or select...">
 					</div>
+					
+					<datalist id="PositionAddList1"></datalist>
 					<div class="form-group">
 						<label for="NamespaceAdd">Namespace (ignored when kind isn't kubernetes)</label>
-						<input type="text" class="form-control" id="NamespaceAdd">
+					<input class="form-control" list="NamespaceAddList1" id="NamespaceAdd1" placeholder="Type or select...">
 					</div>
+					<datalist id="NamespaceAddList1"></datalist>
 					<label for="kind-selection">Select container kind:</label>
 					<select id="kind-selection" name="kind-selection" class="form-select">
 						<option value="docker">Docker</option>
@@ -126,12 +129,16 @@
 					</div>
 					<div class="form-group">
 						<label for="PositionEdit">Position (ignored when kind isn't kubernetes)</label>
-						<input type="text" class="form-control" id="PositionEdit" placeholder="Address of the Snap4Sentinel instance's host which holds the container" required>
+						<input class="form-control" list="PositionEditList1" id="PositionEdit1" placeholder="Type or select...">
 					</div>
+
+					<datalist id="PositionEditList1"></datalist>
+					
 					<div class="form-group">
 						<label for="NamespaceEdit">Namespace (ignored when kind isn't kubernetes)</label>
-						<input type="text" class="form-control" id="NamespaceEdit" required>
+						<input class="form-control" list="NamespaceEditList1" id="NamespaceEdit1" placeholder="Type or select...">
 					</div>
+					<datalist id="NamespaceEdit1"></datalist>
 					<label for="kind-selection-edit">Select container kind:</label>
 					<select id="kind-selection-edit" name="kind-selection-edit" class="form-select">
 						<option value="docker">Docker</option>
@@ -207,6 +214,34 @@
         
 		$("#containers").DataTable();
         });
+
+	const docker_cont = {{ docker_cont | tojson }};
+	const k8s_cont = {{ k8s_cont | tojson }};
+
+	// 2. Populate the datalist exactly the same way
+	const datalist_1 = document.getElementById('PositionAddList1');
+	const datalist_2 = document.getElementById('PositionEditList1');
+	const datalist_1k = document.getElementById('NamespaceAddList1');
+	const datalist_2k = document.getElementById('NamespaceEditList1');
+	
+	docker_cont.forEach(item => {
+		const option = document.createElement('option');
+		const option_2 = document.createElement('option');
+		option.value = item;
+		option_2.value = item;
+		datalist_1.appendChild(option);
+		datalist_2.appendChild(option_2);
+	});
+	k8s_cont.forEach(item => {
+		const option = document.createElement('option');
+		const option_2 = document.createElement('option');
+		option.value = item;
+		option_2.value = item;
+		datalist_1k.appendChild(option);
+		datalist_2k.appendChild(option_2);
+	});
+
+
 	$('.open-modal-m').on('click', function() {
 		var id = $(this).data('component');
 		$('#componentDeleteId').val(id);
@@ -218,7 +253,6 @@
 		var kind = $(this).data('kind');
 		var position = $(this).data('position');
 		var contacts = $(this).data('contacts');
-		$('#PositionEdit').val(position);
 		$('#ContactsEdit').val(contacts);
 		$('#containeridmodalEdit').val(id);
 		let select = document.getElementById('category-selection-edit');
@@ -238,6 +272,13 @@
 				break;
 			}
 		}
+		if (select_k.value==="docker") {
+			$('#PositionEdit1').val(position);
+		}
+		else {
+			$('#NamespaceEdit1').val(position);
+		}
+		$('#PositionEdit').val(position);
 		$('#editComponent').modal('show');
 	});
 	$('.open-modal').on('click', function() {
@@ -277,8 +318,8 @@
 		var severity = $('#severity-selection').val();
 		var kind = $('#kind-selection').val();
 		var contacts = $('#ContactsAdd').val();
-		var position = $('#PositionAdd').val();
-		var namespace = $('#NamespaceAdd').val();
+		var position = $('#PositionAdd1').val();
+		var namespace = $('#NamespaceAdd1').val();
 		if (password) {
 			try {
 				$.ajax({
@@ -310,8 +351,8 @@
 	var severity = $('#severity-selection-edit').val();
 	var kind = $('#kind-selection-edit').val();
 	var contacts = $('#ContactsEdit').val();
-	var position = $('#PositionEdit').val();
-	var namespace = $('#NamespaceEdit').val();
+	var position = $('#PositionEdit1').val();
+	var namespace = $('#NamespaceEdit1').val();
 	if (password) {
 		try {
 			$.ajax({

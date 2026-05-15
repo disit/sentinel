@@ -367,9 +367,17 @@ function makeCronJobTable(data) { // disabled
 				url: './read_containers_db',
 				type: 'GET',
 				success: function(response) {
-					container_names = [];
-					for (var container of response.result) {container_names.push(container.Name);}
-					makeTable(response.result);
+					var newresult = response.result;
+					const seenCombinations = new Set();
+					const uniqueResult = newresult.filter(item => {
+						const compositeKey = `${item.Container}|${item.Source}`;
+						if (seenCombinations.has(compositeKey)) {
+							return false;
+						}
+						seenCombinations.add(compositeKey);
+						return true;
+					});
+					makeTable(uniqueResult);
 					if(response.error.length > 0)
 						for (var a of response.error) {add_alert(a)};
 				},
