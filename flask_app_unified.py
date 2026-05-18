@@ -597,6 +597,80 @@ def clean_old_db_entries():
         send_email(os.getenv("sender-email","unset@email.com"), os.getenv("sender-email-password","unsetpassword"), string_of_list_to_list(os.getenv("email-recipients","[]")), os.getenv("platform-url","unseturl")+" didn't delete old logs.", os.getenv("platform-url","unseturl")+" didn't delete old logs because of "+traceback.format_exc())
 
 
+def parallelized_top_view(row):
+    try:
+        user = row['user']
+        host = row['host']
+        private_key_path = os.path.join(KEY_DIR, f"{user}_{host}")
+        print_debug_log(f"Asking a top from {host}...")
+
+        # Connect with key
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(host, username=user, key_filename=private_key_path)
+
+        _, stdout, _ = ssh.exec_command("top -b -n 1")
+        output = stdout.read().decode()
+        ssh.close()
+
+        generated_json = parse_top(output)
+        generated_json["source"] = host
+        
+        # Return a success flag and the data
+        return True, generated_json
+
+    except Exception:
+        error_json = {
+            'host': row.get('host'),
+            'user': row.get('user'),
+            'source': row.get('source'),
+            'error': traceback.format_exc()
+        }
+        # Return a failure flag and the error data
+        return False, error_json
+
+def populate_top_entries_p():
+    outs = []
+    errors = []
+    try:
+        # Fetch user from DB
+        conn = mysql.connector.connect(**db_conn_info)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT user, host FROM host;")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        max_workers = min(8, len(rows))
+        if len(rows) == 0:
+            return # nothing to be updated
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # executor.map preserves the original order of the rows
+            results = executor.map(parallelized_top_view, rows)
+        
+        for success, data in results:
+            if success:
+                outs.append(data)
+            else:
+                errors.append(data)
+        with mysql.connector.connect(**db_conn_info) as conn:
+            for result in outs:
+                cursor = conn.cursor(dictionary=True)
+                query = '''INSERT INTO `host_data` (`data`, `host`) VALUES (%s, %s);'''
+                cursor.execute(query, (json.dumps(result), result['source']))
+                conn.commit()
+                cursor.close()
+            for result in errors:
+                cursor = conn.cursor(dictionary=True)
+                query = '''INSERT INTO `host_data` (`errors`, `host`) VALUES (%s, %s);'''
+                cursor.execute(query, (json.dumps(result), result['host']))
+                conn.commit()
+                cursor.close()
+    except Exception as E:
+        print("DEBUG")
+        print(outs)
+        print(errors)
+        raise E
+
 def populate_tops_entries():
     """ask tops from all hosts from which we set up ssh"""
     print_debug_log("Populating top entries")
@@ -1046,7 +1120,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
             cron_results = cursor.fetchall()
     except Exception:
         pass
-    populate_tops_entries()
+    populate_top_entries_p()
     top_results = []
     try:
         with mysql.connector.connect(**db_conn_info) as conn:
@@ -1981,7 +2055,7 @@ runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
     app = Flask(__name__)
     app.config['APPLICATION-ROOT'] =os.getenv("APPLICATION-ROOT", "/")
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_host=1)
+    app.wsgi_app = app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
     app.secret_key = os.getenv("secret-key", "")
     app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
 
