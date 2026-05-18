@@ -37,6 +37,7 @@ import json
 import jwt
 import mysql.connector
 import os
+import io
 import paramiko
 import random
 import re
@@ -224,7 +225,7 @@ async def get_system_info_snmp(host):
     loads = {k: data.get(oid) for k, oid in load_oids.items()}
     return memory, disk, cpu, loads
 
-async def gather_snmp_info(host):
+async def gather_snmp_info(host, stronger_sep=False):
     """returns a dict with the snmp data, given host"""
     memory, disk, cpu, loads = await get_system_info_snmp(host)
 
@@ -243,17 +244,20 @@ async def gather_snmp_info(host):
             "description": info.get('descr', 'unknown'),
             "used_MB": round(used_bytes / 1024 / 1024, 1),
             "total_MB": round(total_bytes / 1024 / 1024, 1),
+            "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
         })
 
     # Disks
     for _, info in disk.items():
         used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
         total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
-        result["disks"].append({
-            "description": info.get('descr', 'unknown'),
-            "used_MB": round(used_bytes / 1024 / 1024, 1),
-            "total_MB": round(total_bytes / 1024 / 1024, 1),
-        })
+        if "memory" not in info.get('descr', 'unknown').lower() or not stronger_sep:
+            result["disks"].append({
+                "description": info.get('descr', 'unknown'),
+                "used_MB": round(used_bytes / 1024 / 1024, 1),
+                "total_MB": round(total_bytes / 1024 / 1024, 1),
+                "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
+            })
 
     # CPU
     if cpu:
@@ -309,29 +313,45 @@ class Snap4SentinelTelegramBot:
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         if chat_id is None or self._chat_id is None:
             return False, "Chat id was not set"
-        for split_text_item in message:
-            payload = {}
-            if chat_id is None:
-                if self._chat_id is None:
-                    pass # can't happen, we have been here already
-                else:
-                    payload["chat_id"] = self._chat_id
-            else:
-                payload["chat_id"] = chat_id
-            payload["parse_mode"] = "HTML"
-            payload["text"] = split_text_item
-            response = requests.post(url, json=payload)
+        if len(message)>30: # above 30, possibly hitting "too many requests"
+            print_debug_log(f"Too many messages ({len(message)}). Bundling into a file and attempting to send a single message...")
+            file_content = "\n".join(message)
+            text_file = io.StringIO(file_content)
+            text_file.name = "all_messages.txt"
+            
+            payload = {'chat_id': chat_id, 'caption': 'Messages bundled to avoid rate limits.'}
+            files = {'document': ('all_messages.txt', text_file, 'text/plain')}
+            
+            response = requests.post(url, data=payload, files=files)
             if response.status_code == 200:
                 pass
             else:
-                print_debug_log(f"Failed to send html-formatted message due to {response.text}, attempting unformatted sending...")
-                del payload["parse_mode"]
-                response_2 = requests.post(url,json=payload)
-                if response_2.status_code == 200:
+                print_debug_log(f"Failed to send unified message due to {response.text}")
+                return False, f"Failed to send (unified) message: {response.text}"
+        else:
+            for split_text_item in message:
+                payload = {}
+                if chat_id is None:
+                    if self._chat_id is None:
+                        pass # can't happen, we have been here already
+                    else:
+                        payload["chat_id"] = self._chat_id
+                else:
+                    payload["chat_id"] = chat_id
+                payload["parse_mode"] = "HTML"
+                payload["text"] = split_text_item
+                response = requests.post(url, json=payload)
+                if response.status_code == 200:
                     pass
                 else:
-                    print_debug_log(f"Failed to send unformatted message as well due to {response_2.text}")
-                    return False, f"Failed to send (complete) message: {response_2.text}"
+                    print_debug_log(f"Failed to send html-formatted message due to {response.text}, attempting unformatted sending...")
+                    del payload["parse_mode"]
+                    response_2 = requests.post(url,json=payload)
+                    if response_2.status_code == 200:
+                        pass
+                    else:
+                        print_debug_log(f"Failed to send unformatted message as well due to {response_2.text}")
+                        return False, f"Failed to send (complete) message: {response_2.text}"
         return True, "Message was sent"
 
 
@@ -1161,6 +1181,8 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
             rows = cursor.fetchall()
             cursor.close()
             if rows:
+                print_debug_log(f"getting {len(rows)} snmps...")
+                        
                 for row in rows:
                     received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
                     data = await gather_snmp_info(received_data)
@@ -1170,20 +1192,18 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                     else:
                         for ram_usage in data["memory"]:
                             if ram_usage["used_MB"]/ram_usage["total_MB"] > row["threshold_mem"]:
-                                snmp_errors.append((f"Host {row['host']} has its used RAM above the threshold of {row['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {row['host']}"))
-                                pass # too much ram used, send a notification, it is ram_usage["description"] which is at fault
+                                snmp_errors.append((f"Host {row['host']} ({row['description']}) has its memory usage above the threshold of {row['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {row['host']}"))
+                                break
                         if data["cpu"]["average"] > float(row["threshold_cpu"])*100:
-                            snmp_errors.append((f"Host {row['host']} has its used CPU above the threshold of {row['threshold_cpu']}: {data['cpu']['average']}",f"SNMP Host {row['host']}"))
-                        #if data["load_avg"]["1min"] > float(row["threshold_cpu"])*100 or data["load_avg"]["5min"] > float(row["threshold_cpu"])*100:
-                        #    pass # too much cpu used recently but not exactly now, send a notification, 15min doesn't matter for notifications
-                if len(snmp_errors)==0:
-                    print_debug_log("No snmp issues found")
+                            snmp_errors.append((f"Host {row['host']} ({row['description']}) has its used CPU above the threshold of {row['threshold_cpu']}: {data['cpu']['average']}",f"SNMP Host {row['host']}"))
+                    if len(snmp_errors)==0:
+                        print_debug_log("No snmp issues found")
             else:
                 print_debug_log("No snmp control to be performed")
     except Exception:
         print_debug_log(f"Issue while checking snmp:"+traceback.format_exc())
 
-    if len(problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0:
+    if len(problematic_containers) > 0 or len(is_alive_with_ports) > 0 or len(containers_which_are_not_expected) or len(cron_results)>0 or len(problematic_tops_cpu)>0 or len(problematic_tops_ram)>0 or len(top_errors)>0 or len(snmp_errors)>0:
         try:
             issues = ["","","","","","","","","","",""]
             if len(problematic_containers) > 0:
@@ -2055,7 +2075,7 @@ runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
     app = Flask(__name__)
     app.config['APPLICATION-ROOT'] =os.getenv("APPLICATION-ROOT", "/")
-    app.wsgi_app = app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+    app.wsgi_app = app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     app.secret_key = os.getenv("secret-key", "")
     app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
 
@@ -4769,8 +4789,6 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
         if 'username' in session:
             if session['username']!="admin":
                 return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
-            if os.getenv('unsafe-mode') != "True":
-                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
             host = request.args.get("host", None)
             if host is None:
                 return render_template("error_showing.html", r = "No SNMP host was selected, please ensure to provide it in the body of the request under 'host'"), 400
@@ -4784,10 +4802,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 if not row:
                     return render_template("error_showing.html", r = "The provided host wasn't found in the db"), 404
                 received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
-                data = asyncio.run(gather_snmp_info(received_data))
+                data = asyncio.run(gather_snmp_info(received_data, stronger_sep=True))
                 if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
                     return jsonify({"error": "No data found from snmp walk, ensure that the protocol is correct, that the credentials are okay and that the host is reachable."}), 500
-                return render_template("snmp_shower.html", host=host, data=data)
+                return render_template("snmp_shower.html", host=host, data=data, threshold_cpu=row["threshold_cpu"], threshold_mem=row["threshold_mem"])
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
 

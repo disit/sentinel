@@ -13,18 +13,18 @@
         <h1>SNMP Info for {{ host }}</h1>
 
         <h2>Memory Usage</h2>
-        <table>
-            <tr><th>Description</th><th>Used (MB)</th><th>Total (MB)</th></tr>
+        <table id="ram">
+            <tr><th>Description</th><th>Used (MB)</th><th>Total (MB)</th><th>%</th></tr>
             {% for mem in data.memory %}
-            <tr><td>{{ mem.description }}</td><td>{{ mem.used_MB }}</td><td>{{ mem.total_MB }}</td></tr>
+            <tr><td>{{ mem.description }}</td><td>{{ mem.used_MB }}</td><td>{{ mem.total_MB }}</td><td>{{ mem.perc }}</td></tr>
             {% endfor %}
         </table>
 
         <h2>Disk Usage</h2>
         <table>
-            <tr><th>Description</th><th>Used (MB)</th><th>Total (MB)</th></tr>
+            <tr><th>Description</th><th>Used (MB)</th><th>Total (MB)</th><th>%</th></tr>
             {% for disk in data.disks %}
-            <tr><td>{{ disk.description }}</td><td>{{ disk.used_MB }}</td><td>{{ disk.total_MB }}</td></tr>
+            <tr><td>{{ disk.description }}</td><td>{{ disk.used_MB }}</td><td>{{ disk.total_MB }}</td><td>{{ disk.perc }}</td></tr>
             {% endfor %}
         </table>
 
@@ -37,6 +37,31 @@
         {% endif %}
 
         <h2>Load Averages</h2>
-        <p>1 min: {{ data.load_avg["1min"] }} | 5 min: {{ data.load_avg["5min"] }} | 15 min: {{ data.load_avg["15min"] }}</p>
+        <p id="la">1 min: {{ data.load_avg["1min"] }} | 5 min: {{ data.load_avg["5min"] }} | 15 min: {{ data.load_avg["15min"] }}</p>
     </body>
+
+    <script>
+    for (let row of document.getElementById("ram").rows) {
+        const lastCell = row.cells[row.cells.length - 1];
+        if (lastCell) {
+            const value = parseFloat(lastCell.textContent.replace('%', ''));
+            if (value > {{threshold_mem | float}}) {
+                row.style.backgroundColor = 'red';
+            }
+        }
+    }
+    const element = document.getElementById('la');
+    let text = element.textContent;
+    const regex = /(?<=:\s*)(\d+\.\d+|\d+)/g;
+    const updatedText = text.replace(regex, (match) => {
+        const value = parseFloat(match);
+        
+        if (value > {{threshold_cpu | float}}*100) {
+        return `<span style="background-color: red; font-weight: bold;">${match}</span>`;
+        }
+        
+        return match;
+    });
+    element.innerHTML = updatedText;
+    </script>
 </html>
