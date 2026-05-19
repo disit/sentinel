@@ -1190,6 +1190,10 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                         print_debug_log(f"Host {row['host']} gave no data, maybe authentication failed?")
                         snmp_errors.append((f"Host {row['host']} gave no data, maybe authentication failed?",f"SNMP Host {row['host']}"))
                     else:
+                        cursor = conn.cursor(buffered=True)
+                        query = '''INSERT INTO `checker`.`snmp_data` (`host`, `data`) VALUES (%s,%s);'''
+                        cursor.execute(query,(row["host"],json.dumps(data),))
+                        conn.commit()
                         for ram_usage in data["memory"]:
                             if ram_usage["used_MB"]/ram_usage["total_MB"] > row["threshold_mem"]:
                                 snmp_errors.append((f"Host {row['host']} ({row['description']}) has its memory usage above the threshold of {row['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {row['host']}"))
@@ -4702,12 +4706,16 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                     for row in rows: #try to hide keys for privacy
                         current_row = []
                         [current_row.append(row[i]) for i in range(6)]  # the first 6 elements are fine
-                        current_json = json.loads(row[6])
-                        if row[5] == "true": # try to hide only if secure, so we have sensitive data, thanks to mysql this has to be a string comparison
-                            updated_json = {}
-                            for a,b in current_json.items():
-                                updated_json[a]=b[:3]+"***" # show only first 3 chars to show sufficient proof of incorrect information
-                            current_json = updated_json
+                        try:
+                            current_json = json.loads(row[6])
+                                
+                            if row[5] == "true": # try to hide only if secure, so we have sensitive data, thanks to mysql this has to be a string comparison
+                                updated_json = {}
+                                for a,b in current_json.items():
+                                    updated_json[a]=b[:3]+"***" # show only first 3 chars to show sufficient proof of incorrect information
+                                current_json = updated_json
+                        except Exception:
+                            current_json = {"data":"no_data"}
                         current_row.append(json.dumps(current_json))
                         real_rows.append(current_row)
                     return render_template("control_panel_snmp.html", hosts=real_rows)
