@@ -252,13 +252,20 @@ async def gather_snmp_info(host, stronger_sep=False):
         used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
         total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
         if "memory" not in info.get('descr', 'unknown').lower() or not stronger_sep:
-            result["disks"].append({
-                "description": info.get('descr', 'unknown'),
-                "used_MB": round(used_bytes / 1024 / 1024, 1),
-                "total_MB": round(total_bytes / 1024 / 1024, 1),
-                "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
-            })
-
+            try:
+                result["disks"].append({
+                    "description": info.get('descr', 'unknown'),
+                    "used_MB": round(used_bytes / 1024 / 1024, 1),
+                    "total_MB": round(total_bytes / 1024 / 1024, 1),
+                    "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
+                })
+            except ZeroDivisionError:
+                result["disks"].append({
+                    "description": info.get('descr', 'unknown'),
+                    "used_MB": round(used_bytes / 1024 / 1024, 1),
+                    "total_MB": round(total_bytes / 1024 / 1024, 1),
+                    "perc": "0%",
+                })
     # CPU
     if cpu:
         result["cpu"] = {
