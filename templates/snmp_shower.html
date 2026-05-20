@@ -33,7 +33,7 @@
             <p>{{ data.cpu.error }}</p>
         {% else %}
             <p>Per-core (0 to 100): {{ data.cpu.per_core }}</p>
-            <p>Average: {{ data.cpu.average }}%</p>
+            <p>Average (of the above): {{ data.cpu.average }}%</p>
         {% endif %}
 
         <h2>Load Averages (estimate of amount of processes running)</h2>

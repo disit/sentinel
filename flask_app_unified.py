@@ -238,14 +238,15 @@ async def gather_snmp_info(host, stronger_sep=False):
 
     # Memory
     for _, info in memory.items():
-        used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
-        total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
-        result["memory"].append({
-            "description": info.get('descr', 'unknown'),
-            "used_MB": round(used_bytes / 1024 / 1024, 1),
-            "total_MB": round(total_bytes / 1024 / 1024, 1),
-            "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
-        })
+        if info.get('descr', 'unknown') not in ["Cached Memory","Shared Memory"]:
+            used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
+            total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
+            result["memory"].append({
+                "description": info.get('descr', 'unknown'),
+                "used_MB": round(used_bytes / 1024 / 1024, 1),
+                "total_MB": round(total_bytes / 1024 / 1024, 1),
+                "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
+            })
 
     # Disks
     for _, info in disk.items():

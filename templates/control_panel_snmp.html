@@ -24,19 +24,22 @@
 </tr>
 {% endfor %}
 </table>
-
+To edit an entry, simply delete the previous one and put another one.
 <h2>Add New SNMP</h2>
 <form id="addForm">
-Host: <input id="host" type="text" class="form-control" name="host" required><br>
-User: <input id="user" type="text" class="form-control" name="user" required><br>
-Description: <input id="description" type="text" class="form-control" name="description" required><br>
-CPU: <input id="cpu" type="number" step="0.01" min="0" max="1" class="form-control" name="cpu" required><br>
-MEM: <input id="mem" type="number" step="0.01" min="0" max="1" class="form-control" name="mem" required><br>
-Protocol: <select id="protocol" name="protocol" class="form-select"><option value="false">Insecure (v2)</option><option value="true">Secure (v3)</option></select><br>
-The following are needed only if a secure protocol was chosen. These will be hidden in the Web UI to the third char of the string.<br>
-PrivKey: <input id="PrivKey" type="password" class="form-control" name="PrivKey"><br>
-AuthKey: <input id="AuthKey" type="password" class="form-control" name="AuthKey"><br>
-<button id="button_add" class="form-control" class="btn btn-info">Add SNMP</button>
+<div class="form-group">Host: <input id="host" type="text" class="form-control" name="host" required><br></div>
+<div class="form-group">User: <input id="user" type="text" class="form-control" name="user" required><br></div>
+<div class="form-group">Description: <input id="description" type="text" class="form-control" name="description" required><br></div>
+<div class="form-group">CPU: <input id="cpu" type="number" step="0.01" min="0" max="1" class="form-control" name="cpu" required><br>
+<small id="cpuHelp" class="form-text text-muted">This value will be compared to the load averages, if any load average is greater than this value an alert will be sent</small></div>
+<div class="form-group">MEM: <input id="mem" type="number" step="0.01" min="0" max="1" class="form-control" name="mem" required><br>
+<small id="memHelp" class="form-text text-muted">This value will be compared to the relative amount of memory used, with 0 being free and 1 completely used, if any memory usage is greater than this value an alert will be sent</small></div>
+<div class="form-group">Protocol: <select id="protocol" name="protocol" class="form-select"><option value="false">Insecure (v2)</option><option value="true">Secure (v3)</option></select><br></div>
+<div class="form-group">The following are needed only if a secure protocol was chosen. These will be hidden in the Web UI to the third char of the string.<br></div>
+<div class="form-group">PrivKey: <input id="PrivKey" type="password" class="form-control" name="PrivKey"><br></div>
+<div class="form-group">AuthKey: <input id="AuthKey" type="password" class="form-control" name="AuthKey"><br></div>
+<div class="form-group"><button id="button_add" class="form-control" class="btn btn-info">Add SNMP</button></div>
+
 </form>
 </div>
 
