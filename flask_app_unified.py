@@ -238,7 +238,7 @@ async def gather_snmp_info(host, stronger_sep=False):
 
     # Memory
     for _, info in memory.items():
-        if info.get('descr', 'unknown') not in ["Cached Memory","Shared Memory"]:
+        if info.get('descr', 'unknown') not in ["Cached memory","Shared memory"]:
             used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
             total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
             result["memory"].append({
@@ -315,9 +315,10 @@ class Snap4SentinelTelegramBot:
             return True
 
     def send_message_new(self, message, chat_id=None):
-        print_debug_log("Sending telegram message")
         if not self._actually_send:
+            print_debug_log("Not sending telegram message (as by conf)")
             return True, "Did not send but was told not to"
+        
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         if chat_id is None or self._chat_id is None:
             return False, "Chat id was not set"
@@ -522,6 +523,9 @@ def linkify(text: str):
     return re.sub(url_pattern, replace_with_link, text)
 
 def send_email(sender_email: str, sender_password: str, receiver_emails: list, subject: str, message: str):
+    if os.getenv("send-notifications", "True") == "False":
+        print_debug_log("Not sending email(s) as for conf")
+        return
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
         print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
     composite_message = message + f"<br><a href='{os.getenv('platform-url','')}' target='_blank'>{os.getenv('platform-url','Url not set in conf')}</a>"
@@ -549,9 +553,12 @@ def send_email(sender_email: str, sender_password: str, receiver_emails: list, s
     print("Email was sent to:",string_of_list_to_list(os.getenv("email-recipients","[]")))
 
 def send_emails(sender_email: str, sender_password: str, receiver_emails: list, data_to_be_sent: list):
+    if os.getenv("send-notifications", "True") == "False":
+        print_debug_log("Not sending email(s) as for conf")
+        return
     print_debug_log("Sending multiple emails")
     if string_of_list_to_list(os.getenv("email-recipients","[]")) == "[]":
-        print("Email was not sent, no email address(es) set as recipients")  #"platform-url"
+        print("Email was not sent, no email address(es) set as recipient(s)")  #"platform-url"
     smtp_server = os.getenv("smtp-server","no.server.set")
     if not smtp_server:
         print("MISSING smtp-server, email not sent.")
