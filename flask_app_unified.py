@@ -233,7 +233,8 @@ async def gather_snmp_info(host, stronger_sep=False):
         "memory": [],
         "disks": [],
         "cpu": {},
-        "load_avg": loads
+        "load_avg": loads,
+        "og_data": host
     }
 
     # Memory
@@ -502,7 +503,8 @@ def send_telegram(chat_id, message):
     """encapsules sending a telegram message"""
     a,b = bot_2.send_message_new(message, chat_id)
     if a:
-        print_debug_log("Telegram message was sent")
+        if b != "Did not send but was told not to":
+            print_debug_log("Telegram message was sent")
     else:
         print_debug_log("Telegram message was not sent because: "+b)
     return
@@ -1195,28 +1197,60 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
             cursor.execute("SELECT * FROM snmp_host;")
             rows = cursor.fetchall()
             cursor.close()
+
             if rows:
-                print_debug_log(f"getting {len(rows)} snmps...")
-                        
-                for row in rows:
-                    received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
-                    data = await gather_snmp_info(received_data)
-                    if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
-                        print_debug_log(f"Host {row['host']} gave no data, maybe authentication failed?")
-                        snmp_errors.append((f"Host {row['host']} gave no data, maybe authentication failed?",f"SNMP Host {row['host']}"))
-                    else:
-                        cursor = conn.cursor(buffered=True)
-                        query = '''INSERT INTO `checker`.`snmp_data` (`host`, `data`) VALUES (%s,%s);'''
-                        cursor.execute(query,(row["host"],json.dumps(data),))
-                        conn.commit()
-                        for ram_usage in data["memory"]:
-                            if ram_usage["used_MB"]/ram_usage["total_MB"] > row["threshold_mem"]:
-                                snmp_errors.append((f"Host {row['host']} ({row['description']}) has its memory usage above the threshold of {row['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {row['host']}"))
-                                break
-                        if data["cpu"]["average"] > float(row["threshold_cpu"])*100:
-                            snmp_errors.append((f"Host {row['host']} ({row['description']}) has its used CPU above the threshold of {row['threshold_cpu']}: {data['cpu']['average']}",f"SNMP Host {row['host']}"))
-                    if len(snmp_errors)==0:
-                        print_debug_log("No snmp issues found")
+                print_debug_log(f"getting parallels {len(rows)} snmps...")
+                async with httpx.AsyncClient() as client:
+                    # We wrap the tasks to ensure they all finish even if some fail
+                    tasks = [gather_snmp_info({"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}) for row in rows]
+
+                    # return_exceptions=True prevents one crash from stopping others
+                    responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+                    for returned_snmp in responses:
+                        try:
+                            if len(returned_snmp["memory"]) == 0:  # using lack of memory data as indication of no data being found
+                                print_debug_log(f"Host unclear gave no data, maybe authentication failed?")
+                                snmp_errors.append((f"Host {returned_snmp['og_data']['host']} gave no data, maybe authentication failed?",f"SNMP Host {returned_snmp['og_data']['host']}"))
+                            else:
+                                cursor = conn.cursor(buffered=True)
+                                query = '''INSERT INTO `checker`.`snmp_data` (`host`, `data`) VALUES (%s,%s);'''
+                                cursor.execute(query,(returned_snmp["og_data"]["host"],json.dumps(returned_snmp),))
+                                conn.commit()
+                                for ram_usage in returned_snmp["memory"]:
+                                    if ram_usage["used_MB"]/ram_usage["total_MB"] > returned_snmp['og_data']["threshold_mem"]:
+                                        snmp_errors.append((f"Host unclear ({returned_snmp['og_data']['host']}) has its memory usage above the threshold of {returned_snmp['og_data']['threshold_mem']}: {returned_snmp['used_MB']/ram_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
+                                        break
+                                if returned_snmp["cpu"]["average"] > float(returned_snmp['og_data']["threshold_cpu"])*100:
+                                    snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used CPU above the threshold of {returned_snmp['og_data']['threshold_cpu']}: {returned_snmp['cpu']['average']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
+                            
+                        except:
+                            print_debug_log("Issue in parallel reading containers: "+traceback.format_exc())
+
+
+
+            #if rows:
+            #   print_debug_log(f"getting {len(rows)} snmps...")
+            #            
+            #    for row in rows:
+            #        received_data={"host":row["host"],"user":row["user"],"description":row["description"],"threshold_cpu":row["threshold_cpu"],"threshold_mem":row["threshold_mem"],"details":row["details"],"protocol":row["protocol"]}
+            #        data = await gather_snmp_info(received_data)
+            #        if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
+            #           print_debug_log(f"Host {row['host']} gave no data, maybe authentication failed?")
+            #            snmp_errors.append((f"Host {row['host']} gave no data, maybe authentication failed?",f"SNMP Host {row['host']}"))
+            #        else:
+            #            cursor = conn.cursor(buffered=True)
+            #            query = '''INSERT INTO `checker`.`snmp_data` (`host`, `data`) VALUES (%s,%s);'''
+            #            cursor.execute(query,(row["host"],json.dumps(data),))
+            #            conn.commit()
+            #            for ram_usage in data["memory"]:
+            #                if ram_usage["used_MB"]/ram_usage["total_MB"] > row["threshold_mem"]:
+            #                    snmp_errors.append((f"Host {row['host']} ({row['description']}) has its memory usage above the threshold of {row['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {row['host']}"))
+            #                    break
+            #            if data["cpu"]["average"] > float(row["threshold_cpu"])*100:
+            #                snmp_errors.append((f"Host {row['host']} ({row['description']}) has its used CPU above the threshold of {row['threshold_cpu']}: {data['cpu']['average']}",f"SNMP Host {row['host']}"))
+            #        if len(snmp_errors)==0:
+            #            print_debug_log("No snmp issues found")
             else:
                 print_debug_log("No snmp control to be performed")
     except Exception:
