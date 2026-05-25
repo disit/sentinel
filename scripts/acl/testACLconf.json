@@ -1,0 +1,8 @@
+{
+  "base-url": "$#base-url#$",
+  "client_id": "js-kpi-client",
+  "rootusername": "userrootadmin",
+  "rootpassword": "$#userrootadmin-pwd#$",
+  "areamanagerusername": "userareamanager",
+  "areamanagerpassword": "$#areamanager-pwd#$"
+}
