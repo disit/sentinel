@@ -34,10 +34,10 @@
 	];
 	var container_severity;
 	
-	const lookupTable = {
-		{%for item in categories%}'{{item[0]}}': ['{{item[1]}}','{{item[2]|safe}}','{{item[3]|safe}}'],
-		{% endfor %}'nothing': 'nothing'
-	};
+	const lookupTable = [
+		{%for item in categories%}{key:'{{item[0]}}', value: ['{{item[1]}}','{{item[2]|safe}}','{{item[3]|safe}}']},
+		{% endfor %}{ key: 'nothing', value: 'nothing' }
+	];
 
 	const lookupTable_cronjobs = {
 		{%for item in cronjobs%}'{{item[0]}}': ['{{item[1]}}', '{{item[2]}}', '{{item[3]|safe}}'],
@@ -1000,10 +1000,20 @@ function makeCronJobTable(data) { // disabled
 				testresults.setAttribute('id',elements[6]+'-result');
 
 				var some_value;
-				for (const key in lookupTable) {
-					if (rowValues["Name"].startsWith(key.replace('*', ''))) {
-						some_value = lookupTable[key];
-					break;
+				//for (const key in lookupTable) {
+				//	if (rowValues["Name"].startsWith(key.replace('*', ''))) {
+				//		some_value = lookupTable[key];
+				//	break;
+				//	}
+				//}
+				for (const entry of lookupTable) {
+					const key = entry.key;
+					const value = entry.value;
+
+					if (name.startsWith(key.replace('*', ''))) {
+						if (Array.isArray(value) && rowValues["Name"].startsWith(key.replace('*', ''))) 
+							some_value = lookupTable[key];
+						break;
 					}
 				}
 				if (!some_value) some_value = ["","Failure to retrieve contacts", "Failure to retrieve location"];
@@ -1110,10 +1120,14 @@ function makeCronJobTable(data) { // disabled
 			}
 			else { // kuber/docker container
 				const name = item.Name;
-				for (const key in lookupTable) {
+				for (const entry of lookupTable) {
+					const key = entry.key;
+					const value = entry.value;
+
 					if (name.startsWith(key.replace('*', ''))) {
-						if (item.Namespace.includes(lookupTable[key][2])) {
-							category = lookupTable[key][0];
+						// Guard clause: ensure value is an array before checking index 2
+						if (Array.isArray(value) && item.Namespace.includes(value[2])) {
+							category = value[0];
 							break;
 						}
 					}
