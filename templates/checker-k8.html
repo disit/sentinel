@@ -1109,7 +1109,7 @@ function makeCronJobTable(data) { // disabled
 			}
 		);
 		const categorizedData = {};
-		
+		const saw_containers = [];
 		containerdata.forEach(item => {
 			let category = 'Unknown';
 			if (item.Labels === "Cronjob") {
@@ -1128,6 +1128,7 @@ function makeCronJobTable(data) { // disabled
 						// Guard clause: ensure value is an array before checking index 2
 						if (Array.isArray(value) && item.Namespace.includes(value[2])) {
 							category = value[0];
+							saw_containers.push(entry);
 							break;
 						}
 					}
@@ -1138,7 +1139,15 @@ function makeCronJobTable(data) { // disabled
 				categorizedData[category].push(item);
 			}
 		});
-		
+
+		const not_found = lookupTable.filter(n => !saw_containers.includes(n));
+		let filteredArr = not_found.filter(item => !(item.key === 'nothing' && item.value === 'nothing'));
+		var made_string = "";
+		for (const entry of filteredArr) {
+			made_string+=entry.key + " not found in " + entry.value[2] + " - "
+		}
+		add_alert(made_string);
+
 		
 		const cg = colorGenerator();
 		var something = Object.keys(categorizedData).sort();
