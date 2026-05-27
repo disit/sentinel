@@ -1144,9 +1144,11 @@ function makeCronJobTable(data) { // disabled
 		let filteredArr = not_found.filter(item => !(item.key === 'nothing' && item.value === 'nothing'));
 		var made_string = "";
 		for (const entry of filteredArr) {
-			made_string+=entry.key + " not found in " + entry.value[2] + " - "
+			made_string+= "Container/pod " + entry.key + " not found in " + entry.value[2] + " - ";
+			logging("Container/pod " + entry.key + " not found in " + entry.value[2]);
 		}
-		add_alert(made_string);
+		if (made_string.length > 0)
+		add_alert(made_string.slice(0,-2));
 
 		
 		const cg = colorGenerator();
