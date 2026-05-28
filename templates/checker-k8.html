@@ -4,10 +4,10 @@
 {{ super() }}
 {% endblock %}
 {% block content %}
-<!-- data-bs-theme="dark" -->
 <script>
+	// used as a global var, when true forces webpage to not update with new data from backend
 	var donotupdate = false;
-	var test_results;
+	var test_results; 
 	var test_results_divs = {};
 	var data_tables = {};
 	const extra_data_locations = [
@@ -16,8 +16,10 @@
 	];
 	var less_columns = true;
 	var container_names = [];
+	// since container/pod/cronjob data can be overwhelming, the backed sends data used to reduce the columns shown. The data is still sent in its entirety, use the inspect page of the browser and see the request and its response
 	var dict_of_hidden_columns = {{column_string | safe}};
-	//var dict_of_hidden_columns = {columnDefs:[{target: 0, visible: false},{target: 1, visible: false},{target: 2, visible: false},{target: 3, visible: false},{target: 4, visible: false},{target: 5, visible: false},{target: 7, visible: false},{target: 10, visible: false},{target: 14, visible: false},{target: 15, visible: false}]};
+
+	// utility variables to maintain consisentency for updates
 	var container_rows = {};
 	var iframes = {};
 	var closed_categories = new Set();
@@ -33,12 +35,15 @@
 		{%endfor%}
 	];
 	var container_severity;
-	
+
+	//not a dict because containers from different sources may have the same name, but this tool was originally written to both be not desired and not intended; 
+	//this patch is the painless one, rest of the code deals with this already
 	const lookupTable = [
 		{%for item in categories%}{key:'{{item[0]}}', value: ['{{item[1]}}','{{item[2]|safe}}','{{item[3]|safe}}']},
 		{% endfor %}{ key: 'nothing', value: 'nothing' }
 	];
 
+	// this is a dict because there is no issue with keys here
 	const lookupTable_cronjobs = {
 		{%for item in cronjobs%}'{{item[0]}}': ['{{item[1]}}', '{{item[2]}}', '{{item[3]|safe}}'],
 		{% endfor %}'nothing': 'nothing'
@@ -52,7 +57,7 @@
 		else {
 			document.getElementById("buttonForUpdates").innerHTML = "Resume containers refresh";
 			donotupdate = true;
-			await smartSleep(1800000);
+			await smartSleep(1800000); // reset anyway after 30 minutes in case someone forgets it
 			document.getElementById("buttonForUpdates").innerHTML = "Stop containers refresh";
 			donotupdate = false;
 		}
@@ -71,13 +76,10 @@
 	$(document).ready(async function askcontainers() {
 	{% block additional_content_admin_log_datatable_trigger %}{% endblock %}
 	
-	// Select the target div to observe
+	//
 	const targetDiv = document.getElementById('floating-div');
-
-	// Create a new instance of MutationObserver
 	const observer = new MutationObserver((mutations) => {
 		mutations.forEach((mutation) => {
-			// Check if the mutation type is "childList" (addition or removal of child nodes)
 			if (mutation.type === 'childList') {
 				if (targetDiv.childNodes.length < 2) {
 					document.getElementById('alerts').innerHTML = "No alerts to be shown";
@@ -202,42 +204,42 @@ function findClosestKeyStartsWith(searchTerm, obj) {
 	
 	}
 	
-	async function update_routine() {
-		
-		testsResults();
-		var allTables = $.fn.dataTable.tables();
-		delete allTables[0];
-		$.each(allTables, function(index, table) { 
-			testthisthingffs = structuredClone(dict_of_hidden_columns);
-			testthisthingffs['destroy'] = true;
-			var newOptions = {
-				...testthisthingffs,
-    			autoWidth: false,
-				responsive: true
-			};
+async function update_routine() {
+	
+	testsResults();
+	var allTables = $.fn.dataTable.tables();
+	delete allTables[0];
+	$.each(allTables, function(index, table) { 
+		testthisthingffs = structuredClone(dict_of_hidden_columns);
+		testthisthingffs['destroy'] = true;
+		var newOptions = {
+			...testthisthingffs,
+			autoWidth: false,
+			responsive: true
+		};
 
-			var dataTable = $(table).DataTable(newOptions);
-		});
-		getcontainersdb();
-		showTestResults();
-		$("table[id^='table-']").DataTable();
-		document.getElementById("last-update").innerHTML = "Last update: " + new Date().toLocaleString();
-		cg = colorGenerator();
-		better_get_all_tests();
-		const logs = document.querySelectorAll('p');
-		logs.forEach(current_log => {
-			if (current_log.id.endsWith("logs"))
-			logs_for_categories[current_log.id]=current_log.innerHTML;
-		});
-		//$('.resizeable').css("width", "max-content"); //makes it so on mobile the table has a usable size
-		var see_logs = document.getElementById('see_logs');
-		var lines = see_logs.innerHTML.split('<br>');
-		get_muted_components();
-		if (lines.length > 100) {
-			lines = lines.slice(lines.length - 100);
-			see_logs.innerHTML = lines.join('<br>');
-		}
-	};
+		var dataTable = $(table).DataTable(newOptions);
+	});
+	getcontainersdb();
+	showTestResults();
+	$("table[id^='table-']").DataTable();
+	document.getElementById("last-update").innerHTML = "Last update: " + new Date().toLocaleString();
+	cg = colorGenerator();
+	better_get_all_tests();
+	const logs = document.querySelectorAll('p');
+	logs.forEach(current_log => {
+		if (current_log.id.endsWith("logs"))
+		logs_for_categories[current_log.id]=current_log.innerHTML;
+	});
+	//$('.resizeable').css("width", "max-content"); //makes it so on mobile the table has a usable size
+	var see_logs = document.getElementById('see_logs');
+	var lines = see_logs.innerHTML.split('<br>');
+	get_muted_components();
+	if (lines.length > 100) {
+		lines = lines.slice(lines.length - 100);
+		see_logs.innerHTML = lines.join('<br>');
+	}
+};
 
 function makeCronJobTable(data) { // disabled
 	return;
@@ -1109,7 +1111,7 @@ function makeCronJobTable(data) { // disabled
 			}
 		);
 		const categorizedData = {};
-		
+		const saw_containers = [];
 		containerdata.forEach(item => {
 			let category = 'Unknown';
 			if (item.Labels === "Cronjob") {
@@ -1128,6 +1130,7 @@ function makeCronJobTable(data) { // disabled
 						// Guard clause: ensure value is an array before checking index 2
 						if (Array.isArray(value) && item.Namespace.includes(value[2])) {
 							category = value[0];
+							saw_containers.push(entry);
 							break;
 						}
 					}
@@ -1138,7 +1141,17 @@ function makeCronJobTable(data) { // disabled
 				categorizedData[category].push(item);
 			}
 		});
-		
+
+		const not_found = lookupTable.filter(n => !saw_containers.includes(n));
+		let filteredArr = not_found.filter(item => !(item.key === 'nothing' && item.value === 'nothing'));
+		var made_string = "";
+		for (const entry of filteredArr) {
+			made_string+= "Container/pod " + entry.key + " not found in " + entry.value[2] + " - ";
+			logging("Container/pod " + entry.key + " not found in " + entry.value[2]);
+		}
+		if (made_string.length > 0)
+		add_alert(made_string.slice(0,-2));
+
 		
 		const cg = colorGenerator();
 		var something = Object.keys(categorizedData).sort();
@@ -1541,7 +1554,6 @@ function makeCronJobTable(data) { // disabled
 	{% block additional_content_code %}{% endblock %}
 
 	  window.addEventListener('load', () => {
-			// 2000 ms = 2 seconds
 			setTimeout(async () => {
 				await update_routine();
 			}, 500);
