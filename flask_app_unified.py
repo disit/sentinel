@@ -1219,7 +1219,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                                 conn.commit()
                                 for ram_usage in returned_snmp["memory"]:
                                     if ram_usage["used_MB"]/ram_usage["total_MB"] > returned_snmp['og_data']["threshold_mem"]:
-                                        snmp_errors.append((f"Host unclear ({returned_snmp['og_data']['host']}) has its memory usage above the threshold of {returned_snmp['og_data']['threshold_mem']}: {returned_snmp['used_MB']/ram_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
+                                        snmp_errors.append((f"Host unclear ({returned_snmp['og_data']['host']}) has its memory usage above the threshold of {returned_snmp['og_data']['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
                                         break
                                 if returned_snmp["cpu"]["average"] > float(returned_snmp['og_data']["threshold_cpu"])*100:
                                     snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used CPU above the threshold of {returned_snmp['og_data']['threshold_cpu']}: {returned_snmp['cpu']['average']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
