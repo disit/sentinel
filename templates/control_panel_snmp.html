@@ -8,7 +8,7 @@
 <div class="p-3 m-0 border-0 bd-example m-0 border-0">
 <h1>Available SNMP</h1>
 <table border="1" cellpadding="5" id="hosts_table">
-<thead><tr><th>Host</th><th>User</th><th>Description</th><th>CPU</th><th>MEM</th><th>Protocol</th><th>Details</th><th>Delete SNMP</th></tr></thead>
+<thead><tr><th>Host</th><th>User</th><th>Description</th><th>CPU</th><th>MEM</th><th>Protocol</th><th>Details</th><th>Operations SNMP</th><th>Healthy</th></tr></thead>
 {% for row in hosts %}
 <tr>
 <td><a target="_blank" href="./snmp_info?host={{ row[0] }}">{{ row[0] }}</a></td>
@@ -20,7 +20,8 @@
 <td>Secure (v3)</td>{%else%}<td>Insecure (v2)</td>
 {%endif%}
 <td>{{ row[6] }}</td>
-<td><button class="btn btn-danger" onclick="deleteSNMPHost('{{ row[0] }}')">Delete</button></td>
+<td><button class="btn btn-danger" onclick="deleteSNMPHost('{{ row[0] }}')">Delete</button><button class="btn btn-warning" onclick="editSNMPHost('{{ row[0] }}','{{ row[1] }}','{{ row[2] }}','{{ row[3] }}','{{ row[4] }}','{{ row[5] }}','{{ row[6] }}')">Load values in form (check passwords)</button></td>
+<td>{{ row[7] }}</td>
 </tr>
 {% endfor %}
 </table>
@@ -38,7 +39,7 @@ To edit an entry, simply delete the previous one and put another one.
 <div class="form-group">The following are needed only if a secure protocol was chosen. These will be hidden in the Web UI to the third char of the string.<br></div>
 <div class="form-group">PrivKey: <input id="PrivKey" type="password" class="form-control" name="PrivKey"><br></div>
 <div class="form-group">AuthKey: <input id="AuthKey" type="password" class="form-control" name="AuthKey"><br></div>
-<div class="form-group"><button id="button_add" class="form-control" class="btn btn-info">Add SNMP</button></div>
+<div class="form-group"><button id="button_add" class="form-control" class="btn btn-info">Add SNMP</button><button id="button_edit" class="form-control" class="btn btn-info">Edit SNMP</button></div>
 
 </form>
 </div>
@@ -65,6 +66,14 @@ function deleteSNMPHost(host) {
         }
 };
 
+function editSNMPHost(host,user,description,cpu,mem,protocol,details) {
+    $('#user').val(user);
+    $('#host').val(host);
+    $('#cpu').val(cpu);
+    $('#mem').val(mem);
+    $('#protocol').val(protocol);
+    $('#description').val(description);
+}
 
 
 $('#button_add').on('click', function(e) {
@@ -80,6 +89,26 @@ $('#button_add').on('click', function(e) {
             },
             error: function(error) {
                 alert("Host was not added because of: " + error.responseText);
+            }
+        });
+    }
+    catch (exception_var) {
+        console.log(exception_var);
+    }
+});
+$('#button_edit').on('click', function(e) {
+    e.preventDefault();
+    try {
+        $.ajax({
+            url: './edit_snmp',
+            data: {user: $('#user').val(), description: $('#description').val(), cpu: $('#cpu').val(), mem: $('#mem').val(), protocol:$('#protocol').val(), host: $('#host').val(), PrivKey: $('#PrivKey').val(), AuthKey: $('#AuthKey').val()},
+            type: 'POST',
+            success: function(response) {
+                alert("Host was edited!");
+                location.reload();
+            },
+            error: function(error) {
+                alert("Host was not edited because of: " + error.responseText);
             }
         });
     }

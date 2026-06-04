@@ -829,6 +829,16 @@ function makeCronJobTable(data) { // disabled
 		catch {
 			//it's fine
 		}
+		
+		// if something starts generating a different json obj (a docker container data json, for instance) and somehow it isn't filtered in the backend, this will try to return to an okay one
+		const ok_keys = ["Container", "CreatedAt", "ID", "Image", "Labels", "Mounts", "Name", "Names", "Namespace", "Node", "Ports", "RunningFor", "Source", "State", "Status", "Volumes"];
+		rowData.forEach(obj => {
+			Object.keys(obj).forEach(key => {
+				if (!ok_keys.includes(key)) {
+				delete obj[key];
+				}
+			});
+		});
 		const table = document.createElement("table");
 		table.setAttribute("id", "table-"+name_of_table_value.replace(/\s+/g, ''));
 		table.setAttribute("class", "table table-striped table-bordered resizeable");
@@ -1011,11 +1021,17 @@ function makeCronJobTable(data) { // disabled
 				for (const entry of lookupTable) {
 					const key = entry.key;
 					const value = entry.value;
-
-					if (name.startsWith(key.replace('*', ''))) {
-						if (Array.isArray(value) && rowValues["Name"].startsWith(key.replace('*', ''))) 
+					if (rowValues["Name"].includes("*")) {
+						if (rowValues["Name"].startsWith(key.replace('*', ''))) {
+							if (Array.isArray(value) && rowValues["Name"].startsWith(key.replace('*', ''))) 
+								some_value = lookupTable[key];
+							continue;
+						}
+					}
+					else {
+						if (Array.isArray(value) && rowValues["Name"] == key) 
 							some_value = lookupTable[key];
-						break;
+						continue;
 					}
 				}
 				if (!some_value) some_value = ["","Failure to retrieve contacts", "Failure to retrieve location"];
@@ -1125,13 +1141,25 @@ function makeCronJobTable(data) { // disabled
 				for (const entry of lookupTable) {
 					const key = entry.key;
 					const value = entry.value;
-
-					if (name.startsWith(key.replace('*', ''))) {
-						// Guard clause: ensure value is an array before checking index 2
-						if (Array.isArray(value) && item.Namespace.includes(value[2])) {
-							category = value[0];
-							saw_containers.push(entry);
-							break;
+					
+					if (name.includes("*")) {
+						if (name.startsWith(key.replace('*', ''))) {
+							// Guard clause: ensure value is an array before checking index 2
+							if (Array.isArray(value) && item.Namespace.includes(value[2])) {
+								category = value[0];
+								saw_containers.push(entry);
+								break;
+							}
+						}
+					}
+					else {
+						if (name == key) {
+							// Guard clause: ensure value is an array before checking index 2
+							if (Array.isArray(value) && item.Namespace.includes(value[2])) {
+								category = value[0];
+								saw_containers.push(entry);
+								break;
+							}
 						}
 					}
 				}
@@ -1140,7 +1168,9 @@ function makeCronJobTable(data) { // disabled
 				}
 				categorizedData[category].push(item);
 			}
-		});
+		}
+		//here
+		);
 
 		const not_found = lookupTable.filter(n => !saw_containers.includes(n));
 		let filteredArr = not_found.filter(item => !(item.key === 'nothing' && item.value === 'nothing'));

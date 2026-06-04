@@ -1092,15 +1092,15 @@ async def auto_alert_status():
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
     components_original_docker = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
     components_original_kubernetes = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
+    ##FIXME these will still take non-asterisk containers
+    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0]) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
 
-    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
-
-    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]]
+    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0]) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" in c["State"])]]
 
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
 
-    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(c["Names"].startswith(value[0]) and c["Source"]==value[1] for value in components_docker) and "unhealthy" in c["Status"]]
+    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0]) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and "unhealthy" in c["Status"]]
     for c_m in containers_merged_kubernetes:
         if any(c_m["Names"].startswith(value) for value in components_kubernetes):
             if "restarts" in c_m["State"]:
@@ -1210,7 +1210,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                     for returned_snmp in responses:
                         try:
                             if len(returned_snmp["memory"]) == 0:  # using lack of memory data as indication of no data being found
-                                print_debug_log(f"Host unclear gave no data, maybe authentication failed?")
+                                print_debug_log(f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) gave no data, maybe authentication failed?")
                                 snmp_errors.append((f"Host {returned_snmp['og_data']['host']} gave no data, maybe authentication failed?",f"SNMP Host {returned_snmp['og_data']['host']}"))
                             else:
                                 cursor = conn.cursor(buffered=True)
@@ -1219,7 +1219,7 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                                 conn.commit()
                                 for ram_usage in returned_snmp["memory"]:
                                     if ram_usage["used_MB"]/ram_usage["total_MB"] > returned_snmp['og_data']["threshold_mem"]:
-                                        snmp_errors.append((f"Host unclear ({returned_snmp['og_data']['host']}) has its memory usage above the threshold of {returned_snmp['og_data']['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
+                                        snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its memory usage above the threshold of {returned_snmp['og_data']['threshold_mem']}: {ram_usage['used_MB']/ram_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
                                         break
                                 if returned_snmp["cpu"]["average"] > float(returned_snmp['og_data']["threshold_cpu"])*100:
                                     snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used CPU above the threshold of {returned_snmp['og_data']['threshold_cpu']}: {returned_snmp['cpu']['average']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
@@ -1859,7 +1859,7 @@ def send_advanced_alerts(message):
                 except Exception:
                     print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification"+traceback.format_exc())
                     continue
-                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Source']][1]} has some issues in {c['Source']}."})
+                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} has some issues in {c['Source']}."})
 
         if len(message[1])>0:
             for c in message[1]:
@@ -1873,7 +1873,7 @@ def send_advanced_alerts(message):
                 except Exception:
                     print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification:"+traceback.format_exc())
                     continue
-                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Source']][1]} is not answering correctly to its \"is alive\" test in {cont_sevr[c['Name']+c['Node']][0]}."})
+                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} is not answering correctly to its \"is alive\" test in {cont_sevr[c['Name']+c['Node']][0]}."})
 
         if len(message[2])>0:
             for c in message[2]:
@@ -1967,7 +1967,7 @@ def send_advanced_alerts(message):
                     pass
                 except Exception:
                     print_debug_log(f"Something failed while determinging if {c[0]} should be sent as a notification")
-                text_for_telegram.append(f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Node']][1]} has some issues in {cont_sevr[c['Name']+c['Node']][0]}.")
+                text_for_telegram.append(f"Container {c['Name']} in category has some issues in {c['Source']}.")
         if len(message[1])>0:
             for c in message[1]:
                 try:
@@ -1979,7 +1979,7 @@ def send_advanced_alerts(message):
                     pass
                 except Exception:
                     print_debug_log(f"Something failed while determinging if {c[0]} should be sent as a notification")
-                text_for_telegram.append(f"Container {c['Name']} in category {cont_sevr[c['Name']+c['Node']][1]} is not answering correctly to its \"is alive\" test in {cont_sevr[c['Name']+c['Node']][0]}.")
+                text_for_telegram.append(f"Container {c['Name']} is not answering correctly to its \"is alive\" test in {c['Source']}.")
 
         if len(message[2])>0:
             for c in message[2]:
@@ -4749,7 +4749,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    cursor.execute("SELECT host, user, description, threshold_cpu, threshold_mem, protocol, details FROM snmp_host")
+                    cursor.execute("WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY host ORDER BY sampled_at DESC) AS row_num FROM snmp_data) select snmp_host.host, snmp_host.user, snmp_host.description, snmp_host.threshold_cpu, snmp_host.threshold_mem, snmp_host.protocol, snmp_host.details, rankedentries.data from rankedentries right outer join snmp_host on snmp_host.host = rankedentries.host WHERE row_num = 1 or row_num is null")
                     rows = cursor.fetchall()
                     real_rows = []
                     for row in rows: #try to hide keys for privacy
@@ -4765,7 +4765,20 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                                 current_json = updated_json
                         except Exception:
                             current_json = {"data":"no_data"}
+                        ## is this snmp up to its standards?
+                        try:
+                            data_json = json.loads(row[7])
+                            is_this_ok="True"
+                            for ram_usage in data_json["memory"]:
+                                if ram_usage["used_MB"]/ram_usage["total_MB"] > float(row[4]):
+                                    is_this_ok="False"
+                                    break
+                            if data_json["cpu"]["average"] > float(row[4]) * 100:
+                                is_this_ok="False"
+                        except: # probably no snmp data found
+                            is_this_ok="False"
                         current_row.append(json.dumps(current_json))
+                        current_row.append(is_this_ok)
                         real_rows.append(current_row)
                     return render_template("control_panel_snmp.html", hosts=real_rows)
             except Exception:
@@ -4799,6 +4812,48 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 else:
                     return jsonify({"error": "Illegal protocol detected", "data":str(request.form)}), 500
                 cursor.execute("INSERT INTO snmp_host (host, user, description, threshold_cpu, threshold_mem, details, protocol) VALUES (%s, %s, %s, %s, %s, %s, %s)", (host, user, description, cpu, mem, details, protocol))
+                conn.commit()
+                cursor.close()
+                conn.close()
+
+                return jsonify({"status": "ok"})
+
+            except Exception:
+                return jsonify({"error": traceback.format_exc()}), 500
+        return redirect(url_for('login'))
+    
+    @app.route('/edit_snmp', methods=['POST'])
+    def edit_snmp():
+        if 'username' in session:
+            if session['username']!="admin":
+                return render_template("error_showing.html", r = "You do not have the privileges to access this webpage."), 401
+            if os.getenv('unsafe-mode') != "True":
+                return render_template("error_showing.html", r = "Unsafe mode is not set, hence you cannot perform this action (edit conf.json or env variables)"), 401
+            user = request.form.get('user', None)
+            description = request.form.get('description', None)
+            details = request.form.get('details', None)
+            cpu = request.form.get('cpu', None)
+            mem = request.form.get('mem', None)
+            protocol = request.form.get('protocol', None)
+            host = request.form.get('host', None)
+            PrivKey = request.form.get('PrivKey', None)
+            AuthKey = request.form.get('AuthKey', None)
+            try:
+
+                conn = mysql.connector.connect(**db_conn_info)
+                cursor = conn.cursor()
+                if PrivKey == "" or AuthKey == "":
+                    cursor.execute("UPDATE `checker`.`snmp_host` SET `host` =  %s, `user` = %s, `description` =  %s, `threshold_cpu` =  %s, `threshold_mem` =  %s WHERE (`host` =  %s);", ( host, user, description, cpu, mem, host))
+                
+                else:
+                    if protocol=="true":
+                        details = json.dumps({"PrivKey":PrivKey, "AuthKey":AuthKey})
+                    elif protocol=="false":
+                        details = None
+                    else:
+                        return jsonify({"error": "Illegal protocol detected", "data":str(request.form)}), 500
+                    cursor.execute("UPDATE `checker`.`snmp_host` SET `protocol` = %s, `host` =  %s, `user` = %s, `description` =  %s, `threshold_cpu` =  %s, `details` =  %s, `threshold_mem` =  %s WHERE (`host` =  %s);", (protocol, host, user, description, cpu, details, mem, host))
+                
                 conn.commit()
                 cursor.close()
                 conn.close()
