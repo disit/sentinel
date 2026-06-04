@@ -1021,7 +1021,7 @@ function makeCronJobTable(data) { // disabled
 				for (const entry of lookupTable) {
 					const key = entry.key;
 					const value = entry.value;
-					if (rowValues["Name"].includes("*")) {
+					if (key.includes("*")) {
 						if (rowValues["Name"].startsWith(key.replace('*', ''))) {
 							if (Array.isArray(value) && rowValues["Name"].startsWith(key.replace('*', ''))) 
 								some_value = lookupTable[key];
@@ -1142,7 +1142,7 @@ function makeCronJobTable(data) { // disabled
 					const key = entry.key;
 					const value = entry.value;
 					
-					if (name.includes("*")) {
+					if (key.includes("*")) {
 						if (name.startsWith(key.replace('*', ''))) {
 							// Guard clause: ensure value is an array before checking index 2
 							if (Array.isArray(value) && item.Namespace.includes(value[2])) {
