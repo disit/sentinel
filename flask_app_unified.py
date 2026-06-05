@@ -236,12 +236,18 @@ async def gather_snmp_info(host, stronger_sep=False):
         "load_avg": loads,
         "og_data": host
     }
-
+    #snmp puts ram stuff in disks too, so we try to filter them out of disks
+    keys_saw_in_memory = set()
+    # the following two are always full, even if the host isn't doing anything, and it will cause false positives
+    keys_saw_in_memory.add("Cached memory")
+    keys_saw_in_memory.add("Shared memory")
+    
     # Memory
     for _, info in memory.items():
         if info.get('descr', 'unknown') not in ["Cached memory","Shared memory"]:
             used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
             total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
+            keys_saw_in_memory.add(info.get('descr', 'unknown'))
             result["memory"].append({
                 "description": info.get('descr', 'unknown'),
                 "used_MB": round(used_bytes / 1024 / 1024, 1),
@@ -253,21 +259,22 @@ async def gather_snmp_info(host, stronger_sep=False):
     for _, info in disk.items():
         used_bytes = info.get('used', 0) * info.get('alloc_unit', 1)
         total_bytes = info.get('size', 0) * info.get('alloc_unit', 1)
-        if "memory" not in info.get('descr', 'unknown').lower() or not stronger_sep:
-            try:
-                result["disks"].append({
-                    "description": info.get('descr', 'unknown'),
-                    "used_MB": round(used_bytes / 1024 / 1024, 1),
-                    "total_MB": round(total_bytes / 1024 / 1024, 1),
-                    "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
-                })
-            except ZeroDivisionError:
-                result["disks"].append({
-                    "description": info.get('descr', 'unknown'),
-                    "used_MB": round(used_bytes / 1024 / 1024, 1),
-                    "total_MB": round(total_bytes / 1024 / 1024, 1),
-                    "perc": "0%",
-                })
+        if info.get('descr', 'unknown') not in keys_saw_in_memory: # if it's in this set, then it's most likely a ram, so if it's not, it should be a ram
+            if "memory" not in info.get('descr', 'unknown').lower() or not stronger_sep:
+                try:
+                    result["disks"].append({
+                        "description": info.get('descr', 'unknown'),
+                        "used_MB": round(used_bytes / 1024 / 1024, 1),
+                        "total_MB": round(total_bytes / 1024 / 1024, 1),
+                        "perc": str(round(used_bytes/total_bytes*100,2)) +"%",
+                    })
+                except ZeroDivisionError:
+                    result["disks"].append({
+                        "description": info.get('descr', 'unknown'),
+                        "used_MB": round(used_bytes / 1024 / 1024, 1),
+                        "total_MB": round(total_bytes / 1024 / 1024, 1),
+                        "perc": "0%",
+                    })
     # CPU
     if cpu:
         result["cpu"] = {
@@ -1224,8 +1231,9 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                                     snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used CPU above the threshold of {returned_snmp['og_data']['threshold_cpu']}: {returned_snmp['cpu']['average']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
                                 for disk_usage in returned_snmp["disks"]:
                                     if disk_usage["total_MB"] > int(os.getenv("snmp_disk_minimum_cutoff",16384)): # minimum MB filter to avoid useless "disks"
-                                        if disk_usage["used_MB"]/disk_usage["total_MB"]>float(os.getenv("snmp_disk_notification_threshold",0.9)):
-                                            snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used disk above the threshold of {os.getenv('snmp_disk_notification_threshold',0.9)}: {disk_usage['used_MB']/disk_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
+                                        if "memory" in disk_usage["description"].lower():
+                                            if disk_usage["used_MB"]/disk_usage["total_MB"]>float(os.getenv("snmp_disk_notification_threshold",0.9)):
+                                                snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used disk above the threshold of {os.getenv('snmp_disk_notification_threshold',0.9)}: {disk_usage['used_MB']/disk_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
                         except:
                             print_debug_log("Issue in parallel reading containers: "+traceback.format_exc())
 
@@ -4775,6 +4783,10 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                                 if ram_usage["used_MB"]/ram_usage["total_MB"] > float(row[4]):
                                     is_this_ok="False"
                                     break
+                            for disk_usage in data_json["disk"]:
+                                if disk_usage["used_MB"]/disk_usage["total_MB"] > float(row[4]) and disk_usage["total_MB"] > int(os.getenv("snmp_disk_minimum_cutoff",16384)) and disk_usage["used_MB"]/disk_usage["total_MB"]>float(os.getenv("snmp_disk_notification_threshold",0.9)):
+                                    is_this_ok="False"
+                                    break
                             if data_json["cpu"]["average"] > float(row[4]) * 100:
                                 is_this_ok="False"
                         except: # probably no snmp data found
@@ -4919,7 +4931,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
                 data = asyncio.run(gather_snmp_info(received_data, stronger_sep=True))
                 if len(data["memory"]) == 0:  # using lack of memory data as indication of no data being found
                     return jsonify({"error": "No data found from snmp walk, ensure that the protocol is correct, that the credentials are okay and that the host is reachable."}), 500
-                return render_template("snmp_shower.html", host=host, data=data, threshold_cpu=row["threshold_cpu"], threshold_mem=row["threshold_mem"])
+                return render_template("snmp_shower.html", host=host, data=data, threshold_cpu=row["threshold_cpu"], threshold_mem=row["threshold_mem"],threshold_disk=float(os.getenv("snmp_disk_notification_threshold",0.9)))
             except Exception:
                 return jsonify({"error": traceback.format_exc()}), 500
 

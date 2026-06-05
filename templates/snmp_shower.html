@@ -21,7 +21,7 @@
         </table>
 
         <h2>Disk Usage</h2>
-        <table>
+        <table id="disk">
             <tr><th>Description</th><th>Used (MB)</th><th>Total (MB)</th><th>%</th></tr>
             {% for disk in data.disks %}
             <tr><td>{{ disk.description }}</td><td>{{ disk.used_MB }}</td><td>{{ disk.total_MB }}</td><td>{{ disk.perc }}</td></tr>
@@ -46,6 +46,15 @@
         if (lastCell) {
             const value = parseFloat(lastCell.textContent.replace('%', ''));
             if (value > {{threshold_mem | float}}*100) {
+                row.style.backgroundColor = 'red';
+            }
+        }
+    }
+    for (let row of document.getElementById("disk").rows) {
+        const lastCell = row.cells[row.cells.length - 1];
+        if (lastCell) {
+            const value = parseFloat(lastCell.textContent.replace('%', ''));
+            if (value > {{threshold_disk | float}}*100) {
                 row.style.backgroundColor = 'red';
             }
         }
