@@ -1092,10 +1092,9 @@ async def auto_alert_status():
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
     components_original_docker = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
     components_original_kubernetes = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
-    ##FIXME these will still take non-asterisk containers
-    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0]) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
+    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
 
-    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0]) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" in c["State"])]]
+    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" in c["State"])]]
 
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
@@ -1223,7 +1222,10 @@ SELECT datetime,result,errors,name,command,categories.category,restart_logic,des
                                         break
                                 if returned_snmp["cpu"]["average"] > float(returned_snmp['og_data']["threshold_cpu"])*100:
                                     snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used CPU above the threshold of {returned_snmp['og_data']['threshold_cpu']}: {returned_snmp['cpu']['average']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
-                            
+                                for disk_usage in returned_snmp["disks"]:
+                                    if disk_usage["total_MB"] > int(os.getenv("snmp_disk_minimum_cutoff",16384)): # minimum MB filter to avoid useless "disks"
+                                        if disk_usage["used_MB"]/disk_usage["total_MB"]>float(os.getenv("snmp_disk_notification_threshold",0.9)):
+                                            snmp_errors.append((f"Host {returned_snmp['og_data']['host']} ({returned_snmp['og_data']['description']}) has its used disk above the threshold of {os.getenv('snmp_disk_notification_threshold',0.9)}: {disk_usage['used_MB']/disk_usage['total_MB']}",f"SNMP Host {returned_snmp['og_data']['host']}"))
                         except:
                             print_debug_log("Issue in parallel reading containers: "+traceback.format_exc())
 

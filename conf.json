@@ -35,6 +35,8 @@
 	"send-telegram-notifications":"True",
 	"sender-email": "change@at.me",
 	"sender-email-password": "replacethispassword",
+	"snmp_disk_minimum_cutoff": "16384",
+	"snmp_disk_notification_threshold": "0.9",
 	"smtp-port":"587",
 	"smtp-server": "change.me.com",
 	"smtp-type": "ssl",
