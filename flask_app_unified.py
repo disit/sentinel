@@ -1867,7 +1867,7 @@ def send_advanced_alerts(message):
                 except KeyError: # just make it maximum severity in doubt
                     pass
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification"+traceback.format_exc())
+                    print_debug_log(f"Something failed while determining if {c['Name']} should be sent as a notification"+traceback.format_exc())
                     continue
                 email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} has some issues in {c['Source']}."})
 
@@ -1881,9 +1881,9 @@ def send_advanced_alerts(message):
                 except KeyError: # just make it maximum severity in doubt
                     pass
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification:"+traceback.format_exc())
+                    print_debug_log(f"Something failed while determining if {c['Name']} should be sent as a notification:"+traceback.format_exc())
                     continue
-                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} is not answering correctly to its \"is alive\" test in {cont_sevr[c['Name']+c['Node']][0]}."})
+                email_data.append({"subject":c["Name"] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c['Name']} is not answering correctly to its \"is alive\" test in {c['Source']}."})
 
         if len(message[2])>0:
             for c in message[2]:
@@ -1895,7 +1895,7 @@ def send_advanced_alerts(message):
                 except KeyError: # just make it maximum severity in doubt
                     pass
                 except Exception:
-                    print_debug_log(f"Something failed while determinging if {c['Name']} should be sent as a notification"+traceback.format_exc())
+                    print_debug_log(f"Something failed while determining if {c['Name']} should be sent as a notification"+traceback.format_exc())
                     continue
                 email_data.append({"subject":c[0] + " - " + datetime.now().strftime("%d/%m/%Y-%H:%M:%S"),"text":f"Container {c[0]} in category {c[1]} wasn't found running in {c[2]}."})
 
@@ -2232,7 +2232,7 @@ def create_app():
                         if i["Namespace"].startswith("Docker"):
                             doc_c.add(i["Node"])
                         else:
-                            k8s_p.add(i["Node"])
+                            k8s_p.add(i["Namespace"])
                     return render_template("organize_containers_unified.html",containers=results, categories=results_2,timeout=int(os.getenv("requests-timeout","15000")), docker_cont=list(doc_c), k8s_cont=list(k8s_p))
 
             except Exception:
@@ -4759,7 +4759,7 @@ SELECT datetime,result,errors,name,command,categories.category FROM RankedEntrie
             try:
                 with mysql.connector.connect(**db_conn_info) as conn:
                     cursor = conn.cursor(buffered=True)
-                    cursor.execute("WITH RankedEntries AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY host ORDER BY sampled_at DESC) AS row_num FROM snmp_data) select snmp_host.host, snmp_host.user, snmp_host.description, snmp_host.threshold_cpu, snmp_host.threshold_mem, snmp_host.protocol, snmp_host.details, rankedentries.data from rankedentries right outer join snmp_host on snmp_host.host = rankedentries.host WHERE row_num = 1 or row_num is null")
+                    cursor.execute("SELECT sh.host, sh.user, sh.description, sh.threshold_cpu, sh.threshold_mem, sh.protocol, sh.details, sd.data FROM snmp_host sh LEFT JOIN snmp_data sd ON sh.host = sd.host AND sd.sampled_at = ( SELECT MAX(latest.sampled_at) FROM snmp_data latest WHERE latest.host = sh.host );")
                     rows = cursor.fetchall()
                     real_rows = []
                     for row in rows: #try to hide keys for privacy

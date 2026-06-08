@@ -1024,13 +1024,13 @@ function makeCronJobTable(data) { // disabled
 					if (key.includes("*")) {
 						if (rowValues["Name"].startsWith(key.replace('*', ''))) {
 							if (Array.isArray(value) && rowValues["Name"].startsWith(key.replace('*', ''))) 
-								some_value = lookupTable[key];
+								some_value = lookupTable.find(item => item.key === key).value;
 							continue;
 						}
 					}
 					else {
 						if (Array.isArray(value) && rowValues["Name"] == key) 
-							some_value = lookupTable[key];
+							some_value = lookupTable.find(item => item.key === key).value;
 						continue;
 					}
 				}
