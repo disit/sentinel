@@ -956,7 +956,10 @@ async def auto_alert_status():
                     conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minute(s) and {(dt2-dt1).seconds % 60} second(s)"
                 except Exception as E:
                     conversion["RunningFor"] = "Not running"
-                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
+                try:
+                    conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
+                except: 
+                    conversion["State"] = item["status"]["phase"] + " - restarts: 0" 
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
                 try:
                     conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
@@ -1592,7 +1595,10 @@ async def update_container_state_db():
                     conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minute(s) and {(dt2-dt1).seconds % 60} second(s)"
                 except Exception:
                     conversion["RunningFor"] = "Not running"
-                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
+                try:
+                    conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
+                except: 
+                    conversion["State"] = item["status"]["phase"] + " - restarts: 0"
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
                 try:
                     conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
@@ -3872,7 +3878,10 @@ SELECT datetime,result,errors,name,command,categories.category,cronjobs.idcronjo
                     conversion["RunningFor"] = f"{(dt2-dt1).days} day(s), {(dt2-dt1).seconds // 3600} hour(s), {((dt2-dt1).seconds % 3600) // 60} minute(s) and {(dt2-dt1).seconds % 60} second(s)"
                 except Exception as E:
                     conversion["RunningFor"] = "Not running"
-                conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
+                try:
+                    conversion["State"] = list(item["status"]["containerStatuses"][0]["state"].keys())[0] + " - restarts: " + str(item["status"]["containerStatuses"][0]["restartCount"])
+                except: 
+                    conversion["State"] = item["status"]["phase"] + " - restarts: 0" 
                 conversion["Status"] = item["status"]["conditions"][0]["type"] # actually a list, has the last few different statuses
                 try:
                     conversion["Container"] = item["status"]["containerStatuses"][0]["containerID"][item["status"]["containerStatuses"][0]["containerID"].find("://")+3:]
