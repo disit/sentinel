@@ -686,6 +686,7 @@
         const inputs_final = inputs.map(input => input.value.trim()).filter(value => value !== "").join(' ');
         let composed_command_text = $("#command-prototype-edit").val() + " " + $("#TargetEdit").val() + " " + inputs_final + " " + $("#Timeout_timeEdit").val() + " " + $("#RetriesEdit").val() + " " + $("#Retries_waitEdit").val();
         $("#CommandEdit").val(composed_command_text);
+        //var splits = document.getElementById('additional-params-edit').value.split(" ");
     }
 
     function handleSelectionCommandPrototypeEdit(selectElement) {
@@ -696,18 +697,21 @@
         const container = document.getElementById('additional-params-edit');
         // Clear container first if needed
         container.innerHTML = '';
-
+        //const a = document.getElementById("CommandEdit").value.split(" ");
+        //a.shift() // the command
+        //a.shift() // the target
         JSON.parse(params).forEach(word => {
             // Create the HTML string by replacing "Element" with our word
             const snippet = `
                 <div class="form-group">
                 <label for="${word}DynamicEdit">${word}</label>
-                <input type="text" class="form-control" id="${word}DynamicEdit" placeholder="${word}" onchange="update_edit()">
+                <input type="text" class="form-control" id="${word}DynamicEdit" placeholder="${word}" onchange="update_edit()" value="${a.shift()}">
                 </div>
             `;
             
             // Append the snippet to the container
             container.insertAdjacentHTML('beforeend', snippet);
+
         });
         document.getElementById("category-selection-desc-edit").innerHTML=desc;
         update_edit();

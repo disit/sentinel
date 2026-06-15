@@ -1110,8 +1110,12 @@ async def auto_alert_status():
     components_original_kubernetes = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
     containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and not ("running" == c["State"] or c["State"].startswith("running"))]
 
-    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" == c["State"] or c["State"].startswith("running"))]]
-
+    #[containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" == c["State"] or c["State"].startswith("running"))]]
+    for c in containers_merged_kubernetes: # all pods from k8s
+        for value in components_kubernetes: # all "to be watched" pods
+            if c["Names"]==value or c["Names"].startswith(value.replace("*","")): # is the name an exact match or is it matching to the extent of the "*"?
+                if not ("running" == c["State"] or c["State"].startswith("running")): # is this running
+                    containers_which_should_be_running_and_are_not.append(c)
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
 
@@ -1121,7 +1125,7 @@ async def auto_alert_status():
             if "restarts" in c_m["State"]:
                 try:
                     if int(c_m["State"].strip().split("restarts:")[-1]) > 4:
-                        since = sum([int(b[0])*b[1] for b in zip(re.findall(f"(\d+)", c_m["RunningFor"]),[86400,3600,60,1])])
+                        since = sum([int(b[0])*b[1] for b in zip(re.findall(r"(\d+)", c_m["RunningFor"]),[86400,3600,60,1])])
                         if since>600 or since==0:
                             containers_which_are_running_but_are_not_healthy.append(c_m)
                 except Exception:
@@ -1142,7 +1146,7 @@ async def auto_alert_status():
 
     for c in components_original_kubernetes: # use this to determine who's missing
         found=False
-        for in_that_position in [a for a in containers_merged if a["Node"]==c[2]]:
+        for in_that_position in [a for a in containers_merged if a["Namespace"]==c[2]]:
             if in_that_position["Name"] == c[0] or c[0]=="":
                 found=True
                 break
@@ -2020,6 +2024,7 @@ def send_advanced_alerts(message):
                     pass
                 except Exception:
                     print_debug_log(f"Something failed while determinging if {c[0]} should be sent as a notification")
+                print_debug_log(f"Printing {c[0]} for debugging reasons: {str(c)}")
                 text_for_telegram.append(f"Container {c[0]} in category {c[1]} wasn't found running in {c[2]}.")
         if len(message[3])>0:
             text_for_telegram.append(message[3])
@@ -2147,7 +2152,7 @@ scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-f
 scheduler.add_job(clean_old_db_entries, 'cron',day=1)
 scheduler.start()
 asyncio.run(auto_alert_status())
-if os.getenv("is-master","True"): clean_old_db_entries()
+if os.getenv("is-master","True") == "True": clean_old_db_entries()
 
 slave_attempt_self_register()
 
@@ -2297,8 +2302,8 @@ def create_app():
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     if request.form.to_dict()['kind'] == "Kubernetes":
                         if request.form.to_dict()['position']=="": #if namespace left empty, just leave the old one
-                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `kind` = %s, `severity` = %s where (`component` = %s)'''
-                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
+                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s,`kind` = %s, `severity` = %s where (`component` = %s)'''
+                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
                         else:
                             query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s, `severity` = %s where (`component` = %s)'''
                             cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
