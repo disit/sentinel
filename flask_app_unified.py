@@ -1108,9 +1108,9 @@ async def auto_alert_status():
     components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
     components_original_docker = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
     components_original_kubernetes = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
-    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and not ("running" in c["State"])]
+    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and not ("running" == c["State"] or c["State"].startswith("running"))]
 
-    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" in c["State"])]]
+    [containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" == c["State"] or c["State"].startswith("running"))]]
 
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
@@ -1121,7 +1121,7 @@ async def auto_alert_status():
             if "restarts" in c_m["State"]:
                 try:
                     if int(c_m["State"].strip().split("restarts:")[-1]) > 4:
-                        since = sum([int(b[0])*b[1] for b in zip(re.findall("(\d+)", c_m["RunningFor"]),[86400,3600,60,1])])
+                        since = sum([int(b[0])*b[1] for b in zip(re.findall(f"(\d+)", c_m["RunningFor"]),[86400,3600,60,1])])
                         if since>600 or since==0:
                             containers_which_are_running_but_are_not_healthy.append(c_m)
                 except Exception:
@@ -1136,6 +1136,7 @@ async def auto_alert_status():
                 found=True
                 break
         if not found:
+            print_debug_log(f"Container not found in docker, this will cause a notification: {c[0]}")
             containers_which_are_not_expected.append(c)
     containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
 
@@ -1146,6 +1147,7 @@ async def auto_alert_status():
                 found=True
                 break
         if not found:
+            print_debug_log(f"Pod not found in k8s, this will cause a notification: {c[0]}")
             containers_which_are_not_expected.append(c)
 
     if "False" == os.getenv("running-as-kubernetes","False"):
@@ -1856,13 +1858,14 @@ def slave_attempt_self_register():
 
 def send_advanced_alerts(message):
     print_debug_log("Preparing the content of an alert")
+    for a in range(len(message)):
+            print(f"Element {a}: "+str(message[a])[:200])
     if is_this_notification_duplicated(message):
         return # won't send a doubled notification
     try:
         text_for_email = ""
         email_data = []
-        for a in range(len(message)):
-            print(f"Element {a}: "+str(message[a])[:100])
+        
         cont_sevr = {}
         with mysql.connector.connect(**db_conn_info) as conn:
             cursor = conn.cursor(buffered=True)
@@ -2144,7 +2147,7 @@ scheduler.add_job(runcronjobs, trigger='interval', minutes=int(os.getenv("cron-f
 scheduler.add_job(clean_old_db_entries, 'cron',day=1)
 scheduler.start()
 asyncio.run(auto_alert_status())
-
+if os.getenv("is-master","True"): clean_old_db_entries()
 
 slave_attempt_self_register()
 
