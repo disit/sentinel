@@ -1147,11 +1147,11 @@ async def auto_alert_status():
     for c in components_original_kubernetes: # use this to determine who's missing
         found=False
         for in_that_position in [a for a in containers_merged if a["Namespace"]==c[2]]:
-            if in_that_position["Name"] == c[0] or c[0]=="":
+            if in_that_position["Name"] == c[0] or c[0]=="" or in_that_position["Name"].startswith(c[0].replace("*","")):
                 found=True
                 break
         if not found:
-            print_debug_log(f"Pod not found in k8s, this will cause a notification: {c[0]}")
+            print(f"Pod not found in k8s, this will cause a notification: {c[0]}")
             containers_which_are_not_expected.append(c)
 
     if "False" == os.getenv("running-as-kubernetes","False"):
