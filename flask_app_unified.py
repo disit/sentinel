@@ -1028,7 +1028,10 @@ async def auto_alert_status():
                                 print("Error on multi reading container data:", str(E))
                 except requests.exceptions.ConnectionError as E:
                     print("Error on multi reading container data:", str(E))
-        containers_merged = containers_merged + total_answer
+        try:
+            containers_merged = containers_merged + total_answer
+        except UnboundLocalError: # still unknown why it happens
+            containers_merged = total_answer
         #new_containers_merged = []
         source = os.getenv("platform-url","")
         for current in total_answer:
