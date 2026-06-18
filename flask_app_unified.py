@@ -2302,14 +2302,14 @@ def create_app():
                     # to run malicious code, malicious code must be present in the db or the machine in the first place
                     if request.form.to_dict()['kind'] == "Kubernetes":
                         if request.form.to_dict()['position']=="": #if namespace left empty, just leave the old one
-                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s,`kind` = %s, `severity` = %s where (`component` = %s)'''
-                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
+                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s,`kind` = %s, `severity` = %s where (`component` = %s and `position` = %s)'''
+                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['namespace'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],request.form.to_dict()['namespace']))
                         else:
-                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s, `severity` = %s where (`component` = %s)'''
-                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
+                            query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s, `severity` = %s where (`component` = %s and `position` = %s)'''
+                            cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],request.form.to_dict()['position']))
                     else:
-                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s, `severity` = %s where (`component` = %s)'''
-                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],))
+                        query = '''UPDATE `checker`.`component_to_category` SET `references` = %s, `category` = %s, `position` = %s, `kind` = %s, `severity` = %s where (`component` = %s and `position` = %s)'''
+                        cursor.execute(query, (request.form.to_dict()['contacts'],request.form.to_dict()['category'],request.form.to_dict()['position'],request.form.to_dict()['kind'],request.form.to_dict()['severity'],request.form.to_dict()['id'],request.form.to_dict()['position']))
 
                     conn.commit()
                     if cursor.rowcount > 0:
