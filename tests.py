@@ -1,15 +1,306 @@
-message = '<html>\n\n<body>\n\n<h1>The Evolution of Distributed Systems and Cloud Computing</h1>\n\n<p>The concept of distributed computing has undergone a radical transformation over the last several decades. Originally, computing was a centralized endeavor, characterized by massive mainframes that occupied entire rooms. These systems were powerful for their time but lacked the flexibility required for modern, globalized business operations.</p>\n\n<h2>The Rise of Client-Server Architecture</h2>\n\n<p>In the late 1980s and early 1990s, the shift toward client-server models began. This allowed for a more modular approach where specific tasks—such as database management—could be handled by a dedicated server, while the user interface was handled by a local client machine. However, scaling these systems was often expensive and required significant physical hardware upgrades.</p>\n\n<p>As the internet matured, the need for <strong>Elasticity</strong> became apparent. Elasticity refers to the ability of a system to grow or shrink its resource consumption based on real-time demand. This led to the birth of virtualization, where a single physical server could be partitioned into multiple "Virtual Machines" (VMs). This was the foundational technology that eventually gave rise to what we now call Cloud Computing.</p>\n\n<h2>Cloud Service Models</h2>\n\n<p>Today, cloud computing is generally categorized into three primary service models. Understanding the distinction between these is crucial for any developer or IT architect:</p>\n\n<ul>\n\n<li><strong>Infrastructure as a Service (IaaS):</strong> This provides the raw building blocks of cloud IT. It typically provides access to networking features, computers (virtual or on dedicated hardware), and data storage space. Examples include Amazon EC2 and Google Compute Engine.</li>\n\n<li><strong>Platform as a Service (PaaS):</strong> This removes the need for organizations to manage the underlying infrastructure (usually hardware and operating systems) and allows you to focus on the deployment and management of your applications. This helps you be more efficient as you don’t need to worry about resource procurement, capacity planning, software maintenance, or any of the other transformational heavy lifting.</li>\n\n<li><strong>Software as a Service (SaaS):</strong> This provides you with a completed product that is run and managed by the service provider. In most cases, people referring to Software as a Service are referring to end-user applications. With a SaaS offering, you don’t have to think about how the service is maintained or how the underlying infrastructure is managed; you only need to think about how you will use that particular piece of software.</li>\n\n</ul>\n\n<h2>The Microservices Revolution</h2>\n\n<p>The transition to the cloud also facilitated the move from monolithic architectures to microservices. In a monolith, all components of a software application are interconnected and interdependent. If one small part of the application needs an update, the entire system must be redeployed. Microservices break the application down into small, independent services that communicate over well-defined APIs.</p>\n\n<p>This approach offers several advantages:\n\n1. <strong>Fault Tolerance:</strong> If one service fails, the others can continue to function.\n\n2. <strong>Scalability:</strong> Specific services can be scaled independently based on their specific resource needs.\n\n3. <strong>Speed of Development:</strong> Smaller teams can work on individual services without interfering with the work of other teams.</p>\n\n<h2>Future Trends: Edge Computing and Beyond</h2>\n\n<p>As we look forward, the trend is moving toward <em>Edge Computing</em>. This involves processing data closer to where it is generated—at the "edge" of the network—rather than sending it back to a centralized data center. This is particularly important for Internet of Things (IoT) devices, autonomous vehicles, and real-time streaming services where latency is a critical factor.</p>\n\n<p>The history of computing is a cycle of centralization and decentralization. While we are currently in a highly distributed phase, the advent of specialized hardware like AI accelerators is once again centralizing certain high-intensity workloads in specialized hubs. Only time will tell what the next major paradigm shift will be, but the principles of efficient data distribution and resource management will remain at the core of technological progress.</p>\n\n<p>Furthermore, the environmental impact of these massive data centers is becoming a focal point for the industry. Sustainable computing, which focuses on energy efficiency and carbon neutrality, is no longer an afterthought but a primary requirement for modern infrastructure providers. Companies are now investing heavily in liquid cooling, renewable energy sources, and advanced power management algorithms to ensure that the digital world does not come at the expense of the physical one.</p>\n\n</body>\n\n</html>'
+import json
 
-split_text=message.split("\n\n")
-recompressed = []
-current_message = ""
-for little_msg in split_text:
-    if len(little_msg) + len(current_message) > 4000:
-        recompressed.append(current_message)
-        current_message=little_msg
-    else:
-        current_message+=little_msg+"\n"
-recompressed.append(current_message)
-for a in recompressed:
-    print(a)
-    print("\n\n\n\n")
+containers = json.loads('''[
+    {
+        "CreatedAt": "2026-06-15 11:17:16 +0000 UTC",
+        "Source": "http://sentinel:9080",
+        "ID": "9cfe5c4361b5",
+        "Image": "fabriziomereu/sentinel:v0.7.1",
+        "Labels": "com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,desktop.docker.io/binds/4/SourceKind=hostFile,desktop.docker.io/binds/5/Target=/confs_here,desktop.docker.io/ports.scheme=v2,com.docker.compose.image=sha256:c4755975e5e403529ea54a71dd00d72a6c6b0979df992ab0e73c4514627aa28d,desktop.docker.io/binds/1/SourceKind=dockerSocketProxied,desktop.docker.io/binds/2/SourceKind=hostFile,desktop.docker.io/binds/4/Target=/app/conf.json,desktop.docker.io/binds/5/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\confs_here,desktop.docker.io/ports/9080/tcp=:9080,com.docker.compose.depends_on=,com.docker.compose.replace=sentinel,com.docker.compose.service=sentinel,desktop.docker.io/binds/1/Source=/var/run/docker.sock,desktop.docker.io/binds/4/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\conf.json,com.docker.compose.config-hash=6c99e4ea3fa3749ac7a8b6d97759ed463fc9fdfb169902288cf2d72c2730c7cd,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,com.docker.compose.version=5.1.4,desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\users.txt,desktop.docker.io/binds/2/Target=/app/users.txt,desktop.docker.io/binds/5/SourceKind=hostFile,desktop.docker.io/binds/1/Target=/var/run/docker.sock,com.docker.compose.container-number=1,com.docker.compose.oneoff=False,com.docker.compose.project=sentinel_local",
+        "Mounts": "sentinel_local…,/run/host-serv…,/run/desktop/m…,sentinel_local…,/run/desktop/m…,/run/desktop/m…",
+        "Names": "sentinel",
+        "Name": "sentinel",
+        "Ports": "0.0.0.0:9080->9080/tcp, :::9080->9080/tcp",
+        "RunningFor": "2 hours ago",
+        "State": "running",
+        "Status": "Up 2 hours",
+        "Container": "9cfe5c4361b5",
+        "Node": "http://sentinel:9080",
+        "Volumes": "2",
+        "Namespace": "Docker - http://sentinel:9080"
+    },
+    {
+        "CreatedAt": "2026-06-15 11:17:16 +0000 UTC",
+        "Source": "http://sentinel:9080",
+        "ID": "51d5c1e2d303",
+        "Image": "fabriziomereu/sentinel:v0.7.1",
+        "Labels": "desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\conf-slave.json,desktop.docker.io/ports.scheme=v2,com.docker.compose.config-hash=ec8262da19b13c451fbfea60b976687e7fb63960d8a2e733a709ba99ecd475d5,com.docker.compose.image=sha256:c4755975e5e403529ea54a71dd00d72a6c6b0979df992ab0e73c4514627aa28d,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,desktop.docker.io/binds/0/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\users.txt,desktop.docker.io/binds/3/SourceKind=hostFile,com.docker.compose.container-number=1,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,com.docker.compose.version=5.1.4,desktop.docker.io/binds/0/SourceKind=hostFile,desktop.docker.io/binds/3/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\confs_here,desktop.docker.io/binds/3/Target=/confs_here,com.docker.compose.oneoff=False,com.docker.compose.project=sentinel_local,desktop.docker.io/binds/2/SourceKind=hostFile,desktop.docker.io/binds/2/Target=/app/conf.json,desktop.docker.io/ports/9080/tcp=:10080,com.docker.compose.depends_on=,com.docker.compose.replace=sentinel-2,com.docker.compose.service=sentinel-2,desktop.docker.io/binds/0/Target=/app/users.txt",
+        "Mounts": "/run/desktop/m…,sentinel_local…,/run/desktop/m…,/run/desktop/m…,sentinel_local…",
+        "Names": "sentinel-2",
+        "Name": "sentinel-2",
+        "Ports": "0.0.0.0:10080->9080/tcp, :::10080->9080/tcp",
+        "RunningFor": "2 hours ago",
+        "State": "running",
+        "Status": "Up 2 hours",
+        "Container": "51d5c1e2d303",
+        "Node": "http://sentinel:9080",
+        "Volumes": "2",
+        "Namespace": "Docker - http://sentinel:9080"
+    },
+    {
+        "CreatedAt": "2026-06-14 08:15:25 +0000 UTC",
+        "Source": "http://sentinel:9080",
+        "ID": "2226e23123ec",
+        "Image": "pathfinder-app-app-maker",
+        "Labels": "org.opencontainers.image.version=22.04,com.docker.compose.depends_on=,com.docker.compose.image=sha256:bbb9ddfec29a13be2bc77ea16cc5523e3b20cfd769ee8aeae3da3a0c5c918e42,com.docker.compose.oneoff=False,com.docker.compose.project=pathfinder-app,com.docker.compose.replace=app-maker-1,com.docker.compose.version=5.1.4,desktop.docker.io/binds/2/SourceKind=hostFile,desktop.docker.io/binds/2/Target=/src/app,com.docker.compose.container-number=1,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\pathfinder-app\\docker-compose.yaml,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\pathfinder-app,desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\pathfinder-app\\buildozer.spec,desktop.docker.io/binds/1/Target=/home/user/app/buildozer.spec,desktop.docker.io/ports.scheme=v2,com.docker.compose.config-hash=22b5fd4395554bda6d2f370607312f95e4d99cb9cef0ca3dafcc4c2a7bd085e2,com.docker.compose.service=app-maker,desktop.docker.io/binds/1/SourceKind=hostFile,desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\pathfinder-app",
+        "Mounts": "/run/desktop/m…,pathfinder-app…,/run/desktop/m…",
+        "Names": "pathfinder-app-app-maker-1",
+        "Name": "pathfinder-app-app-maker-1",
+        "Ports": "",
+        "RunningFor": "29 hours ago",
+        "State": "exited",
+        "Status": "Exited (255) 4 hours ago",
+        "Container": "2226e23123ec",
+        "Node": "http://sentinel:9080",
+        "Volumes": "1",
+        "Namespace": "Docker - http://sentinel:9080"
+    },
+    {
+        "CreatedAt": "2026-06-13 14:16:39 +0000 UTC",
+        "Source": "http://sentinel:9080",
+        "ID": "181ba319a4d5",
+        "Image": "kivy/buildozer:latest",
+        "Labels": "labels",
+        "Mounts": "",
+        "Names": "appmaker",
+        "Name": "appmaker",
+        "Ports": "",
+        "RunningFor": "47 hours ago",
+        "State": "exited",
+        "Status": "Exited (1) 47 hours ago",
+        "Container": "181ba319a4d5",
+        "Node": "http://sentinel:9080",
+        "Volumes": "0",
+        "Namespace": "Docker - http://sentinel:9080"
+    },
+    {
+        "CreatedAt": "2026-05-18 08:55:07 +0000 UTC",
+        "Source": "http://sentinel-k8s:9080",
+        "ID": "1f55b5281e7b",
+        "Image": "mariadb:10.3",
+        "Labels": "com.docker.compose.project=sentinel_local,com.docker.compose.version=5.1.3,org.opencontainers.image.base.name=docker.io/library/ubuntu:focal,org.opencontainers.image.description=MariaDB Database for relational SQL,org.opencontainers.image.licenses=GPL-2.0,org.opencontainers.image.version=10.3.39,com.docker.compose.container-number=1,com.docker.compose.image=sha256:1172e50de4349638bab15b56ded75a75c16312c73cf895e045b21da3cff82948,com.docker.compose.service=sentinel-db,desktop.docker.io/binds/1/SourceKind=hostFile,desktop.docker.io/ports.scheme=v2,org.opencontainers.image.documentation=https://hub.docker.com/_/mariadb/,org.opencontainers.image.url=https://github.com/MariaDB/mariadb-docker,org.opencontainers.image.vendor=MariaDB Community,com.docker.compose.config-hash=436a9968d501abceb5f79051a370c2fe0cb43a95f133ddd61b2c4704e1fcc19d,com.docker.compose.oneoff=False,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\dump2026.sql,desktop.docker.io/ports/3306/tcp=:3333,org.opencontainers.image.ref.name=ubuntu,org.opencontainers.image.source=https://github.com/MariaDB/mariadb-docker,org.opencontainers.image.title=MariaDB Database,com.docker.compose.depends_on=,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,desktop.docker.io/binds/1/Target=/docker-entrypoint-initdb.d/0_init.sql,org.opencontainers.image.authors=MariaDB Community",
+        "Mounts": "/run/desktop/m…,sentinel_local…",
+        "Names": "sentinel-db",
+        "Name": "sentinel-db",
+        "Ports": "0.0.0.0:3333->3306/tcp, :::3333->3306/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "pending",
+        "Status": "Up 4 hours",
+        "Container": "1f55b5281e7b",
+        "Node": "http://sentinel-k8s:9080",
+        "Volumes": "1",
+        "Namespace": "sentinel-namespace"
+    },
+    {
+        "CreatedAt": "2026-05-18 08:55:07 +0000 UTC",
+        "Source": "http://sentinel:9080",
+        "ID": "38a72641fdcb",
+        "Image": "tecnativa/docker-socket-proxy",
+        "Labels": "com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,org.opencontainers.image.created=2025-12-16T07:26:21.623Z,org.opencontainers.image.source=https://github.com/Tecnativa/docker-socket-proxy,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.version=5.1.3,desktop.docker.io/ports/2375/tcp=:2375,org.opencontainers.image.licenses=Apache-2.0,org.opencontainers.image.version=v0.4.2,com.docker.compose.image=sha256:16bbd1209742dc156656caf35b18e51edfab62c24d29bf4c8d2353b785cefa1f,com.docker.compose.oneoff=False,desktop.docker.io/binds/0/Source=/var/run/docker.sock,desktop.docker.io/binds/0/SourceKind=dockerSocketProxied,desktop.docker.io/binds/0/Target=/var/run/docker.sock,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,com.docker.compose.service=docker-socket-proxy,desktop.docker.io/ports.scheme=v2,org.opencontainers.image.description=Proxy over your Docker socket to restrict which requests it accepts,org.opencontainers.image.revision=2f04313b042c1bf4dfbd039475dfc42db79bde7a,org.opencontainers.image.title=docker-socket-proxy,org.opencontainers.image.url=https://github.com/Tecnativa/docker-socket-proxy,com.docker.compose.config-hash=b0a01519588926fd0f5b9076d7a4f7f42b21babad72705c059f324a2ca4e4edd,com.docker.compose.project=sentinel_local",
+        "Mounts": "/run/host-serv…",
+        "Names": "docker_socket_proxy",
+        "Name": "docker_socket_proxy",
+        "Ports": "0.0.0.0:2375->2375/tcp, :::2375->2375/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "running",
+        "Status": "Up 2 hours",
+        "Container": "38a72641fdcb",
+        "Node": "http://sentinel:9080",
+        "Volumes": "0",
+        "Namespace": "Docker - http://sentinel:9080"
+    },
+    {
+        "CreatedAt": "2026-05-14 15:15:11 +0000 UTC",
+        "Source": "http://sentinel:9080",
+        "ID": "ea23fbb915e8",
+        "Image": "fabriziomereu/snap4city_installation_generator:dev.2.5",
+        "Labels": "com.docker.compose.config-hash=905edc9fe06b02d92bd5514d4023411bb96b59a65b2d71935e366ea3f70a0a07,desktop.docker.io/binds/1/Target=/Flask/Output,com.docker.compose.image=sha256:a8a895c1b1679d0f902e4d526fd8468ebbc79b514a8bf80af49807cd59435111,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\Tesi\\docker-compose.yml,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\Tesi,com.docker.compose.version=5.1.3,desktop.docker.io/binds/0/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Mysql\\latest.sql,desktop.docker.io/binds/1/SourceKind=hostFile,com.docker.compose.container-number=1,com.docker.compose.depends_on=db:service_started:true,com.docker.compose.project=tesi,desktop.docker.io/binds/0/Target=/data/mysql/a.sql,desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Output,com.docker.compose.service=app,desktop.docker.io/binds/0/SourceKind=hostFile,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/80/tcp=:80",
+        "Mounts": "/run/desktop/m…,/run/desktop/m…",
+        "Names": "app",
+        "Name": "app",
+        "Ports": "0.0.0.0:80->80/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "exited",
+        "Status": "Exited (255) 4 weeks ago",
+        "Container": "ea23fbb915e8",
+        "Node": "http://sentinel:9080",
+        "Volumes": "0",
+        "Namespace": "Docker - http://sentinel:9080"
+    },
+    {
+        "CreatedAt": "2026-05-14 15:15:11 +0000 UTC",
+        "Source": "http://sentinel:9080",
+        "ID": "9d388aace1ce",
+        "Image": "mysql:latest",
+        "Labels": "desktop.docker.io/binds/1/SourceKind=hostFile,com.docker.compose.config-hash=f6f9267c020d56d0927448f898f8f52635f42d8bf9fe368aefe4e8b2ab8403c9,com.docker.compose.depends_on=,com.docker.compose.oneoff=False,com.docker.compose.project=tesi,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\Tesi\\docker-compose.yml,com.docker.compose.service=db,desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Mysql\\latest.sql,desktop.docker.io/binds/1/Target=/docker-entrypoint-initdb.d/a.sql,desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Mysql\\users.sql,desktop.docker.io/binds/2/Target=/docker-entrypoint-initdb.d/b.sql,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/3306/tcp=:32000,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\Tesi,com.docker.compose.version=5.1.3,desktop.docker.io/binds/2/SourceKind=hostFile,com.docker.compose.container-number=1,com.docker.compose.image=sha256:094aec64961bf03283c2c3a4dd8805dc3d61ff83dbc37eaabc30d9d3e379449c",
+        "Mounts": "tesi_container…,/run/desktop/m…,/run/desktop/m…",
+        "Names": "db",
+        "Name": "db",
+        "Ports": "33060/tcp, 0.0.0.0:32000->3306/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "exited",
+        "Status": "Exited (255) 4 weeks ago",
+        "Container": "9d388aace1ce",
+        "Node": "http://sentinel:9080",
+        "Volumes": "1",
+        "Namespace": "Docker - http://sentinel:9080"
+    },
+    {
+        "CreatedAt": "2026-06-15 11:17:16 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "9cfe5c4361b5",
+        "Image": "fabriziomereu/sentinel:v0.7.1",
+        "Labels": "desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\users.txt,desktop.docker.io/binds/2/SourceKind=hostFile,desktop.docker.io/binds/4/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\conf.json,desktop.docker.io/binds/5/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\confs_here,com.docker.compose.container-number=1,com.docker.compose.project=sentinel_local,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,desktop.docker.io/binds/1/Source=/var/run/docker.sock,desktop.docker.io/binds/2/Target=/app/users.txt,desktop.docker.io/ports/9080/tcp=:9080,com.docker.compose.config-hash=6c99e4ea3fa3749ac7a8b6d97759ed463fc9fdfb169902288cf2d72c2730c7cd,com.docker.compose.depends_on=,com.docker.compose.oneoff=False,desktop.docker.io/binds/4/Target=/app/conf.json,desktop.docker.io/binds/5/SourceKind=hostFile,desktop.docker.io/binds/5/Target=/confs_here,desktop.docker.io/ports.scheme=v2,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,com.docker.compose.replace=sentinel,com.docker.compose.service=sentinel,com.docker.compose.version=5.1.4,desktop.docker.io/binds/1/Target=/var/run/docker.sock,desktop.docker.io/binds/4/SourceKind=hostFile,com.docker.compose.image=sha256:c4755975e5e403529ea54a71dd00d72a6c6b0979df992ab0e73c4514627aa28d,desktop.docker.io/binds/1/SourceKind=dockerSocketProxied",
+        "Mounts": "/run/host-serv…,/run/desktop/m…,sentinel_local…,/run/desktop/m…,/run/desktop/m…,sentinel_local…",
+        "Names": "sentinel",
+        "Name": "sentinel",
+        "Ports": "0.0.0.0:9080->9080/tcp, :::9080->9080/tcp",
+        "RunningFor": "2 hours ago",
+        "State": "running",
+        "Status": "Up 2 hours",
+        "Container": "9cfe5c4361b5",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "2",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    },
+    {
+        "CreatedAt": "2026-06-15 11:17:16 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "51d5c1e2d303",
+        "Image": "fabriziomereu/sentinel:v0.7.1",
+        "Labels": "com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,desktop.docker.io/binds/0/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\users.txt,desktop.docker.io/binds/0/SourceKind=hostFile,com.docker.compose.image=sha256:c4755975e5e403529ea54a71dd00d72a6c6b0979df992ab0e73c4514627aa28d,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,desktop.docker.io/binds/2/SourceKind=hostFile,com.docker.compose.config-hash=ec8262da19b13c451fbfea60b976687e7fb63960d8a2e733a709ba99ecd475d5,com.docker.compose.project=sentinel_local,com.docker.compose.replace=sentinel-2,com.docker.compose.version=5.1.4,desktop.docker.io/binds/0/Target=/app/users.txt,desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\conf-slave.json,desktop.docker.io/binds/3/SourceKind=hostFile,desktop.docker.io/binds/3/Target=/confs_here,com.docker.compose.depends_on=,com.docker.compose.service=sentinel-2,desktop.docker.io/binds/2/Target=/app/conf.json,desktop.docker.io/binds/3/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\confs_here,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/9080/tcp=:10080,com.docker.compose.container-number=1,com.docker.compose.oneoff=False",
+        "Mounts": "/run/desktop/m…,sentinel_local…,/run/desktop/m…,/run/desktop/m…,sentinel_local…",
+        "Names": "sentinel-2",
+        "Name": "sentinel-2",
+        "Ports": "0.0.0.0:10080->9080/tcp, :::10080->9080/tcp",
+        "RunningFor": "2 hours ago",
+        "State": "running",
+        "Status": "Up 2 hours",
+        "Container": "51d5c1e2d303",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "2",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    },
+    {
+        "CreatedAt": "2026-06-14 08:15:25 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "2226e23123ec",
+        "Image": "pathfinder-app-app-maker",
+        "Labels": "desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\pathfinder-app\\buildozer.spec,desktop.docker.io/binds/1/Target=/home/user/app/buildozer.spec,desktop.docker.io/binds/2/Target=/src/app,desktop.docker.io/ports.scheme=v2,com.docker.compose.config-hash=22b5fd4395554bda6d2f370607312f95e4d99cb9cef0ca3dafcc4c2a7bd085e2,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\pathfinder-app\\docker-compose.yaml,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\pathfinder-app,desktop.docker.io/binds/1/SourceKind=hostFile,desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\pathfinder-app,desktop.docker.io/binds/2/SourceKind=hostFile,com.docker.compose.depends_on=,com.docker.compose.replace=app-maker-1,com.docker.compose.service=app-maker,com.docker.compose.version=5.1.4,com.docker.compose.container-number=1,com.docker.compose.image=sha256:bbb9ddfec29a13be2bc77ea16cc5523e3b20cfd769ee8aeae3da3a0c5c918e42,org.opencontainers.image.version=22.04,com.docker.compose.project=pathfinder-app",
+        "Mounts": "/run/desktop/m…,pathfinder-app…,/run/desktop/m…",
+        "Names": "pathfinder-app-app-maker-1",
+        "Name": "pathfinder-app-app-maker-1",
+        "Ports": "",
+        "RunningFor": "29 hours ago",
+        "State": "exited",
+        "Status": "Exited (255) 4 hours ago",
+        "Container": "2226e23123ec",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "1",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    },
+    {
+        "CreatedAt": "2026-06-13 14:16:39 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "181ba319a4d5",
+        "Image": "kivy/buildozer:latest",
+        "Labels": "label",
+        "Mounts": "",
+        "Names": "appmaker",
+        "Name": "appmaker",
+        "Ports": "",
+        "RunningFor": "47 hours ago",
+        "State": "exited",
+        "Status": "Exited (1) 47 hours ago",
+        "Container": "181ba319a4d5",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "0",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    },
+    {
+        "CreatedAt": "2026-05-18 08:55:07 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "1f55b5281e7b",
+        "Image": "mariadb:10.3",
+        "Labels": "com.docker.compose.image=sha256:1172e50de4349638bab15b56ded75a75c16312c73cf895e045b21da3cff82948,com.docker.compose.project=sentinel_local,com.docker.compose.service=sentinel-db,com.docker.compose.version=5.1.3,desktop.docker.io/binds/1/SourceKind=hostFile,desktop.docker.io/ports/3306/tcp=:3333,org.opencontainers.image.authors=MariaDB Community,org.opencontainers.image.description=MariaDB Database for relational SQL,org.opencontainers.image.licenses=GPL-2.0,org.opencontainers.image.source=https://github.com/MariaDB/mariadb-docker,org.opencontainers.image.vendor=MariaDB Community,org.opencontainers.image.version=10.3.39,com.docker.compose.container-number=1,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,org.opencontainers.image.base.name=docker.io/library/ubuntu:focal,org.opencontainers.image.documentation=https://hub.docker.com/_/mariadb/,org.opencontainers.image.title=MariaDB Database,com.docker.compose.config-hash=436a9968d501abceb5f79051a370c2fe0cb43a95f133ddd61b2c4704e1fcc19d,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\sentinel_local\\dump2026.sql,org.opencontainers.image.ref.name=ubuntu,org.opencontainers.image.url=https://github.com/MariaDB/mariadb-docker,desktop.docker.io/binds/1/Target=/docker-entrypoint-initdb.d/0_init.sql,desktop.docker.io/ports.scheme=v2,com.docker.compose.depends_on=",
+        "Mounts": "/run/desktop/m…,sentinel_local…",
+        "Names": "sentinel-db",
+        "Name": "sentinel-db",
+        "Ports": "0.0.0.0:3333->3306/tcp, :::3333->3306/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "running",
+        "Status": "Up 4 hours",
+        "Container": "1f55b5281e7b",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "1",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    },
+    {
+        "CreatedAt": "2026-05-18 08:55:07 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "38a72641fdcb",
+        "Image": "tecnativa/docker-socket-proxy",
+        "Labels": "desktop.docker.io/binds/0/SourceKind=dockerSocketProxied,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.image=sha256:16bbd1209742dc156656caf35b18e51edfab62c24d29bf4c8d2353b785cefa1f,com.docker.compose.project=sentinel_local,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\sentinel_local,desktop.docker.io/ports/2375/tcp=:2375,org.opencontainers.image.created=2025-12-16T07:26:21.623Z,org.opencontainers.image.description=Proxy over your Docker socket to restrict which requests it accepts,org.opencontainers.image.source=https://github.com/Tecnativa/docker-socket-proxy,org.opencontainers.image.title=docker-socket-proxy,desktop.docker.io/binds/0/Source=/var/run/docker.sock,desktop.docker.io/binds/0/Target=/var/run/docker.sock,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\sentinel_local\\docker-compose.yml,com.docker.compose.service=docker-socket-proxy,com.docker.compose.version=5.1.3,org.opencontainers.image.licenses=Apache-2.0,org.opencontainers.image.revision=2f04313b042c1bf4dfbd039475dfc42db79bde7a,org.opencontainers.image.url=https://github.com/Tecnativa/docker-socket-proxy,com.docker.compose.config-hash=b0a01519588926fd0f5b9076d7a4f7f42b21babad72705c059f324a2ca4e4edd,com.docker.compose.oneoff=False,desktop.docker.io/ports.scheme=v2,org.opencontainers.image.version=v0.4.2",
+        "Mounts": "/run/host-serv…",
+        "Names": "docker_socket_proxy",
+        "Name": "docker_socket_proxy",
+        "Ports": "0.0.0.0:2375->2375/tcp, :::2375->2375/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "running",
+        "Status": "Up 2 hours",
+        "Container": "38a72641fdcb",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "0",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    },
+    {
+        "CreatedAt": "2026-05-14 15:15:11 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "ea23fbb915e8",
+        "Image": "fabriziomereu/snap4city_installation_generator:dev.2.5",
+        "Labels": "com.docker.compose.config-hash=905edc9fe06b02d92bd5514d4023411bb96b59a65b2d71935e366ea3f70a0a07,com.docker.compose.container-number=1,com.docker.compose.image=sha256:a8a895c1b1679d0f902e4d526fd8468ebbc79b514a8bf80af49807cd59435111,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\Tesi\\docker-compose.yml,desktop.docker.io/binds/1/Target=/Flask/Output,com.docker.compose.depends_on=db:service_started:true,com.docker.compose.version=5.1.3,desktop.docker.io/binds/0/SourceKind=hostFile,com.docker.compose.oneoff=False,com.docker.compose.project=tesi,com.docker.compose.service=app,desktop.docker.io/binds/0/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Mysql\\latest.sql,desktop.docker.io/binds/1/SourceKind=hostFile,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\Tesi,desktop.docker.io/binds/0/Target=/data/mysql/a.sql,desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Output,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/80/tcp=:80",
+        "Mounts": "/run/desktop/m…,/run/desktop/m…",
+        "Names": "app",
+        "Name": "app",
+        "Ports": "0.0.0.0:80->80/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "exited",
+        "Status": "Exited (255) 4 weeks ago",
+        "Container": "ea23fbb915e8",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "0",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    },
+    {
+        "CreatedAt": "2026-05-14 15:15:11 +0000 UTC",
+        "Source": "http://sentinel-2:9080",
+        "ID": "9d388aace1ce",
+        "Image": "mysql:latest",
+        "Labels": "com.docker.compose.version=5.1.3,com.docker.compose.container-number=1,desktop.docker.io/binds/1/Target=/docker-entrypoint-initdb.d/a.sql,desktop.docker.io/ports/3306/tcp=:32000,com.docker.compose.depends_on=,com.docker.compose.image=sha256:094aec64961bf03283c2c3a4dd8805dc3d61ff83dbc37eaabc30d9d3e379449c,com.docker.compose.oneoff=False,com.docker.compose.project=tesi,com.docker.compose.project.working_dir=C:\\Users\\fabri\\Desktop\\Tesi,com.docker.compose.service=db,desktop.docker.io/binds/1/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Mysql\\latest.sql,desktop.docker.io/binds/1/SourceKind=hostFile,com.docker.compose.project.config_files=C:\\Users\\fabri\\Desktop\\Tesi\\docker-compose.yml,desktop.docker.io/binds/2/Source=C:\\Users\\fabri\\Desktop\\Tesi\\Mysql\\users.sql,desktop.docker.io/binds/2/SourceKind=hostFile,desktop.docker.io/binds/2/Target=/docker-entrypoint-initdb.d/b.sql,desktop.docker.io/ports.scheme=v2,com.docker.compose.config-hash=f6f9267c020d56d0927448f898f8f52635f42d8bf9fe368aefe4e8b2ab8403c9",
+        "Mounts": "tesi_container…,/run/desktop/m…,/run/desktop/m…",
+        "Names": "db",
+        "Name": "db",
+        "Ports": "33060/tcp, 0.0.0.0:32000->3306/tcp",
+        "RunningFor": "4 weeks ago",
+        "State": "exited",
+        "Status": "Exited (255) 4 weeks ago",
+        "Container": "9d388aace1ce",
+        "Node": "http://sentinel-2:9080",
+        "Volumes": "1",
+        "Namespace": "Docker - http://sentinel-2:9080"
+    }
+]'''.replace("\\", "\\\\"))
+
+containers_merged_kubernetes = [a for a in containers if not a["Namespace"].startswith("Docker - ")]
+#print(containers_merged_kubernetes)
+containers_which_should_be_running_and_are_not = []
+components_kubernetes = [("sentinel-*")]
+second_step = []
+for c in containers_merged_kubernetes: # all pods from k8s
+    for value in components_kubernetes: # all "to be watched" pods
+        if c["Names"]==value or c["Names"].startswith(value.replace("*","")): # is the name an exact match or is it to the extent of the "*"?
+            if not ("running" == c["State"] or c["State"].startswith("running")):
+                print(f"{c['Names']} is not running!")
+#second_step = [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" == c["State"] or c["State"].startswith("running"))]
+[containers_which_should_be_running_and_are_not.append(a) for a in second_step]
+print(containers_which_should_be_running_and_are_not)
