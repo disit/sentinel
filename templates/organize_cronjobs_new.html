@@ -524,6 +524,7 @@
         {% endfor %}
         $('#CommandEdit').val(command);
         $('#editCronJob').modal('show');
+        distributeCommandValues();
     });
     $('.open-modal').on('click', function() {
         $('#Timeout_timeAdd').val(0);
@@ -705,7 +706,7 @@
             const snippet = `
                 <div class="form-group">
                 <label for="${word}DynamicEdit">${word}</label>
-                <input type="text" class="form-control" id="${word}DynamicEdit" placeholder="${word}" onchange="update_edit()" value="${a.shift()}">
+                <input type="text" class="form-control" id="${word}DynamicEdit" placeholder="${word}" onchange="update_edit()">
                 </div>
             `;
             
@@ -740,5 +741,34 @@
         document.getElementById("category-selection-desc-add").innerHTML=desc;
         update_add();
     }
+    function distributeCommandValues() {
+        // 1. Get the command string and split it by spaces
+        const commandInput = document.getElementById("CommandEdit");
+        if (!commandInput) return; // Safety check
+        
+        // Filter out empty strings caused by multiple consecutive spaces
+        const commandValues = commandInput.value.trim().split(/\s+/);
+        
+        // 2. Target all input elements inside the container's form-groups
+        const container = document.getElementById("additional-params-edit");
+        const inputs = container.querySelectorAll(".form-group input");
+        
+        // 3. Loop through the inputs and fill them
+        inputs.forEach((input, index) => {
+            // Calculate the corresponding index in the commandValues array (starting at index 2)
+            const valueIndex = index + 2; 
+            
+            if (valueIndex < commandValues.length) {
+                input.value = commandValues[valueIndex];
+            } else {
+                input.value = ""; // Clear the field if no data is available
+            }
+            
+            // Trigger the onchange event manually if needed for update_add()
+            if (typeof input.onchange === "function") {
+                input.onchange();
+            }
+    });
+}
 </script>
 {% endblock %}
