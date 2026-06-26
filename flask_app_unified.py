@@ -61,6 +61,62 @@ def print_debug_log(log_str):
     if os.getenv("debug","False") == "True":
         print(f"{datetime.now()} DEBUG: {log_str}",flush=True)
 
+def container_name_matches(component_pattern, container_name, match_prefix_without_wildcard=False):
+    """Match container names, supporting a trailing * as a prefix wildcard."""
+    if "*" in component_pattern:
+        return container_name.startswith(component_pattern[:component_pattern.find("*")])
+    if match_prefix_without_wildcard:
+        return component_pattern != "" and container_name.startswith(component_pattern)
+    return container_name == component_pattern
+
+def container_is_running(container):
+    return "running" == container["State"] or container["State"].startswith("running")
+
+def log_container_alert_reason(reason, component_pattern=None, container=None, expected_location=None):
+    details = [f"{datetime.now()} CONTAINER ALERT: {reason}"]
+    if component_pattern is not None:
+        details.append(f"pattern={component_pattern}")
+    if expected_location is not None:
+        details.append(f"expected_location={expected_location}")
+    if container is not None:
+        details.append(f"name={container.get('Name', container.get('Names', 'unknown'))}")
+        details.append(f"state={container.get('State', 'unknown')}")
+        details.append(f"status={container.get('Status', 'unknown')}")
+        details.append(f"source={container.get('Source', 'unknown')}")
+        details.append(f"node={container.get('Node', 'unknown')}")
+        details.append(f"namespace={container.get('Namespace', 'unknown')}")
+    print(" | ".join(details), flush=True)
+
+def log_missing_container_context(containers, component_pattern, expected_location, location_field, match_prefix_without_wildcard=False):
+    available_locations = sorted({str(container.get(location_field, "unknown")) for container in containers})
+    same_location = [container for container in containers if container.get(location_field) == expected_location]
+    matching_any_location = [
+        container for container in containers
+        if container_name_matches(component_pattern, container.get("Name", container.get("Names", "")), match_prefix_without_wildcard=match_prefix_without_wildcard)
+    ]
+    def sample(containers_to_sample):
+        return ", ".join([
+            f"{container.get('Name', container.get('Names', 'unknown'))}({location_field}={container.get(location_field, 'unknown')},state={container.get('State', 'unknown')})"
+            for container in containers_to_sample[:10]
+        ]) or "none"
+    details = [
+        f"{datetime.now()} CONTAINER ALERT CONTEXT: not found diagnostics",
+        f"pattern={component_pattern}",
+        f"expected_{location_field.lower()}={expected_location}",
+        f"available_{location_field.lower()}s={available_locations}",
+        f"same_location_count={len(same_location)}",
+        f"same_location_sample={sample(same_location)}",
+        f"matching_any_location_count={len(matching_any_location)}",
+        f"matching_any_location_sample={sample(matching_any_location)}",
+    ]
+    if location_field == "Namespace":
+        configured_namespaces_raw = os.getenv("namespaces", "['default']")
+        configured_namespaces = string_of_list_to_list(configured_namespaces_raw)
+        details.append(f"configured_namespaces={configured_namespaces}")
+        if expected_location not in configured_namespaces:
+            details.append("configuration_issue=db namespace is not included in configured namespaces")
+    print(" | ".join(details), flush=True)
+
 async def safe_snmp_walk(host_data):
     """
     Walk only the relevant OIDs for memory, disk, and CPU.
@@ -294,7 +350,7 @@ def string_of_list_to_list(string: str):
         a = a.replace('"',"")
         a = a.replace("'","")
         ret = a.split(",")
-        return [b.strip() for b in ret]
+        return [b.strip() for b in ret if b.strip() != ""]
     except:
         raise Exception("Couldn't do it")
 
@@ -871,6 +927,19 @@ async def auto_alert_status():
     other_errors = []
     if os.getenv("is-master","False") == "False": #slaves don't send status
         return
+    try:
+        with mysql.connector.connect(**db_conn_info) as conn:
+            cursor = conn.cursor(buffered=True)
+            if os.getenv("skip-empty-positions-containers", "False") == "False":
+                query = '''SELECT * FROM checker.component_to_category;'''
+            else:
+                query = '''SELECT * FROM checker.component_to_category where position != "";'''
+            cursor.execute(query)
+            conn.commit()
+            component_results = cursor.fetchall()
+    except Exception:
+        send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
+        return
     if "False" == os.getenv("running-as-kubernetes","False"):
         try:
             containers_ps = [a for a in (subprocess.run(['docker', 'ps', '--format', 'json', '-a'], capture_output=True, text=True, encoding="utf_8", timeout=10).stdout).split('\n')][:-1]
@@ -916,8 +985,25 @@ async def auto_alert_status():
     else:
 
         raw_jsons = []
-        for a in string_of_list_to_list(os.getenv("namespaces","['default']")):
-            raw_jsons.append(json.loads(subprocess.run(f'kubectl get pods -o json -n {a}',shell=True, capture_output=True, text=True, encoding="utf_8").stdout))
+        configured_namespaces = string_of_list_to_list(os.getenv("namespaces","['default']"))
+        db_namespace_to_patterns = {}
+        for component in component_results:
+            if component[4] == {"kubernetes"} and component[3] != "":
+                db_namespace_to_patterns.setdefault(component[3], []).append(component[0])
+        for db_namespace, patterns in db_namespace_to_patterns.items():
+            if db_namespace not in configured_namespaces:
+                print(f"{datetime.now()} CONTAINER CONFIG WARNING: kubernetes namespace configured in DB is not in allowed namespaces | db_namespace={db_namespace} | configured_namespaces={configured_namespaces} | patterns={patterns}", flush=True)
+        namespaces_to_read = configured_namespaces
+        print(f"{datetime.now()} CONTAINER DISCOVERY: configured kubernetes namespaces to read: {namespaces_to_read}", flush=True)
+        for a in namespaces_to_read:
+            kubectl_result = subprocess.run(['kubectl', 'get', 'pods', '-o', 'json', '-n', a], capture_output=True, text=True, encoding="utf_8")
+            if kubectl_result.returncode != 0:
+                print(f"{datetime.now()} CONTAINER DISCOVERY ERROR: failed reading namespace {a}: {kubectl_result.stderr}", flush=True)
+                continue
+            try:
+                raw_jsons.append(json.loads(kubectl_result.stdout))
+            except Exception:
+                print(f"{datetime.now()} CONTAINER DISCOVERY ERROR: invalid kubectl JSON for namespace {a}: {traceback.format_exc()}", flush=True)
         conversions=[]
         source = os.getenv("platform-url","")
         for raw_json in raw_jsons:
@@ -1073,19 +1159,7 @@ async def auto_alert_status():
             new_containers_merged.append(td)
         containers_merged = new_containers_merged
 
-    try:
-        with mysql.connector.connect(**db_conn_info) as conn:
-            cursor = conn.cursor(buffered=True)
-            if os.getenv("skip-empty-positions-containers", "False") == "False":
-                query = '''SELECT * FROM checker.component_to_category;'''
-            else:
-                query = '''SELECT * FROM checker.component_to_category where position != "";'''
-            cursor.execute(query)
-            conn.commit()
-            results = cursor.fetchall()
-    except Exception:
-        send_alerts("Can't reach db, auto alert 1:"+ traceback.format_exc())
-        return
+    results = component_results
 
 
     try:
@@ -1105,30 +1179,44 @@ async def auto_alert_status():
     containers_merged_kubernetes = [a for a in containers_merged if not a["Namespace"].startswith("Docker - ")]
 
     components_docker = [(a[0],a[3]) for a in results if a[4]=={"docker"}]
-    components_kubernetes = [a[0].replace("*","") for a in results if a[4]=={"kubernetes"}]
-    components_original_docker = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
-    components_original_kubernetes = [(a[0][:a[0].find("*") if "*" in a[0] else len(a[0])],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
-    containers_which_should_be_running_and_are_not = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and not ("running" == c["State"] or c["State"].startswith("running"))]
-
-    #[containers_which_should_be_running_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(((c["Names"].startswith(value[0].replace("*","")) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_kubernetes) and not ("running" == c["State"] or c["State"].startswith("running"))]]
+    components_kubernetes = [a[0] for a in results if a[4]=={"kubernetes"}]
+    components_original_docker = [(a[0],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"docker"}]
+    components_original_kubernetes = [(a[0],a[1],a[3],list(a[5])[0],list(a[4])[0]) for a in results if a[4]=={"kubernetes"}]
+    containers_which_should_be_running_and_are_not = []
+    for c in containers_merged_docker:
+        for value in components_docker:
+            if container_name_matches(value[0], c["Names"]) and c["Source"]==value[1] and not container_is_running(c):
+                log_container_alert_reason("matched docker container is not running", component_pattern=value[0], container=c, expected_location=value[1])
+                containers_which_should_be_running_and_are_not.append(c)
+                break
     for c in containers_merged_kubernetes: # all pods from k8s
         for value in components_kubernetes: # all "to be watched" pods
-            if c["Names"]==value or c["Names"].startswith(value.replace("*","")): # is the name an exact match or is it matching to the extent of the "*"?
-                if not ("running" == c["State"] or c["State"].startswith("running")): # is this running
+            if container_name_matches(value, c["Names"], match_prefix_without_wildcard=True): # is the name an exact match or is it matching to the extent of the "*"?
+                if not container_is_running(c): # is this running
+                    log_container_alert_reason("matched kubernetes pod is not running", component_pattern=value, container=c)
                     containers_which_should_be_running_and_are_not.append(c)
+                break
     containers_which_should_be_exited_and_are_not = [c for c in containers_merged_docker if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]
     [containers_which_should_be_exited_and_are_not.append(a) for a in [c for c in containers_merged_kubernetes if any(c["Names"].startswith(value) for value in ["certbot"]) and c["State"] != "exited"]]
 
-    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(((c["Names"].startswith(value[0]) and "*" in value[0]) or (c["Names"]==value[0])) and c["Source"]==value[1] for value in components_docker) and "unhealthy" in c["Status"]]
+    containers_which_are_running_but_are_not_healthy = [c for c in containers_merged_docker if any(container_name_matches(value[0], c["Names"]) and c["Source"]==value[1] for value in components_docker) and "unhealthy" in c["Status"]]
+    for c in containers_which_should_be_exited_and_are_not:
+        log_container_alert_reason("certbot container/pod is expected to be exited", container=c)
+    for c in containers_which_are_running_but_are_not_healthy:
+        matching_docker_pattern = next((value for value in components_docker if container_name_matches(value[0], c["Names"]) and c["Source"]==value[1]), None)
+        log_container_alert_reason("matched docker container is unhealthy", component_pattern=matching_docker_pattern[0] if matching_docker_pattern else None, container=c, expected_location=matching_docker_pattern[1] if matching_docker_pattern else None)
     for c_m in containers_merged_kubernetes:
-        if any(c_m["Names"].startswith(value) for value in components_kubernetes):
+        matching_kubernetes_pattern = next((value for value in components_kubernetes if container_name_matches(value, c_m["Names"], match_prefix_without_wildcard=True)), None)
+        if matching_kubernetes_pattern is not None:
             if "restarts" in c_m["State"]:
                 try:
                     if int(c_m["State"].strip().split("restarts:")[-1]) > 4:
                         since = sum([int(b[0])*b[1] for b in zip(re.findall(r"(\d+)", c_m["RunningFor"]),[86400,3600,60,1])])
                         if since>600 or since==0:
+                            log_container_alert_reason("matched kubernetes pod has too many restarts", component_pattern=matching_kubernetes_pattern, container=c_m)
                             containers_which_are_running_but_are_not_healthy.append(c_m)
                 except Exception:
+                    log_container_alert_reason("matched kubernetes pod restart count could not be parsed", component_pattern=matching_kubernetes_pattern, container=c_m)
                     containers_which_are_running_but_are_not_healthy.append(c_m)
     problematic_containers = containers_which_should_be_exited_and_are_not + containers_which_should_be_running_and_are_not + containers_which_are_running_but_are_not_healthy
 
@@ -1136,22 +1224,22 @@ async def auto_alert_status():
     for c in components_original_docker: # use this to determine who's missing
         found=False
         for in_that_position in [a for a in containers_merged if a["Node"]==c[2]]:
-            if in_that_position["Name"] == c[0] or c[0]=="":
+            if c[0]=="" or container_name_matches(c[0], in_that_position["Name"]):
                 found=True
                 break
         if not found:
-            print_debug_log(f"Container not found in docker, this will cause a notification: {c[0]}")
+            log_container_alert_reason("docker container was not found in expected node", component_pattern=c[0], expected_location=c[2])
+            log_missing_container_context(containers_merged_docker, c[0], c[2], "Node")
             containers_which_are_not_expected.append(c)
-    containers_which_are_not_expected = [a for a in containers_which_are_not_expected if not a[0].endswith("*")]
-
     for c in components_original_kubernetes: # use this to determine who's missing
         found=False
         for in_that_position in [a for a in containers_merged if a["Namespace"]==c[2]]:
-            if in_that_position["Name"] == c[0] or c[0]=="" or in_that_position["Name"].startswith(c[0].replace("*","")):
+            if c[0]=="" or container_name_matches(c[0], in_that_position["Name"], match_prefix_without_wildcard=True):
                 found=True
                 break
         if not found:
-            print(f"Pod not found in k8s, this will cause a notification: {c[0]}")
+            log_container_alert_reason("kubernetes pod was not found in expected namespace", component_pattern=c[0], expected_location=c[2])
+            log_missing_container_context(containers_merged_kubernetes, c[0], c[2], "Namespace", match_prefix_without_wildcard=True)
             containers_which_are_not_expected.append(c)
 
     if "False" == os.getenv("running-as-kubernetes","False"):
