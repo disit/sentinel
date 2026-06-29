@@ -1,5 +1,6 @@
 {
 	"APPLICATION-ROOT": "/",
+	"BEHIND_PROXY": "False",
 	"PYTHONUNBUFFERED": "1",
 	"admin-log-length": "200",
 	"cluster-secret": "This is a super secret",
