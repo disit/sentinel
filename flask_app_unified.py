@@ -2249,7 +2249,7 @@ runcronjobs_parallel() # run this oneshot to see what happens
 def create_app():
     app = Flask(__name__)
     app.config['APPLICATION-ROOT'] =os.getenv("APPLICATION-ROOT", "/")
-    app.config['BEHIND_PROXY'] =os.getenv("BEHIND_PROXY", "True")
+    app.config['BEHIND-PROXY'] =os.getenv("BEHIND-PROXY", "True")
     app.wsgi_app = app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     app.secret_key = os.getenv("secret-key", "")
     app.permanent_session_lifetime = timedelta(minutes=15)  # session expires after 15 mins of inactivity
